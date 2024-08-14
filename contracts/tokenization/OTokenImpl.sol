@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.24;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
@@ -14,7 +13,7 @@ import {Structs} from "./structs/Structs.sol";
 import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
 
-contract OTokenImpl is ERC20, Initializable, ReentrancyGuard {
+contract OTokenImpl is InitializableERC20, ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
     using Address for address;
 
@@ -29,9 +28,6 @@ contract OTokenImpl is ERC20, Initializable, ReentrancyGuard {
     uint256 public earliestExercise;
     bool public transferrable;
     bool public reverseExercisable;
-    uint8 internal _decimals;
-    string private _name;
-    string private _symbol;
     mapping(address target => mapping(string method => address caller))
         public allowedCalls;
     mapping(address user => uint256 amount) public reverseExercisableAmounts;
@@ -43,10 +39,6 @@ contract OTokenImpl is ERC20, Initializable, ReentrancyGuard {
     error NonTransferrable();
     error NotReverseExercisable();
     error Unauthorized();
-
-    constructor() ERC20("", "") {
-        _disableInitializers();
-    }
 
     /**
      * @notice Initializes the OToken contract with specified parameters.
@@ -372,21 +364,10 @@ contract OTokenImpl is ERC20, Initializable, ReentrancyGuard {
     {
         settlementAmount = (amount * strike) / 10 ** decimals();
         settlementFeesReceiver = TokenizationFactory(factory).feesReceiver();
+        // @dev: if there's no fee receiver then fee is also zero
         if (settlementFeesReceiver != address(0)) {
             settlementFee = (settlementAmount * SETTLEMENT_FEE) / BASE;
         }
-    }
-
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-
-    function name() public view override returns (string memory) {
-        return _name;
-    }
-
-    function symbol() public view override returns (string memory) {
-        return _symbol;
     }
 
     /**

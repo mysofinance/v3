@@ -21,22 +21,15 @@ describe("oToken Contracts", function () {
   let deployer: any;
   let user1: any;
   let user2: any;
-  let user3: any;
-  let user4: any;
-  let user5: any;
   let oTokenImpl: OTokenImpl;
   let bTokenImpl: BTokenImpl;
   let tokenizationFactory: TokenizationFactory;
-  let initialBlockTime: any;
   let usdc: any;
   let token: any;
 
   beforeEach(async function () {
-    [deployer, user1, user2, user3, user4, user5] = await ethers.getSigners();
+    [deployer, user1, user2] = await ethers.getSigners();
     provider = deployer.provider;
-
-    // Store the initial block time
-    initialBlockTime = (await provider.getBlock("latest")).timestamp;
 
     const MockERC20 = await ethers.getContractFactory("MockERC20");
     usdc = await MockERC20.deploy("USDC", "USDC", 6);

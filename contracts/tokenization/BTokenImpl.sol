@@ -1,32 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.24;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {OTokenImpl} from "./OTokenImpl.sol";
 
-contract BTokenImpl is ERC20, Initializable, ReentrancyGuard {
+contract BTokenImpl is InitializableERC20, ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
     using Address for address;
 
     address public factory;
     address public oToken;
-    uint8 internal _decimals;
-    string private _name;
-    string private _symbol;
 
     error InvalidAmount();
     error InvalidTime();
     error NothingToRedeem();
     error Unauthorized();
-
-    constructor() ERC20("", "") {
-        _disableInitializers();
-    }
 
     /**
      * @notice Initializes the BToken contract with specified parameters.
@@ -190,17 +182,5 @@ contract BTokenImpl is ERC20, Initializable, ReentrancyGuard {
                 }
             }
         }
-    }
-
-    function decimals() public view override returns (uint8) {
-        return _decimals;
-    }
-
-    function name() public view override returns (string memory) {
-        return _name;
-    }
-
-    function symbol() public view override returns (string memory) {
-        return _symbol;
     }
 }
