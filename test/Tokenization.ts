@@ -13,8 +13,6 @@ async function increaseTime(provider: any, seconds: any) {
   return newBlockTime;
 }
 
-const ONE_WEEK = BigInt(60 * 60 * 24 * 7);
-
 describe("oToken Contracts", function () {
   let provider: any;
 
@@ -173,8 +171,8 @@ describe("oToken Contracts", function () {
         .mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
-      const mintedBToken = await bTokenImpl.attach(tokens[1][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
+      const mintedBToken: any = await bTokenImpl.attach(tokens[1][0]);
 
       // check mint config properly set
       expect(await mintedOToken.name()).to.be.equal("oToken XYZ");
@@ -283,7 +281,7 @@ describe("oToken Contracts", function () {
       await tokenizationFactory.mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
 
       // Exercise the oToken
       const { settlementAmount, settlementFee, settlementFeesReceiver } =
@@ -347,7 +345,7 @@ describe("oToken Contracts", function () {
       await tokenizationFactory.mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
 
       // Exercise the oToken
       const { settlementAmount, settlementFee, settlementFeesReceiver } =
@@ -391,7 +389,7 @@ describe("oToken Contracts", function () {
       await tokenizationFactory.mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
 
       // Exercise the oToken
       const { settlementAmount, settlementFee, settlementFeesReceiver } =
@@ -465,7 +463,7 @@ describe("oToken Contracts", function () {
       await tokenizationFactory.mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
 
       await expect(
         mintedOToken.connect(deployer).transfer(user1.address, amount),
@@ -513,7 +511,7 @@ describe("oToken Contracts", function () {
       await tokenizationFactory.mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
 
       const abi = ethers.AbiCoder.defaultAbiCoder();
 
@@ -568,8 +566,8 @@ describe("oToken Contracts", function () {
       await tokenizationFactory.mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
-      const mintedBToken = await bTokenImpl.attach(tokens[1][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
+      const mintedBToken: any = await bTokenImpl.attach(tokens[1][0]);
 
       await expect(
         mintedOToken.forwardUnderlying(user1.address, amount),
@@ -624,7 +622,7 @@ describe("oToken Contracts", function () {
       await tokenizationFactory.mint(oTokenTo, bTokenTo, amount, mintConfig);
 
       const tokens = await tokenizationFactory.getTokens(0, 0, 1);
-      const mintedOToken = await oTokenImpl.attach(tokens[0][0]);
+      const mintedOToken: any = await oTokenImpl.attach(tokens[0][0]);
 
       await expect(
         mintedOToken.connect(user1).reverseMint(user1.address, 0),
