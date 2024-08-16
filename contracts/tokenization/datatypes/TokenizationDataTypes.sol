@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-library Structs {
+library TokenizationDataTypes {
     struct AllowedCalls {
         address allowedCaller;
         address allowedTarget;
@@ -9,13 +9,7 @@ library Structs {
         string allowedMethod;
     }
 
-    struct MintConfig {
-        uint256 version;
-        address underlying;
-        address settlementToken;
-        uint256 strike;
-        uint256 expiry;
-        uint256 earliestExercise;
+    struct BaseMintConfig {
         bool remintable;
         AllowedCalls[] allowedOTokenCalls;
         bool hasERC20Votes;
@@ -24,5 +18,14 @@ library Structs {
         bytes32 spaceId;
         bool transferrable;
         bool reverseExercisable;
+    }
+
+    struct MintConfig {
+        address underlying;
+        address settlementToken;
+        uint256 strike;
+        uint256 expiry;
+        uint256 earliestExercise;
+        BaseMintConfig baseMintConfig;
     }
 }
