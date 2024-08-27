@@ -112,26 +112,23 @@ contract BTokenImpl is InitializableERC20, ReentrancyGuard {
             uint256 userBal
         )
     {
-        if (block.timestamp <= OTokenImpl(oToken).expiry()) {
-            revert InvalidTime();
-        }
-        (
-            proRataUnderlying,
-            proRataSettlement,
-            underlying,
-            settlementToken,
-            userBal
-        ) = redeemableAmounts(msg.sender);
-        if (proRataUnderlying == 0 && proRataSettlement == 0) {
-            revert NothingToRedeem();
-        }
-        _burn(msg.sender, userBal);
-        if (proRataUnderlying > 0) {
-            OTokenImpl(oToken).forwardUnderlying(to, proRataUnderlying);
-        }
-        if (proRataSettlement > 0) {
-            IERC20Metadata(settlementToken).safeTransfer(to, proRataSettlement);
-        }
+        return _redeem(msg.sender, to);
+    }
+
+    function redeemOnBehalf(
+        address from
+    )
+        external
+        nonReentrant
+        returns (
+            uint256 proRataUnderlying,
+            uint256 proRataSettlement,
+            address underlying,
+            address settlementToken,
+            uint256 userBal
+        )
+    {
+        return _redeem(from, from);
     }
 
     /**
@@ -181,6 +178,41 @@ contract BTokenImpl is InitializableERC20, ReentrancyGuard {
                         _totalSupply;
                 }
             }
+        }
+    }
+
+    function _redeem(
+        address from,
+        address to
+    )
+        internal
+        returns (
+            uint256 proRataUnderlying,
+            uint256 proRataSettlement,
+            address underlying,
+            address settlementToken,
+            uint256 userBal
+        )
+    {
+        if (block.timestamp <= OTokenImpl(oToken).expiry()) {
+            revert InvalidTime();
+        }
+        (
+            proRataUnderlying,
+            proRataSettlement,
+            underlying,
+            settlementToken,
+            userBal
+        ) = redeemableAmounts(from);
+        if (proRataUnderlying == 0 && proRataSettlement == 0) {
+            revert NothingToRedeem();
+        }
+        _burn(from, userBal);
+        if (proRataUnderlying > 0) {
+            OTokenImpl(oToken).forwardUnderlying(to, proRataUnderlying);
+        }
+        if (proRataSettlement > 0) {
+            IERC20Metadata(settlementToken).safeTransfer(to, proRataSettlement);
         }
     }
 }

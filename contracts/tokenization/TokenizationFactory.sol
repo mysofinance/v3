@@ -7,7 +7,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {OTokenImpl} from "./OTokenImpl.sol";
 import {BTokenImpl} from "./BTokenImpl.sol";
-import {Structs} from "./structs/Structs.sol";
+import {TokenizationDataTypes} from "./datatypes/TokenizationDataTypes.sol";
 
 /**
  * @title TokenizationFactory
@@ -28,22 +28,20 @@ import {Structs} from "./structs/Structs.sol";
 contract TokenizationFactory is Ownable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 public version;
     uint256 public nonRemintableCounter;
     address public feesReceiver;
-    mapping(uint256 version => address oTokenImpl) public oTokenImpl;
-    mapping(uint256 version => address bTokenImpl) public bTokenImpl;
+    address public immutable oTokenImpl;
+    address public immutable bTokenImpl;
     mapping(bytes32 mintId => bool exists) public exists;
     mapping(bytes32 mintId => address oToken) public oTokens;
     mapping(bytes32 mintId => address bToken) public bTokens;
 
-    mapping(uint256 version => address[] oToken) internal _oTokens;
-    mapping(uint256 version => address[] bToken) internal _bTokens;
+    address[] internal _oTokens;
+    address[] internal _bTokens;
 
     error Invalid();
     error InvalidSignature();
     error InvalidTokens();
-    error InvalidVersion();
     error InvalidMint();
     error CannotMintAfterExpiry(uint256 expiry);
 
@@ -53,25 +51,9 @@ contract TokenizationFactory is Ownable {
         address _bTokenImpl,
         address _feesReceiver
     ) Ownable(_owner) {
-        oTokenImpl[0] = _oTokenImpl;
-        bTokenImpl[0] = _bTokenImpl;
+        oTokenImpl = _oTokenImpl;
+        bTokenImpl = _bTokenImpl;
         feesReceiver = _feesReceiver;
-    }
-
-    /**
-     * @notice Updates the implementation addresses for oToken and bToken.
-     * @dev This function increments the version and sets the new
-     * @dev implementation addresses for oToken and bToken.
-     * @param newOTokenImpl The address of the new oToken implementation.
-     * @param newBTokenImpl The address of the new bToken implementation.
-     */
-    function updateTokenImpl(
-        address newOTokenImpl,
-        address newBTokenImpl
-    ) external onlyOwner {
-        uint256 _newVersion = ++version;
-        oTokenImpl[_newVersion] = newOTokenImpl;
-        bTokenImpl[_newVersion] = newBTokenImpl;
     }
 
     /**
@@ -96,7 +78,7 @@ contract TokenizationFactory is Ownable {
         address oTokenTo,
         address bTokenTo,
         uint256 amount,
-        Structs.MintConfig memory mintConfig
+        TokenizationDataTypes.MintConfig memory mintConfig
     ) external returns (address oToken, address bToken, bytes32 mintId) {
         (oToken, bToken, mintId) = _mint(
             msg.sender,
@@ -109,14 +91,12 @@ contract TokenizationFactory is Ownable {
 
     /**
      * @notice Retrieve a list of minted oTokens and bTokens.
-     * @param _version Implementation version.
      * @param from Index to start retrieving tokens from.
      * @param numElements Number of tokens to retrieve.
      * @return mintedOTokens Array of oToken addresses.
      * @return mintedBTokens Array of bToken addresses.
      */
     function getTokens(
-        uint256 _version,
         uint256 from,
         uint256 numElements
     )
@@ -124,15 +104,15 @@ contract TokenizationFactory is Ownable {
         view
         returns (address[] memory mintedOTokens, address[] memory mintedBTokens)
     {
-        uint256 length = _bTokens[_version].length;
+        uint256 length = _bTokens.length;
         if (numElements == 0 || from + numElements > length + 1) {
             revert Invalid();
         }
         mintedOTokens = new address[](numElements);
         mintedBTokens = new address[](numElements);
         for (uint256 i; i < numElements; ) {
-            mintedOTokens[i] = _oTokens[_version][from + i];
-            mintedBTokens[i] = _bTokens[_version][from + i];
+            mintedOTokens[i] = _oTokens[from + i];
+            mintedBTokens[i] = _bTokens[from + i];
             unchecked {
                 ++i;
             }
@@ -146,12 +126,13 @@ contract TokenizationFactory is Ownable {
      * @return mintId The mint ID.
      */
     function getMintId(
-        Structs.MintConfig memory mintConfig
+        TokenizationDataTypes.MintConfig memory mintConfig
     ) public view returns (bytes32 mintId) {
         mintId = keccak256(
             abi.encode(
-                version,
-                mintConfig.remintable ? 0 : nonRemintableCounter + 1,
+                mintConfig.baseMintConfig.remintable
+                    ? 0
+                    : nonRemintableCounter + 1,
                 mintConfig
             )
         );
@@ -162,11 +143,8 @@ contract TokenizationFactory is Ownable {
         address oTokenTo,
         address bTokenTo,
         uint256 amount,
-        Structs.MintConfig memory mintConfig
+        TokenizationDataTypes.MintConfig memory mintConfig
     ) internal returns (address oToken, address bToken, bytes32 mintId) {
-        if (mintConfig.version != version) {
-            revert InvalidVersion();
-        }
         if (
             mintConfig.underlying == address(0) ||
             mintConfig.settlementToken == address(0) ||
@@ -176,18 +154,12 @@ contract TokenizationFactory is Ownable {
         }
         mintId = getMintId(mintConfig);
         if (!exists[mintId]) {
-            oToken = Clones.cloneDeterministic(
-                oTokenImpl[mintConfig.version],
-                mintId
-            );
-            bToken = Clones.cloneDeterministic(
-                bTokenImpl[mintConfig.version],
-                mintId
-            );
+            oToken = Clones.cloneDeterministic(oTokenImpl, mintId);
+            bToken = Clones.cloneDeterministic(bTokenImpl, mintId);
             oTokens[mintId] = oToken;
             bTokens[mintId] = bToken;
-            _oTokens[version].push(oToken);
-            _bTokens[version].push(bToken);
+            _oTokens.push(oToken);
+            _bTokens.push(bToken);
             string memory name = IERC20Metadata(mintConfig.underlying).name();
             string memory symbol = IERC20Metadata(mintConfig.underlying)
                 .symbol();
@@ -212,7 +184,7 @@ contract TokenizationFactory is Ownable {
                 revert CannotMintAfterExpiry(mintConfig.expiry);
             }
         }
-        if (!mintConfig.remintable) {
+        if (!mintConfig.baseMintConfig.remintable) {
             nonRemintableCounter++;
         }
         OTokenImpl(oToken).mint(oTokenTo, amount);
@@ -225,10 +197,10 @@ contract TokenizationFactory is Ownable {
         // @dev: note in case of reminting, all voting power will
         // be sent according to given previously minted voting configuration
         OTokenImpl(oToken).delegateVotes(
-            mintConfig.hasERC20Votes,
-            mintConfig.votingDelegate,
-            mintConfig.delegateRegistry,
-            mintConfig.spaceId
+            mintConfig.baseMintConfig.hasERC20Votes,
+            mintConfig.baseMintConfig.votingDelegate,
+            mintConfig.baseMintConfig.delegateRegistry,
+            mintConfig.baseMintConfig.spaceId
         );
     }
 }

@@ -9,7 +9,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {BTokenImpl} from "./BTokenImpl.sol";
 import {TokenizationFactory} from "./TokenizationFactory.sol";
-import {Structs} from "./structs/Structs.sol";
+import {TokenizationDataTypes} from "./datatypes/TokenizationDataTypes.sol";
 import {IRewardDistributor} from "../interfaces/IRewardDistributor.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
 
@@ -54,7 +54,7 @@ contract OTokenImpl is InitializableERC20, ReentrancyGuard {
         string memory __symbol,
         uint8 __decimals,
         address _bToken,
-        Structs.MintConfig memory mintConfig
+        TokenizationDataTypes.MintConfig memory mintConfig
     ) external initializer {
         if (
             mintConfig.strike == 0 ||
@@ -74,11 +74,16 @@ contract OTokenImpl is InitializableERC20, ReentrancyGuard {
         strike = mintConfig.strike;
         expiry = mintConfig.expiry;
         earliestExercise = mintConfig.earliestExercise;
-        transferrable = mintConfig.transferrable;
-        reverseExercisable = mintConfig.reverseExercisable;
+        transferrable = mintConfig.baseMintConfig.transferrable;
+        reverseExercisable = mintConfig.baseMintConfig.reverseExercisable;
 
-        for (uint256 i; i < mintConfig.allowedOTokenCalls.length; ) {
-            Structs.AllowedCalls memory _allowedCalls = mintConfig
+        for (
+            uint256 i;
+            i < mintConfig.baseMintConfig.allowedOTokenCalls.length;
+
+        ) {
+            TokenizationDataTypes.AllowedCalls memory _allowedCalls = mintConfig
+                .baseMintConfig
                 .allowedOTokenCalls[i];
             allowedCalls[_allowedCalls.allowedTarget][
                 _allowedCalls.allowedMethod
