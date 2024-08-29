@@ -57,4 +57,15 @@ library DataTypes {
         uint256 oracleSpotPrice;
         uint256 currAsk;
     }
+
+    struct Quote {
+        address underlyingToken;
+        address settlementToken;
+        uint256 notional;
+        uint256 strike;
+        uint256 expiry;
+        uint256 premium;
+        uint256 validUntil;
+        bytes signature;
+    }
 }

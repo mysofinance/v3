@@ -4,6 +4,8 @@ pragma solidity 0.8.24;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Escrow} from "./Escrow.sol";
 import {DataTypes} from "./DataTypes.sol";
 
@@ -14,13 +16,15 @@ contract Router {
     uint256 public numEscrows;
 
     mapping(address => bool) public isEscrow;
+    mapping(bytes32 => bool) public isQuoteUsed;
 
     constructor(address _escrowImpl) {
         escrowImpl = _escrowImpl;
     }
 
     function startAuction(DataTypes.AuctionInfo calldata auctionInfo) external {
-        address escrow = _createEscrow(auctionInfo);
+        address escrow = _createEscrow(msg.sender);
+        Escrow(escrow).initializeAuction(auctionInfo);
         IERC20Metadata(auctionInfo.tokenInfo.underlyingToken).safeTransferFrom(
             msg.sender,
             escrow,
@@ -45,7 +49,8 @@ contract Router {
                 oldEscrow
             )
         );
-        address newEscrow = _createEscrow(auctionInfo);
+        address newEscrow = _createEscrow(msg.sender);
+        Escrow(newEscrow).initializeAuction(auctionInfo);
         IERC20Metadata(auctionInfo.tokenInfo.underlyingToken).safeTransferFrom(
             msg.sender,
             newEscrow,
@@ -81,7 +86,7 @@ contract Router {
             _earliestExercise,
             _premium,
             _oracleSpotPrice
-        ) = Escrow(escrow).handleCallBid(
+        ) = Escrow(escrow).handleAuctionBid(
             relBid,
             amount,
             optionReceiver,
@@ -104,7 +109,7 @@ contract Router {
             revert();
         }
         (address settlementToken, uint256 settlementAmount) = Escrow(escrow)
-            .handleCallExercise(
+            .handleOptionExercise(
                 msg.sender,
                 underlyingReceiver,
                 underlyingAmount
@@ -157,22 +162,47 @@ contract Router {
         );
     }
 
-    function takeOffer() external /* for RFQ */
-    /*underlyingToken, settlementToken, notional, strike, expiry, premium, signature, validUntil*/ {
-        //address escrow = _createEscrow(auctionInfo);
-        //safeTransferFrom(quoter, msg.sender, premium)
+    function takeQuote(DataTypes.Quote calldata quote) external {
+        if (block.timestamp > quote.validUntil) {
+            revert();
+        }
+        bytes32 msgHash = keccak256(
+            abi.encode(
+                block.chainid,
+                quote.underlyingToken,
+                quote.settlementToken,
+                quote.notional,
+                quote.strike,
+                quote.expiry,
+                quote.premium,
+                quote.validUntil
+            )
+        );
+        if (isQuoteUsed[msgHash]) {
+            revert();
+        }
+        address quoter = ECDSA.recover(
+            MessageHashUtils.toEthSignedMessageHash(msgHash),
+            quote.signature
+        );
+        isQuoteUsed[msgHash] = true;
+        address escrow = _createEscrow(msg.sender);
+        Escrow(escrow).initializeRFQMatch(quoter, quote);
+        IERC20Metadata(quote.underlyingToken).safeTransferFrom(
+            quoter,
+            msg.sender,
+            quote.premium
+        );
     }
 
-    function _createEscrow(
-        DataTypes.AuctionInfo calldata auctionInfo
-    ) internal returns (address) {
+    function _createEscrow(address _owner) internal returns (address) {
         address escrow = Clones.cloneDeterministic(
             escrowImpl,
             keccak256(abi.encode(numEscrows))
         );
         numEscrows += 1;
         isEscrow[escrow] = true;
-        Escrow(escrow).initialize(address(this), auctionInfo);
+        Escrow(escrow).initialize(address(this), _owner);
         return escrow;
     }
 }

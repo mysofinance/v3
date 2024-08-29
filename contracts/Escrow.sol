@@ -19,6 +19,7 @@ contract Escrow is InitializableERC20 {
     uint256 public strike;
     uint256 public expiry;
     uint256 public earliestExercise;
+    bool internal _initialized;
 
     DataTypes.AuctionInfo public auctionInfo;
     mapping(address => uint256) public borrowedUnderlyingAmounts;
@@ -26,18 +27,24 @@ contract Escrow is InitializableERC20 {
     event OptionExercised(address indexed exerciser);
     event Withdrawn(address indexed to, address indexed token, uint256 amount);
 
-    function initialize(
-        address _router,
-        DataTypes.AuctionInfo calldata _auctionInfo
-    ) external initializer {
+    function initialize(address _router, address _owner) external initializer {
         router = _router;
-        owner = msg.sender;
+        owner = _owner;
+    }
+
+    function initializeAuction(
+        DataTypes.AuctionInfo calldata _auctionInfo
+    ) external {
+        if (_initialized) {
+            revert();
+        }
         if (
             _auctionInfo.pricingInfo.notional == 0 ||
             _auctionInfo.pricingInfo.tenor == 0
         ) {
             revert();
         }
+        _initialized = true;
         auctionInfo = _auctionInfo;
         string memory __name = IERC20Metadata(
             _auctionInfo.tokenInfo.underlyingToken
@@ -51,7 +58,29 @@ contract Escrow is InitializableERC20 {
             .decimals();
     }
 
-    function handleCallBid(
+    function initializeRFQMatch(
+        address optionReceiver,
+        DataTypes.Quote calldata quote
+    ) external {
+        if (_initialized) {
+            revert();
+        }
+        _initialized = true;
+        auctionInfo.tokenInfo.underlyingToken = quote.underlyingToken;
+        auctionInfo.tokenInfo.settlementToken = quote.settlementToken;
+        auctionInfo.pricingInfo.notional = quote.notional;
+        strike = quote.strike;
+        expiry = quote.expiry;
+        earliestExercise = 0;
+        _mint(optionReceiver, quote.notional);
+        string memory __name = IERC20Metadata(quote.underlyingToken).name();
+        string memory __symbol = IERC20Metadata(quote.underlyingToken).symbol();
+        _name = string(abi.encodePacked("Call ", __name));
+        _symbol = string(abi.encodePacked("Call ", __symbol));
+        _decimals = IERC20Metadata(quote.underlyingToken).decimals();
+    }
+
+    function handleAuctionBid(
         uint256 relBid,
         uint256 amount,
         address optionReceiver,
@@ -97,7 +126,7 @@ contract Escrow is InitializableERC20 {
         _mint(optionReceiver, amount);
     }
 
-    function handleCallExercise(
+    function handleOptionExercise(
         address exerciser,
         address underlyingReceiver,
         uint256 underlyingAmount
@@ -105,7 +134,7 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router) {
             revert();
         }
-        if (!auctionSuccessful()) {
+        if (!callWritten()) {
             revert();
         }
         if (block.timestamp > expiry || block.timestamp < earliestExercise) {
@@ -131,7 +160,7 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router) {
             revert();
         }
-        if (!auctionSuccessful()) {
+        if (!callWritten()) {
             revert();
         }
         if (block.timestamp > expiry || block.timestamp < earliestExercise) {
@@ -163,7 +192,7 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router) {
             revert();
         }
-        if (!auctionSuccessful()) {
+        if (!callWritten()) {
             revert();
         }
         if (block.timestamp > expiry || block.timestamp < earliestExercise) {
@@ -220,7 +249,7 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router && msg.sender != owner) {
             revert();
         }
-        if (auctionSuccessful() && block.timestamp <= expiry) {
+        if (callWritten() && block.timestamp <= expiry) {
             revert();
         }
         IERC20Metadata(token).safeTransfer(to, amount);
@@ -238,7 +267,7 @@ contract Escrow is InitializableERC20 {
         owner = newOwner;
     }
 
-    function auctionSuccessful() public view returns (bool) {
+    function callWritten() public view returns (bool) {
         return strike > 0;
     }
 
@@ -249,7 +278,7 @@ contract Escrow is InitializableERC20 {
         bytes[] memory _data
     ) public view returns (DataTypes.CallBidPreview memory preview) {
         uint256 _currAsk = currAsk();
-        if (auctionSuccessful()) {
+        if (callWritten()) {
             return
                 DataTypes.CallBidPreview({
                     status: DataTypes.BidStatus.AuctionAlreadySuccessful,
