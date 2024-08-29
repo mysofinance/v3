@@ -157,10 +157,8 @@ contract Router {
         );
     }
 
-    function takeOffer()
-        external
-        /* for RFQ */
-        /*underlyingToken, settlementToken, notional, strike, expiry, premium, signature, validUntil*/ {
+    function takeOffer() external /* for RFQ */
+    /*underlyingToken, settlementToken, notional, strike, expiry, premium, signature, validUntil*/ {
         //address escrow = _createEscrow(auctionInfo);
         //safeTransferFrom(quoter, msg.sender, premium)
     }
