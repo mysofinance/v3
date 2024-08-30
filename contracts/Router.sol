@@ -17,6 +17,7 @@ contract Router {
 
     mapping(address => bool) public isEscrow;
     mapping(bytes32 => bool) public isQuoteUsed;
+    address[] public escrows;
 
     event StartAuction(
         address indexed owner,
@@ -118,9 +119,9 @@ contract Router {
 
     function bidOnAuction(
         address escrow,
+        address optionReceiver,
         uint256 relBid,
         uint256 amount,
-        address optionReceiver,
         uint256 _refSpot,
         bytes[] memory _data
     )
@@ -248,6 +249,12 @@ contract Router {
 
         IERC20Metadata(rfqInitialization.optionInfo.underlyingToken)
             .safeTransferFrom(
+                msg.sender,
+                escrow,
+                rfqInitialization.optionInfo.notional
+            );
+        IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
+            .safeTransferFrom(
                 preview.quoter,
                 msg.sender,
                 rfqInitialization.rfqQuote.premium
@@ -266,6 +273,7 @@ contract Router {
                 rfqInitialization.optionInfo.notional,
                 rfqInitialization.optionInfo.strike,
                 rfqInitialization.optionInfo.expiry,
+                rfqInitialization.optionInfo.earliestExercise,
                 rfqInitialization.rfqQuote.premium,
                 rfqInitialization.rfqQuote.validUntil
             )
@@ -315,6 +323,23 @@ contract Router {
             });
     }
 
+    function getEscrows(
+        uint256 from,
+        uint256 numElements
+    ) external view returns (address[] memory _escrows) {
+        uint256 length = escrows.length;
+        if (numElements == 0 || from + numElements > length) {
+            revert();
+        }
+        _escrows = new address[](numElements);
+        for (uint256 i; i < numElements; ) {
+            _escrows[i] = escrows[from + i];
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
     function _createEscrow() internal returns (address) {
         address escrow = Clones.cloneDeterministic(
             escrowImpl,
@@ -322,6 +347,7 @@ contract Router {
         );
         numEscrows += 1;
         isEscrow[escrow] = true;
+        escrows.push(escrow);
         return escrow;
     }
 }

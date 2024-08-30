@@ -64,8 +64,8 @@ contract Escrow is InitializableERC20 {
             revert();
         }
         if (
-            _auctionInitialization.auctionParams.tenor + 1 days >=
-            _auctionInitialization.auctionParams.earliestExerciseTenor
+            _auctionInitialization.auctionParams.tenor <
+            _auctionInitialization.auctionParams.earliestExerciseTenor + 1 days
         ) {
             revert();
         }
@@ -120,8 +120,8 @@ contract Escrow is InitializableERC20 {
         }
         if (
             block.timestamp > _rfqInitialization.optionInfo.expiry ||
-            _rfqInitialization.optionInfo.expiry + 1 days >=
-            _rfqInitialization.optionInfo.earliestExercise
+            _rfqInitialization.optionInfo.expiry <
+            _rfqInitialization.optionInfo.earliestExercise + 1 days
         ) {
             revert();
         }
