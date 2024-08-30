@@ -31,17 +31,55 @@ contract Escrow is InitializableERC20 {
     function initializeAuction(
         address _router,
         address _owner,
-        DataTypes.AuctionInitialization calldata _auctionInfo
+        DataTypes.AuctionInitialization calldata _auctionInitialization
     ) external initializer {
-        optionInfo.underlyingToken = _auctionInfo.underlyingToken;
-        optionInfo.settlementToken = _auctionInfo.settlementToken;
-        optionInfo.notional = _auctionInfo.notional;
-        optionInfo.advancedEscrowSettings = _auctionInfo.advancedEscrowSettings;
+        if (
+            _auctionInitialization.underlyingToken ==
+            _auctionInitialization.settlementToken
+        ) {
+            revert();
+        }
+        if (_auctionInitialization.auctionParams.relStrike == 0) {
+            revert();
+        }
+        if (_auctionInitialization.auctionParams.tenor == 0) {
+            revert();
+        }
+        if (
+            _auctionInitialization.auctionParams.tenor >=
+            _auctionInitialization.auctionParams.earliestExerciseTenor
+        ) {
+            revert();
+        }
+        if (
+            _auctionInitialization.auctionParams.relPremiumStart == 0 ||
+            _auctionInitialization.auctionParams.relPremiumFloor == 0 ||
+            _auctionInitialization.auctionParams.relPremiumStart <
+            _auctionInitialization.auctionParams.relPremiumFloor
+        ) {
+            revert();
+        }
+        if (
+            _auctionInitialization.auctionParams.maxSpot == 0 ||
+            _auctionInitialization.auctionParams.maxSpot <
+            _auctionInitialization.auctionParams.minSpot
+        ) {
+            revert();
+        }
+        if (_auctionInitialization.auctionParams.oracle == address(0)) {
+            revert();
+        }
 
-        auctionParams = _auctionInfo.auctionParams;
+        optionInfo.underlyingToken = _auctionInitialization.underlyingToken;
+        optionInfo.settlementToken = _auctionInitialization.settlementToken;
+        optionInfo.notional = _auctionInitialization.notional;
+        optionInfo.advancedEscrowSettings = _auctionInitialization
+            .advancedEscrowSettings;
+
+        auctionParams = _auctionInitialization.auctionParams;
 
         isAuction = true;
-        _initialize(_router, _owner, _auctionInfo.underlyingToken);
+        _initialize(_router, _owner, _auctionInitialization.underlyingToken);
     }
 
     function initializeRFQMatch(
@@ -304,19 +342,6 @@ contract Escrow is InitializableERC20 {
                     currAsk: _currAsk
                 });
         }
-        if (block.timestamp < auctionParams.startTime) {
-            return
-                DataTypes.BidPreview({
-                    status: DataTypes.BidStatus.AuctionNotStarted,
-                    settlementToken: address(0),
-                    strike: 0,
-                    expiry: 0,
-                    earliestExercise: 0,
-                    premium: 0,
-                    oracleSpotPrice: 0,
-                    currAsk: _currAsk
-                });
-        }
 
         if (amount != optionInfo.notional) {
             return
@@ -425,18 +450,18 @@ contract Escrow is InitializableERC20 {
     }
 
     function currAsk() public view returns (uint256) {
-        uint256 _startTime = auctionParams.startTime;
-        uint256 _decayTime = auctionParams.decayTime;
-        if (block.timestamp < _startTime) {
+        uint256 _decayStartTime = auctionParams.decayStartTime;
+        uint256 _decayDuration = auctionParams.decayDuration;
+        if (block.timestamp < _decayStartTime) {
             return auctionParams.relPremiumStart;
-        } else if (block.timestamp < _startTime + _decayTime) {
-            uint256 _timePassed = block.timestamp - _startTime;
+        } else if (block.timestamp < _decayStartTime + _decayDuration) {
+            uint256 _timePassed = block.timestamp - _decayStartTime;
             uint256 _relPremiumFloor = auctionParams.relPremiumFloor;
             uint256 _relPremiumStart = auctionParams.relPremiumStart;
             return
                 _relPremiumStart -
                 ((_relPremiumStart - _relPremiumFloor) * _timePassed) /
-                _decayTime;
+                _decayDuration;
         } else {
             return auctionParams.relPremiumFloor;
         }

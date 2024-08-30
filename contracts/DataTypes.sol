@@ -18,10 +18,10 @@ library DataTypes {
         uint256 earliestExerciseTenor;
         uint256 relPremiumStart;
         uint256 relPremiumFloor;
-        uint256 decayTime;
+        uint256 decayDuration;
         uint256 minSpot;
         uint256 maxSpot;
-        uint256 startTime;
+        uint256 decayStartTime;
         address oracle;
     }
 
@@ -56,7 +56,6 @@ library DataTypes {
         SpotPriceTooLow,
         OutOfRangeSpotPrice,
         AuctionAlreadySuccessful,
-        AuctionNotStarted,
         PremiumTooLow,
         NotAnAuction,
         InsufficientFunding
