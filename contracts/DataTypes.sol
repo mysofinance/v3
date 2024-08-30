@@ -2,26 +2,33 @@
 pragma solidity 0.8.24;
 
 library DataTypes {
-    struct TokenInfo {
+    struct CommonOptionInfo {
         address underlyingToken;
         address settlementToken;
+        uint256 notional;
+        uint256 strike;
+        uint256 expiry;
+        uint256 earliestExercise;
+        AdvancedOptions advancedOptions;
     }
 
-    struct PricingInfo {
-        uint256 notional;
+    struct AuctionParams {
         uint256 relStrike;
         uint256 tenor;
         uint256 earliestExerciseTenor;
-    }
-
-    struct BidConditions {
-        uint256 startTime;
         uint256 relPremiumStart;
         uint256 relPremiumFloor;
         uint256 decayTime;
         uint256 minSpot;
         uint256 maxSpot;
+        uint256 startTime;
         address oracle;
+    }
+
+    struct RFQParams {
+        uint256 premium;
+        uint256 validUntil;
+        bytes signature;
     }
 
     struct AdvancedOptions {
@@ -31,10 +38,16 @@ library DataTypes {
     }
 
     struct AuctionInfo {
-        TokenInfo tokenInfo;
-        PricingInfo pricingInfo;
-        BidConditions bidConditions;
+        address underlyingToken;
+        address settlementToken;
+        uint256 notional;
+        AuctionParams auctionParams;
         AdvancedOptions advancedOptions;
+    }
+
+    struct RFQInfo {
+        CommonOptionInfo commonInfo;
+        RFQParams rfqParams;
     }
 
     enum BidStatus {

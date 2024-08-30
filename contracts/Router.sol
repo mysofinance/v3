@@ -25,10 +25,10 @@ contract Router {
     function startAuction(DataTypes.AuctionInfo calldata auctionInfo) external {
         address escrow = _createEscrow(msg.sender);
         Escrow(escrow).initializeAuction(auctionInfo);
-        IERC20Metadata(auctionInfo.tokenInfo.underlyingToken).safeTransferFrom(
+        IERC20Metadata(auctionInfo.underlyingToken).safeTransferFrom(
             msg.sender,
             escrow,
-            auctionInfo.pricingInfo.notional
+            auctionInfo.notional
         );
     }
 
@@ -44,17 +44,15 @@ contract Router {
         }
         Escrow(oldEscrow).handleWithdraw(
             msg.sender,
-            auctionInfo.tokenInfo.underlyingToken,
-            IERC20Metadata(auctionInfo.tokenInfo.underlyingToken).balanceOf(
-                oldEscrow
-            )
+            auctionInfo.underlyingToken,
+            IERC20Metadata(auctionInfo.underlyingToken).balanceOf(oldEscrow)
         );
         address newEscrow = _createEscrow(msg.sender);
         Escrow(newEscrow).initializeAuction(auctionInfo);
-        IERC20Metadata(auctionInfo.tokenInfo.underlyingToken).safeTransferFrom(
+        IERC20Metadata(auctionInfo.underlyingToken).safeTransferFrom(
             msg.sender,
             newEscrow,
-            auctionInfo.pricingInfo.notional
+            auctionInfo.notional
         );
     }
 
@@ -162,20 +160,20 @@ contract Router {
         );
     }
 
-    function takeQuote(DataTypes.Quote calldata quote) external {
-        if (block.timestamp > quote.validUntil) {
+    function takeQuote(DataTypes.RFQInfo calldata quote) external {
+        if (block.timestamp > quote.rfqParams.validUntil) {
             revert();
         }
         bytes32 msgHash = keccak256(
             abi.encode(
                 block.chainid,
-                quote.underlyingToken,
-                quote.settlementToken,
-                quote.notional,
-                quote.strike,
-                quote.expiry,
-                quote.premium,
-                quote.validUntil
+                quote.commonInfo.underlyingToken,
+                quote.commonInfo.settlementToken,
+                quote.commonInfo.notional,
+                quote.commonInfo.strike,
+                quote.commonInfo.expiry,
+                quote.rfqParams.premium,
+                quote.rfqParams.validUntil
             )
         );
         if (isQuoteUsed[msgHash]) {
@@ -183,15 +181,15 @@ contract Router {
         }
         address quoter = ECDSA.recover(
             MessageHashUtils.toEthSignedMessageHash(msgHash),
-            quote.signature
+            quote.rfqParams.signature
         );
         isQuoteUsed[msgHash] = true;
         address escrow = _createEscrow(msg.sender);
         Escrow(escrow).initializeRFQMatch(quoter, quote);
-        IERC20Metadata(quote.underlyingToken).safeTransferFrom(
+        IERC20Metadata(quote.commonInfo.underlyingToken).safeTransferFrom(
             quoter,
             msg.sender,
-            quote.premium
+            quote.rfqParams.premium
         );
     }
 

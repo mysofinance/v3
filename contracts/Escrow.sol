@@ -16,12 +16,13 @@ contract Escrow is InitializableERC20 {
 
     address public router;
     address public owner;
-    uint256 public strike;
-    uint256 public expiry;
     uint256 public earliestExercise;
     bool internal _initialized;
+    bool internal _optionMinted;
 
-    DataTypes.AuctionInfo public auctionInfo;
+    DataTypes.CommonOptionInfo public commonOptionInfo;
+    DataTypes.AuctionParams public auctionParams;
+    DataTypes.RFQInfo public rfqInfo;
     mapping(address => uint256) public borrowedUnderlyingAmounts;
 
     event OptionExercised(address indexed exerciser);
@@ -38,46 +39,39 @@ contract Escrow is InitializableERC20 {
         if (_initialized) {
             revert();
         }
-        if (
-            _auctionInfo.pricingInfo.notional == 0 ||
-            _auctionInfo.pricingInfo.tenor == 0
-        ) {
-            revert();
-        }
+
+        commonOptionInfo.underlyingToken = _auctionInfo.underlyingToken;
+        commonOptionInfo.settlementToken = _auctionInfo.settlementToken;
+        commonOptionInfo.notional = _auctionInfo.notional;
+        commonOptionInfo.advancedOptions = _auctionInfo.advancedOptions;
+
+        auctionParams = _auctionInfo.auctionParams;
+
         _initialized = true;
-        auctionInfo = _auctionInfo;
-        string memory __name = IERC20Metadata(
-            _auctionInfo.tokenInfo.underlyingToken
-        ).name();
-        string memory __symbol = IERC20Metadata(
-            _auctionInfo.tokenInfo.underlyingToken
-        ).symbol();
-        _name = string(abi.encodePacked("Call ", __name));
-        _symbol = string(abi.encodePacked("Call ", __symbol));
-        _decimals = IERC20Metadata(_auctionInfo.tokenInfo.underlyingToken)
-            .decimals();
+
+        _setTokenMetadata(_auctionInfo.underlyingToken);
     }
 
     function initializeRFQMatch(
         address optionReceiver,
-        DataTypes.Quote calldata quote
+        DataTypes.RFQInfo calldata _rfqInfo
     ) external {
         if (_initialized) {
             revert();
         }
         _initialized = true;
-        auctionInfo.tokenInfo.underlyingToken = quote.underlyingToken;
-        auctionInfo.tokenInfo.settlementToken = quote.settlementToken;
-        auctionInfo.pricingInfo.notional = quote.notional;
-        strike = quote.strike;
-        expiry = quote.expiry;
-        earliestExercise = 0;
-        _mint(optionReceiver, quote.notional);
-        string memory __name = IERC20Metadata(quote.underlyingToken).name();
-        string memory __symbol = IERC20Metadata(quote.underlyingToken).symbol();
-        _name = string(abi.encodePacked("Call ", __name));
-        _symbol = string(abi.encodePacked("Call ", __symbol));
-        _decimals = IERC20Metadata(quote.underlyingToken).decimals();
+        rfqInfo = _rfqInfo;
+
+        // Set the common option info for the auction based on the RFQ data
+        commonOptionInfo.underlyingToken = rfqInfo.commonInfo.underlyingToken;
+        commonOptionInfo.settlementToken = rfqInfo.commonInfo.settlementToken;
+        commonOptionInfo.notional = rfqInfo.commonInfo.notional;
+        commonOptionInfo.advancedOptions = rfqInfo.commonInfo.advancedOptions;
+
+        _optionMinted = true;
+        _mint(optionReceiver, rfqInfo.commonInfo.notional);
+
+        _setTokenMetadata(rfqInfo.commonInfo.underlyingToken);
     }
 
     function handleAuctionBid(
@@ -120,9 +114,13 @@ contract Escrow is InitializableERC20 {
         _premium = preview.premium;
         _oracleSpotPrice = preview.oracleSpotPrice;
 
-        expiry = _expiry;
+        commonOptionInfo.strike = _strike;
+        commonOptionInfo.expiry = _expiry;
+        commonOptionInfo.earliestExercise = _earliestExercise;
+
         earliestExercise = _earliestExercise;
-        strike = _strike;
+
+        _optionMinted = true;
         _mint(optionReceiver, amount);
     }
 
@@ -134,18 +132,21 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router) {
             revert();
         }
-        if (!callWritten()) {
+        if (!_optionMinted) {
             revert();
         }
-        if (block.timestamp > expiry || block.timestamp < earliestExercise) {
+        if (
+            block.timestamp > commonOptionInfo.expiry ||
+            block.timestamp < commonOptionInfo.earliestExercise
+        ) {
             revert();
         }
-        settlementToken = auctionInfo.tokenInfo.settlementToken;
+        settlementToken = commonOptionInfo.settlementToken;
         settlementAmount =
-            (strike * underlyingAmount) /
-            auctionInfo.pricingInfo.notional;
+            (commonOptionInfo.strike * underlyingAmount) /
+            commonOptionInfo.notional;
         _burn(exerciser, underlyingAmount);
-        IERC20Metadata(auctionInfo.tokenInfo.underlyingToken).safeTransfer(
+        IERC20Metadata(commonOptionInfo.underlyingToken).safeTransfer(
             underlyingReceiver,
             underlyingAmount
         );
@@ -160,22 +161,25 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router) {
             revert();
         }
-        if (!callWritten()) {
+        if (!_optionMinted) {
             revert();
         }
-        if (block.timestamp > expiry || block.timestamp < earliestExercise) {
+        if (
+            block.timestamp > commonOptionInfo.expiry ||
+            block.timestamp < commonOptionInfo.earliestExercise
+        ) {
             revert();
         }
-        if (!auctionInfo.advancedOptions.borrowingAllowed) {
+        if (!commonOptionInfo.advancedOptions.borrowingAllowed) {
             revert();
         }
-        settlementToken = auctionInfo.tokenInfo.settlementToken;
+        settlementToken = commonOptionInfo.settlementToken;
         collateralAmount =
-            (strike * underlyingAmount) /
-            auctionInfo.pricingInfo.notional;
+            (commonOptionInfo.strike * underlyingAmount) /
+            commonOptionInfo.notional;
         borrowedUnderlyingAmounts[borrower] += underlyingAmount;
         _burn(borrower, underlyingAmount);
-        IERC20Metadata(auctionInfo.tokenInfo.underlyingToken).safeTransfer(
+        IERC20Metadata(commonOptionInfo.underlyingToken).safeTransfer(
             underlyingReceiver,
             underlyingAmount
         );
@@ -192,25 +196,28 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router) {
             revert();
         }
-        if (!callWritten()) {
+        if (!_optionMinted) {
             revert();
         }
-        if (block.timestamp > expiry || block.timestamp < earliestExercise) {
+        if (
+            block.timestamp > commonOptionInfo.expiry ||
+            block.timestamp < commonOptionInfo.earliestExercise
+        ) {
+            revert();
+        }
+        if (!commonOptionInfo.advancedOptions.borrowingAllowed) {
             revert();
         }
         if (underlyingAmount > borrowedUnderlyingAmounts[borrower]) {
             revert();
         }
-        if (!auctionInfo.advancedOptions.borrowingAllowed) {
-            revert();
-        }
-        underlyingToken = auctionInfo.tokenInfo.underlyingToken;
+        underlyingToken = commonOptionInfo.underlyingToken;
         unlockedCollateralAmount =
-            (strike * underlyingAmount) /
-            auctionInfo.pricingInfo.notional;
+            (commonOptionInfo.strike * underlyingAmount) /
+            commonOptionInfo.notional;
         borrowedUnderlyingAmounts[borrower] -= underlyingAmount;
         _mint(borrower, underlyingAmount);
-        IERC20Metadata(auctionInfo.tokenInfo.settlementToken).safeTransfer(
+        IERC20Metadata(commonOptionInfo.settlementToken).safeTransfer(
             collateralReceiver,
             unlockedCollateralAmount
         );
@@ -220,17 +227,17 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != owner) {
             revert();
         }
-        if (!auctionInfo.advancedOptions.votingDelegationAllowed) {
+        if (!commonOptionInfo.advancedOptions.votingDelegationAllowed) {
             revert();
         }
-        ERC20Votes(auctionInfo.tokenInfo.underlyingToken).delegate(delegate);
+        ERC20Votes(commonOptionInfo.underlyingToken).delegate(delegate);
     }
 
     function handleOffChainVoting(bytes32 spaceId, address delegate) external {
         if (msg.sender != owner) {
             revert();
         }
-        address allowedDelegateRegistry = auctionInfo
+        address allowedDelegateRegistry = commonOptionInfo
             .advancedOptions
             .allowedDelegateRegistry;
         if (allowedDelegateRegistry != address(0)) {
@@ -249,7 +256,7 @@ contract Escrow is InitializableERC20 {
         if (msg.sender != router && msg.sender != owner) {
             revert();
         }
-        if (callWritten() && block.timestamp <= expiry) {
+        if (_optionMinted && block.timestamp <= commonOptionInfo.expiry) {
             revert();
         }
         IERC20Metadata(token).safeTransfer(to, amount);
@@ -267,10 +274,6 @@ contract Escrow is InitializableERC20 {
         owner = newOwner;
     }
 
-    function callWritten() public view returns (bool) {
-        return strike > 0;
-    }
-
     function previewCallBid(
         uint256 relBid,
         uint256 amount,
@@ -278,7 +281,7 @@ contract Escrow is InitializableERC20 {
         bytes[] memory _data
     ) public view returns (DataTypes.CallBidPreview memory preview) {
         uint256 _currAsk = currAsk();
-        if (callWritten()) {
+        if (_optionMinted) {
             return
                 DataTypes.CallBidPreview({
                     status: DataTypes.BidStatus.AuctionAlreadySuccessful,
@@ -291,7 +294,7 @@ contract Escrow is InitializableERC20 {
                     currAsk: _currAsk
                 });
         }
-        if (block.timestamp < auctionInfo.bidConditions.startTime) {
+        if (block.timestamp < auctionParams.startTime) {
             return
                 DataTypes.CallBidPreview({
                     status: DataTypes.BidStatus.AuctionNotStarted,
@@ -305,7 +308,7 @@ contract Escrow is InitializableERC20 {
                 });
         }
 
-        if (amount != auctionInfo.pricingInfo.notional) {
+        if (amount != commonOptionInfo.notional) {
             return
                 DataTypes.CallBidPreview({
                     status: DataTypes.BidStatus.InvalidAmount,
@@ -333,13 +336,12 @@ contract Escrow is InitializableERC20 {
                 });
         }
 
-        uint256 oracleSpotPrice = IOracle(auctionInfo.bidConditions.oracle)
-            .getPrice(
-                auctionInfo.tokenInfo.underlyingToken,
-                auctionInfo.tokenInfo.settlementToken,
-                _refSpot,
-                _data
-            );
+        uint256 oracleSpotPrice = IOracle(auctionParams.oracle).getPrice(
+            commonOptionInfo.underlyingToken,
+            commonOptionInfo.settlementToken,
+            _refSpot,
+            _data
+        );
 
         if (_refSpot < oracleSpotPrice) {
             return
@@ -356,8 +358,8 @@ contract Escrow is InitializableERC20 {
         }
 
         if (
-            oracleSpotPrice < auctionInfo.bidConditions.minSpot ||
-            auctionInfo.bidConditions.maxSpot < oracleSpotPrice
+            oracleSpotPrice < auctionParams.minSpot ||
+            oracleSpotPrice > auctionParams.maxSpot
         ) {
             return
                 DataTypes.CallBidPreview({
@@ -373,22 +375,20 @@ contract Escrow is InitializableERC20 {
         }
 
         uint256 premium = (relBid *
-            auctionInfo.pricingInfo.notional *
+            commonOptionInfo.notional *
             oracleSpotPrice) /
             BASE /
-            10 **
-                IERC20Metadata(auctionInfo.tokenInfo.underlyingToken)
-                    .decimals();
-        uint256 strikePrice = (oracleSpotPrice *
-            auctionInfo.pricingInfo.relStrike) / BASE;
-        uint256 expiryTime = block.timestamp + auctionInfo.pricingInfo.tenor;
+            10 ** IERC20Metadata(commonOptionInfo.underlyingToken).decimals();
+        uint256 strikePrice = (oracleSpotPrice * auctionParams.relStrike) /
+            BASE;
+        uint256 expiryTime = block.timestamp + auctionParams.tenor;
         uint256 earliestExerciseTime = block.timestamp +
-            auctionInfo.pricingInfo.earliestExerciseTenor;
+            auctionParams.earliestExerciseTenor;
 
         return
             DataTypes.CallBidPreview({
                 status: DataTypes.BidStatus.Success,
-                settlementToken: auctionInfo.tokenInfo.settlementToken,
+                settlementToken: commonOptionInfo.settlementToken,
                 strike: strikePrice,
                 expiry: expiryTime,
                 earliestExercise: earliestExerciseTime,
@@ -399,24 +399,28 @@ contract Escrow is InitializableERC20 {
     }
 
     function currAsk() public view returns (uint256) {
-        uint256 _startTime = auctionInfo.bidConditions.startTime;
-        uint256 _decayTime = auctionInfo.bidConditions.decayTime;
+        uint256 _startTime = auctionParams.startTime;
+        uint256 _decayTime = auctionParams.decayTime;
         if (block.timestamp < _startTime) {
-            return auctionInfo.bidConditions.relPremiumStart;
+            return auctionParams.relPremiumStart;
         } else if (block.timestamp < _startTime + _decayTime) {
             uint256 _timePassed = block.timestamp - _startTime;
-            uint256 _relPremiumFloor = auctionInfo
-                .bidConditions
-                .relPremiumStart;
-            uint256 _relPremiumStart = auctionInfo
-                .bidConditions
-                .relPremiumStart;
+            uint256 _relPremiumFloor = auctionParams.relPremiumFloor;
+            uint256 _relPremiumStart = auctionParams.relPremiumStart;
             return
                 _relPremiumStart -
                 ((_relPremiumStart - _relPremiumFloor) * _timePassed) /
                 _decayTime;
         } else {
-            return auctionInfo.bidConditions.relPremiumStart;
+            return auctionParams.relPremiumFloor;
         }
+    }
+
+    function _setTokenMetadata(address underlyingToken) internal {
+        string memory __name = IERC20Metadata(underlyingToken).name();
+        string memory __symbol = IERC20Metadata(underlyingToken).symbol();
+        _name = string(abi.encodePacked("Call ", __name));
+        _symbol = string(abi.encodePacked("Call ", __symbol));
+        _decimals = IERC20Metadata(underlyingToken).decimals();
     }
 }
