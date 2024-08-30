@@ -18,6 +18,45 @@ contract Router {
     mapping(address => bool) public isEscrow;
     mapping(bytes32 => bool) public isQuoteUsed;
 
+    event StartAuction(
+        address indexed owner,
+        address indexed escrow,
+        DataTypes.AuctionInitialization auctionInitialization
+    );
+    event WithdrawFromEscrowAndStartAuction(
+        address indexed owner,
+        address indexed oldEscrow,
+        address indexed newEscrow,
+        DataTypes.AuctionInitialization auctionInitialization
+    );
+    event BidOnAuction(
+        address indexed escrow,
+        uint256 relBid,
+        uint256 amount,
+        address optionReceiver,
+        uint256 _refSpot
+    );
+    event ExerciseCall(
+        address indexed escrow,
+        address underlyingReceiver,
+        uint256 underlyingAmount
+    );
+    event Borrow(
+        address indexed escrow,
+        address underlyingReceiver,
+        uint256 underlyingAmount
+    );
+    event Repay(
+        address indexed escrow,
+        address collateralReceiver,
+        uint256 repayUnderlyingAmount
+    );
+    event TakeQuote(
+        address indexed owner,
+        address indexed escrow,
+        DataTypes.RFQInitialization rfqInitialization
+    );
+
     constructor(address _escrowImpl) {
         escrowImpl = _escrowImpl;
     }
@@ -37,6 +76,7 @@ contract Router {
             escrow,
             auctionInitialization.notional
         );
+        emit StartAuction(owner, escrow, auctionInitialization);
     }
 
     function withdrawFromEscrowAndStartAuction(
@@ -67,6 +107,12 @@ contract Router {
             msg.sender,
             newEscrow,
             auctionInitialization.notional
+        );
+        emit WithdrawFromEscrowAndStartAuction(
+            owner,
+            oldEscrow,
+            newEscrow,
+            auctionInitialization
         );
     }
 
@@ -110,6 +156,7 @@ contract Router {
             Escrow(escrow).owner(),
             _premium
         );
+        emit BidOnAuction(escrow, relBid, amount, optionReceiver, _refSpot);
     }
 
     function exerciseCall(
@@ -121,7 +168,7 @@ contract Router {
             revert();
         }
         (address settlementToken, uint256 settlementAmount) = Escrow(escrow)
-            .handleOptionExercise(
+            .handleCallExercise(
                 msg.sender,
                 underlyingReceiver,
                 underlyingAmount
@@ -131,6 +178,7 @@ contract Router {
             Escrow(escrow).owner(),
             settlementAmount
         );
+        emit ExerciseCall(escrow, underlyingReceiver, underlyingAmount);
     }
 
     function borrow(
@@ -152,6 +200,7 @@ contract Router {
             escrow,
             collateralAmount
         );
+        emit Borrow(escrow, underlyingReceiver, borrowUnderlyingAmount);
     }
 
     function repay(
@@ -172,6 +221,7 @@ contract Router {
             escrow,
             repayUnderlyingAmount
         );
+        emit Repay(escrow, collateralReceiver, repayUnderlyingAmount);
     }
 
     function takeQuote(
@@ -202,6 +252,7 @@ contract Router {
                 msg.sender,
                 rfqInitialization.rfqQuote.premium
             );
+        emit TakeQuote(owner, escrow, rfqInitialization);
     }
 
     function previewTakeQuote(

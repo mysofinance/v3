@@ -182,7 +182,7 @@ contract Escrow is InitializableERC20 {
         _mint(optionReceiver, amount);
     }
 
-    function handleOptionExercise(
+    function handleCallExercise(
         address exerciser,
         address underlyingReceiver,
         uint256 underlyingAmount
