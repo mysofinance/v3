@@ -39,6 +39,9 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
+        if (_auctionInitialization.notional == 0) {
+            revert();
+        }
         if (_auctionInitialization.auctionParams.relStrike == 0) {
             revert();
         }
@@ -46,7 +49,7 @@ contract Escrow is InitializableERC20 {
             revert();
         }
         if (
-            _auctionInitialization.auctionParams.tenor >=
+            _auctionInitialization.auctionParams.tenor + 1 days >=
             _auctionInitialization.auctionParams.earliestExerciseTenor
         ) {
             revert();
@@ -88,6 +91,26 @@ contract Escrow is InitializableERC20 {
         address optionReceiver,
         DataTypes.RFQInitialization calldata _rfqInfo
     ) external initializer {
+        if (
+            _rfqInfo.optionInfo.underlyingToken ==
+            _rfqInfo.optionInfo.settlementToken
+        ) {
+            revert();
+        }
+        if (_rfqInfo.optionInfo.notional == 0) {
+            revert();
+        }
+        if (_rfqInfo.optionInfo.strike == 0) {
+            revert();
+        }
+        if (
+            block.timestamp > _rfqInfo.optionInfo.expiry ||
+            _rfqInfo.optionInfo.expiry + 1 days >=
+            _rfqInfo.optionInfo.earliestExercise
+        ) {
+            revert();
+        }
+
         rfqInitialization = _rfqInfo;
 
         optionInfo.underlyingToken = rfqInitialization
