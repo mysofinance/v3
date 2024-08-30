@@ -176,38 +176,92 @@ contract Router {
 
     function takeQuote(
         address owner,
-        DataTypes.RFQInitialization calldata quote
+        DataTypes.RFQInitialization calldata rfqInitialization
     ) external {
-        if (block.timestamp > quote.rfqQuote.validUntil) {
+        DataTypes.TakeQuotePreview memory preview = previewTakeQuote(
+            rfqInitialization
+        );
+
+        if (preview.status != DataTypes.RFQStatus.Success) {
             revert();
         }
+
+        isQuoteUsed[preview.msgHash] = true;
+
+        address escrow = _createEscrow();
+        Escrow(escrow).initializeRFQMatch(
+            address(this),
+            owner,
+            preview.quoter,
+            rfqInitialization
+        );
+
+        IERC20Metadata(rfqInitialization.optionInfo.underlyingToken)
+            .safeTransferFrom(
+                preview.quoter,
+                msg.sender,
+                rfqInitialization.rfqQuote.premium
+            );
+    }
+
+    function previewTakeQuote(
+        DataTypes.RFQInitialization calldata rfqInitialization
+    ) public view returns (DataTypes.TakeQuotePreview memory) {
         bytes32 msgHash = keccak256(
             abi.encode(
                 block.chainid,
-                quote.optionInfo.underlyingToken,
-                quote.optionInfo.settlementToken,
-                quote.optionInfo.notional,
-                quote.optionInfo.strike,
-                quote.optionInfo.expiry,
-                quote.rfqQuote.premium,
-                quote.rfqQuote.validUntil
+                rfqInitialization.optionInfo.underlyingToken,
+                rfqInitialization.optionInfo.settlementToken,
+                rfqInitialization.optionInfo.notional,
+                rfqInitialization.optionInfo.strike,
+                rfqInitialization.optionInfo.expiry,
+                rfqInitialization.rfqQuote.premium,
+                rfqInitialization.rfqQuote.validUntil
             )
         );
-        if (isQuoteUsed[msgHash]) {
-            revert();
-        }
+
         address quoter = ECDSA.recover(
             MessageHashUtils.toEthSignedMessageHash(msgHash),
-            quote.rfqQuote.signature
+            rfqInitialization.rfqQuote.signature
         );
-        isQuoteUsed[msgHash] = true;
-        address escrow = _createEscrow();
-        Escrow(escrow).initializeRFQMatch(address(this), owner, quoter, quote);
-        IERC20Metadata(quote.optionInfo.underlyingToken).safeTransferFrom(
-            quoter,
-            msg.sender,
-            quote.rfqQuote.premium
-        );
+
+        if (block.timestamp > rfqInitialization.rfqQuote.validUntil) {
+            return
+                DataTypes.TakeQuotePreview({
+                    status: DataTypes.RFQStatus.Expired,
+                    msgHash: msgHash,
+                    quoter: quoter
+                });
+        }
+
+        if (isQuoteUsed[msgHash]) {
+            return
+                DataTypes.TakeQuotePreview({
+                    status: DataTypes.RFQStatus.AlreadyExecuted,
+                    msgHash: msgHash,
+                    quoter: quoter
+                });
+        }
+
+        uint256 balance = IERC20Metadata(
+            rfqInitialization.optionInfo.settlementToken
+        ).balanceOf(quoter);
+
+        if (balance < rfqInitialization.rfqQuote.premium) {
+            return
+                DataTypes.TakeQuotePreview({
+                    status: DataTypes.RFQStatus.InsufficientFunding,
+                    msgHash: msgHash,
+                    quoter: quoter
+                });
+        }
+
+        return
+            DataTypes.TakeQuotePreview({
+                status: DataTypes.RFQStatus.Success,
+                msgHash: msgHash,
+                quoter: quoter
+            });
     }
 
     function _createEscrow() internal returns (address) {

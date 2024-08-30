@@ -71,4 +71,17 @@ library DataTypes {
         uint256 oracleSpotPrice;
         uint256 currAsk;
     }
+
+    enum RFQStatus {
+        Expired,
+        AlreadyExecuted,
+        InsufficientFunding,
+        Success
+    }
+
+    struct TakeQuotePreview {
+        RFQStatus status;
+        bytes32 msgHash;
+        address quoter;
+    }
 }

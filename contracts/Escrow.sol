@@ -89,29 +89,29 @@ contract Escrow is InitializableERC20 {
         address _router,
         address _owner,
         address optionReceiver,
-        DataTypes.RFQInitialization calldata _rfqInfo
+        DataTypes.RFQInitialization calldata _rfqInitialization
     ) external initializer {
         if (
-            _rfqInfo.optionInfo.underlyingToken ==
-            _rfqInfo.optionInfo.settlementToken
+            _rfqInitialization.optionInfo.underlyingToken ==
+            _rfqInitialization.optionInfo.settlementToken
         ) {
             revert();
         }
-        if (_rfqInfo.optionInfo.notional == 0) {
+        if (_rfqInitialization.optionInfo.notional == 0) {
             revert();
         }
-        if (_rfqInfo.optionInfo.strike == 0) {
+        if (_rfqInitialization.optionInfo.strike == 0) {
             revert();
         }
         if (
-            block.timestamp > _rfqInfo.optionInfo.expiry ||
-            _rfqInfo.optionInfo.expiry + 1 days >=
-            _rfqInfo.optionInfo.earliestExercise
+            block.timestamp > _rfqInitialization.optionInfo.expiry ||
+            _rfqInitialization.optionInfo.expiry + 1 days >=
+            _rfqInitialization.optionInfo.earliestExercise
         ) {
             revert();
         }
 
-        rfqInitialization = _rfqInfo;
+        rfqInitialization = _rfqInitialization;
 
         optionInfo.underlyingToken = rfqInitialization
             .optionInfo
