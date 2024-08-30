@@ -25,8 +25,23 @@ contract Escrow is InitializableERC20 {
     DataTypes.RFQInitialization public rfqInitialization;
     mapping(address => uint256) public borrowedUnderlyingAmounts;
 
-    event OptionExercised(address indexed exerciser);
-    event Withdrawn(address indexed to, address indexed token, uint256 amount);
+    event OnChainVotingDelegation(address delegate);
+    event OffChainVotingDelegation(
+        address allowedDelegateRegistry,
+        bytes32 spaceId,
+        address delegate
+    );
+    event Withdraw(
+        address indexed sender,
+        address indexed to,
+        address indexed token,
+        uint256 amount
+    );
+    event TransferOwnership(
+        address indexed sender,
+        address oldOwner,
+        address newOwner
+    );
 
     function initializeAuction(
         address _router,
@@ -208,7 +223,6 @@ contract Escrow is InitializableERC20 {
             underlyingReceiver,
             underlyingAmount
         );
-        emit OptionExercised(exerciser);
     }
 
     function handleBorrow(
@@ -289,6 +303,7 @@ contract Escrow is InitializableERC20 {
             revert();
         }
         ERC20Votes(optionInfo.underlyingToken).delegate(delegate);
+        emit OnChainVotingDelegation(delegate);
     }
 
     function handleOffChainVoting(bytes32 spaceId, address delegate) external {
@@ -304,6 +319,11 @@ contract Escrow is InitializableERC20 {
         // @dev: for off-chain voting via Gnosis Delegate Registry
         // see: https://docs.snapshot.org/user-guides/delegation#delegation-contract
         IDelegation(allowedDelegateRegistry).setDelegate(spaceId, delegate);
+        emit OffChainVotingDelegation(
+            allowedDelegateRegistry,
+            spaceId,
+            delegate
+        );
     }
 
     function handleWithdraw(
@@ -318,7 +338,7 @@ contract Escrow is InitializableERC20 {
             revert();
         }
         IERC20Metadata(token).safeTransfer(to, amount);
-        emit Withdrawn(to, token, amount);
+        emit Withdraw(msg.sender, to, token, amount);
     }
 
     function transferOwnership(address newOwner) public {
@@ -330,6 +350,7 @@ contract Escrow is InitializableERC20 {
             revert();
         }
         owner = newOwner;
+        emit TransferOwnership(msg.sender, _owner, newOwner);
     }
 
     function previewBid(
