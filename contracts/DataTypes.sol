@@ -2,14 +2,14 @@
 pragma solidity 0.8.24;
 
 library DataTypes {
-    struct CommonOptionInfo {
+    struct OptionInfo {
         address underlyingToken;
         address settlementToken;
         uint256 notional;
         uint256 strike;
         uint256 expiry;
         uint256 earliestExercise;
-        AdvancedOptions advancedOptions;
+        AdvancedEscrowSettings advancedEscrowSettings;
     }
 
     struct AuctionParams {
@@ -25,29 +25,29 @@ library DataTypes {
         address oracle;
     }
 
-    struct RFQParams {
+    struct RFQQuote {
         uint256 premium;
         uint256 validUntil;
         bytes signature;
     }
 
-    struct AdvancedOptions {
+    struct AdvancedEscrowSettings {
         bool borrowingAllowed;
         bool votingDelegationAllowed;
         address allowedDelegateRegistry;
     }
 
-    struct AuctionInfo {
+    struct AuctionInitialization {
         address underlyingToken;
         address settlementToken;
         uint256 notional;
         AuctionParams auctionParams;
-        AdvancedOptions advancedOptions;
+        AdvancedEscrowSettings advancedEscrowSettings;
     }
 
-    struct RFQInfo {
-        CommonOptionInfo commonInfo;
-        RFQParams rfqParams;
+    struct RFQInitialization {
+        OptionInfo optionInfo;
+        RFQQuote rfqQuote;
     }
 
     enum BidStatus {
@@ -57,10 +57,12 @@ library DataTypes {
         OutOfRangeSpotPrice,
         AuctionAlreadySuccessful,
         AuctionNotStarted,
-        PremiumTooLow
+        PremiumTooLow,
+        NotAnAuction,
+        InsufficientFunding
     }
 
-    struct CallBidPreview {
+    struct BidPreview {
         BidStatus status;
         address settlementToken;
         uint256 strike;
@@ -69,16 +71,5 @@ library DataTypes {
         uint256 premium;
         uint256 oracleSpotPrice;
         uint256 currAsk;
-    }
-
-    struct Quote {
-        address underlyingToken;
-        address settlementToken;
-        uint256 notional;
-        uint256 strike;
-        uint256 expiry;
-        uint256 premium;
-        uint256 validUntil;
-        bytes signature;
     }
 }

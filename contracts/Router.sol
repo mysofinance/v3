@@ -22,19 +22,27 @@ contract Router {
         escrowImpl = _escrowImpl;
     }
 
-    function startAuction(DataTypes.AuctionInfo calldata auctionInfo) external {
-        address escrow = _createEscrow(msg.sender);
-        Escrow(escrow).initializeAuction(auctionInfo);
-        IERC20Metadata(auctionInfo.underlyingToken).safeTransferFrom(
+    function startAuction(
+        address owner,
+        DataTypes.AuctionInitialization calldata auctionInitialization
+    ) external {
+        address escrow = _createEscrow();
+        Escrow(escrow).initializeAuction(
+            address(this),
+            owner,
+            auctionInitialization
+        );
+        IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
             escrow,
-            auctionInfo.notional
+            auctionInitialization.notional
         );
     }
 
     function withdrawFromEscrowAndStartAuction(
         address oldEscrow,
-        DataTypes.AuctionInfo calldata auctionInfo
+        address owner,
+        DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
         if (!isEscrow[oldEscrow]) {
             revert();
@@ -44,15 +52,21 @@ contract Router {
         }
         Escrow(oldEscrow).handleWithdraw(
             msg.sender,
-            auctionInfo.underlyingToken,
-            IERC20Metadata(auctionInfo.underlyingToken).balanceOf(oldEscrow)
+            auctionInitialization.underlyingToken,
+            IERC20Metadata(auctionInitialization.underlyingToken).balanceOf(
+                oldEscrow
+            )
         );
-        address newEscrow = _createEscrow(msg.sender);
-        Escrow(newEscrow).initializeAuction(auctionInfo);
-        IERC20Metadata(auctionInfo.underlyingToken).safeTransferFrom(
+        address newEscrow = _createEscrow();
+        Escrow(newEscrow).initializeAuction(
+            address(this),
+            owner,
+            auctionInitialization
+        );
+        IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
             newEscrow,
-            auctionInfo.notional
+            auctionInitialization.notional
         );
     }
 
@@ -160,20 +174,23 @@ contract Router {
         );
     }
 
-    function takeQuote(DataTypes.RFQInfo calldata quote) external {
-        if (block.timestamp > quote.rfqParams.validUntil) {
+    function takeQuote(
+        address owner,
+        DataTypes.RFQInitialization calldata quote
+    ) external {
+        if (block.timestamp > quote.rfqQuote.validUntil) {
             revert();
         }
         bytes32 msgHash = keccak256(
             abi.encode(
                 block.chainid,
-                quote.commonInfo.underlyingToken,
-                quote.commonInfo.settlementToken,
-                quote.commonInfo.notional,
-                quote.commonInfo.strike,
-                quote.commonInfo.expiry,
-                quote.rfqParams.premium,
-                quote.rfqParams.validUntil
+                quote.optionInfo.underlyingToken,
+                quote.optionInfo.settlementToken,
+                quote.optionInfo.notional,
+                quote.optionInfo.strike,
+                quote.optionInfo.expiry,
+                quote.rfqQuote.premium,
+                quote.rfqQuote.validUntil
             )
         );
         if (isQuoteUsed[msgHash]) {
@@ -181,26 +198,25 @@ contract Router {
         }
         address quoter = ECDSA.recover(
             MessageHashUtils.toEthSignedMessageHash(msgHash),
-            quote.rfqParams.signature
+            quote.rfqQuote.signature
         );
         isQuoteUsed[msgHash] = true;
-        address escrow = _createEscrow(msg.sender);
-        Escrow(escrow).initializeRFQMatch(quoter, quote);
-        IERC20Metadata(quote.commonInfo.underlyingToken).safeTransferFrom(
+        address escrow = _createEscrow();
+        Escrow(escrow).initializeRFQMatch(address(this), owner, quoter, quote);
+        IERC20Metadata(quote.optionInfo.underlyingToken).safeTransferFrom(
             quoter,
             msg.sender,
-            quote.rfqParams.premium
+            quote.rfqQuote.premium
         );
     }
 
-    function _createEscrow(address _owner) internal returns (address) {
+    function _createEscrow() internal returns (address) {
         address escrow = Clones.cloneDeterministic(
             escrowImpl,
             keccak256(abi.encode(numEscrows))
         );
         numEscrows += 1;
         isEscrow[escrow] = true;
-        Escrow(escrow).initialize(address(this), _owner);
         return escrow;
     }
 }
