@@ -23,10 +23,12 @@ contract RouterTest is Test {
     MockERC20 settlementToken;
     address owner;
     address quoter;
+    address taker;
 
     function setUp() public {
         owner = address(this);
         quoter = address(0x1234);
+        taker = makeAddr("taker");
         
         // Deploy mock tokens
         underlyingToken = new MockERC20("Underlying", "UNDER");
@@ -40,10 +42,13 @@ contract RouterTest is Test {
         
         // Mint tokens to this contract and approve Router
         underlyingToken.mint(owner, 1000e18);
+        underlyingToken.mint(taker, 1000e18);
         settlementToken.mint(quoter, 1000e18);
         underlyingToken.approve(address(router), type(uint256).max);
         vm.prank(quoter);
         settlementToken.approve(address(router), type(uint256).max);
+        vm.prank(taker);
+        underlyingToken.approve(address(router), type(uint256).max);
     }
 
     function testStartAuction(uint256 notional, uint256 relStrike) public {
@@ -144,9 +149,6 @@ contract RouterTest is Test {
         vm.prank(quoter);
         settlementToken.approve(address(router), type(uint256).max);
 
-        console2.log("router address:", address(router));
-        console2.log("settlement token address:", address(settlementToken));
-
         // Sign the message as the quoter
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(quoterPrivateKey, ethSignedMessageHash);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -160,11 +162,9 @@ contract RouterTest is Test {
             })
         });
 
-
-        // Log the quoter's address before calling takeQuote
-        console2.log("Quoter address:", quoter);
-
-        vm.prank(quoter);
+        uint256 quoterSettlementBalanceBefore = settlementToken.balanceOf(quoter);
+        uint256 takerUnderlyingBalanceBefore = underlyingToken.balanceOf(taker);
+        vm.prank(taker);
         router.takeQuote(owner, rfqInit);
 
         assertEq(router.numEscrows(), 1);
@@ -175,52 +175,88 @@ contract RouterTest is Test {
         assertEq(escrow.router(), address(router));
         assertEq(escrow.owner(), owner);
         assertEq(underlyingToken.balanceOf(escrowAddr), notional);
-        assertEq(settlementToken.balanceOf(owner), premium);
+        assertEq(settlementToken.balanceOf(quoter), quoterSettlementBalanceBefore - premium);
+        assertEq(underlyingToken.balanceOf(taker), takerUnderlyingBalanceBefore - notional);
+        assertEq(settlementToken.balanceOf(taker), premium);
     }
 
     function testBidOnAuction(uint256 notional, uint256 relStrike, uint256 relBid) public {
-        notional = bound(notional, 1e18, 1000e18);
-        relStrike = bound(relStrike, 0.5e18, 2e18);
-        relBid = bound(relBid, 0.05e18, 0.2e18);
+    notional = bound(notional, 1e18, 1000e18);
+    relStrike = bound(relStrike, 0.5e18, 2e18);
+    relBid = bound(relBid, 0.05e18, 0.2e18);
 
-        // Start an auction first
-        DataTypes.AuctionInitialization memory auctionInit = DataTypes.AuctionInitialization({
-            underlyingToken: address(underlyingToken),
-            settlementToken: address(settlementToken),
-            notional: notional,
-            auctionParams: DataTypes.AuctionParams({
-                relStrike: relStrike,
-                tenor: 7 days,
-                earliestExerciseTenor: 1 days,
-                relPremiumStart: 0.1e18,
-                relPremiumFloor: 0.05e18,
-                decayDuration: 1 days,
-                minSpot: 0.8e18,
-                maxSpot: 1.2e18,
-                decayStartTime: block.timestamp,
-                oracle: address(this)
-            }),
-            advancedEscrowSettings: DataTypes.AdvancedEscrowSettings({
-                borrowingAllowed: true,
-                votingDelegationAllowed: true,
-                allowedDelegateRegistry: address(0)
-            })
-        });
+    // Set up addresses
+    address auctionStarter = makeAddr("auctionStarter");
+    address optionReceiver = makeAddr("optionReceiver");
 
-        router.startAuction(owner, auctionInit);
-        address escrowAddr = router.escrows(0);
+    // Mint underlying tokens to the auction starter
+    vm.startPrank(address(underlyingToken));
+    underlyingToken.mint(auctionStarter, notional);
+    vm.stopPrank();
 
-        // Now bid on the auction
-        address optionReceiver = address(0x1111);
-        uint256 refSpot = 1e18; // Assuming 1:1 exchange rate for simplicity
+    // Approve router to spend underlying tokens
+    vm.prank(auctionStarter);
+    underlyingToken.approve(address(router), notional);
 
-        vm.prank(quoter);
-        router.bidOnAuction(escrowAddr, optionReceiver, relBid, notional, refSpot, new bytes[](0));
+    // Start an auction
+    DataTypes.AuctionInitialization memory auctionInit = DataTypes.AuctionInitialization({
+        underlyingToken: address(underlyingToken),
+        settlementToken: address(settlementToken),
+        notional: notional,
+        auctionParams: DataTypes.AuctionParams({
+            relStrike: relStrike,
+            tenor: 7 days,
+            earliestExerciseTenor: 1 days,
+            relPremiumStart: 0.1e18,
+            relPremiumFloor: 0.05e18,
+            decayDuration: 1 days,
+            minSpot: 0.8e18,
+            maxSpot: 1.2e18,
+            decayStartTime: block.timestamp,
+            oracle: address(this)
+        }),
+        advancedEscrowSettings: DataTypes.AdvancedEscrowSettings({
+            borrowingAllowed: true,
+            votingDelegationAllowed: true,
+            allowedDelegateRegistry: address(0)
+        })
+    });
 
-        Escrow escrow = Escrow(escrowAddr);
-        assertTrue(escrow.optionMinted());
-        assertEq(escrow.balanceOf(optionReceiver), notional);
-    }
+    vm.prank(auctionStarter);
+    router.startAuction(auctionStarter, auctionInit);
+    address escrowAddr = router.escrows(0);
+
+    // Prepare for bidding
+    uint256 refSpot = 1e18; // Assuming 1:1 exchange rate for simplicity
+    uint256 premium = (relBid * notional * refSpot) / 1e18 / 1e18;
+
+    // Mint settlement tokens to the bidder (optionReceiver)
+    vm.startPrank(address(settlementToken));
+    settlementToken.mint(optionReceiver, premium * 2); // Mint extra to ensure enough balance
+    vm.stopPrank();
+
+    // Approve router to spend settlement tokens
+    vm.prank(optionReceiver);
+    settlementToken.approve(address(router), premium * 2);
+
+    // Record balances before bidding
+    uint256 starterUnderlyingBalanceBefore = underlyingToken.balanceOf(auctionStarter);
+    uint256 receiverSettlementBalanceBefore = settlementToken.balanceOf(optionReceiver);
+    uint256 escrowUnderlyingBalanceBefore = underlyingToken.balanceOf(escrowAddr);
+
+    // Now bid on the auction
+    vm.prank(optionReceiver);
+    router.bidOnAuction(escrowAddr, optionReceiver, relBid, notional, refSpot, new bytes[](0));
+
+    // Verify token movements and contract state
+    Escrow escrow = Escrow(escrowAddr);
+    assertTrue(escrow.optionMinted());
+    assertEq(escrow.balanceOf(optionReceiver), notional);
+    assertEq(underlyingToken.balanceOf(escrowAddr), escrowUnderlyingBalanceBefore);
+    assertEq(settlementToken.balanceOf(optionReceiver), receiverSettlementBalanceBefore - premium);
+    assertEq(settlementToken.balanceOf(auctionStarter), premium);
+    assertEq(underlyingToken.balanceOf(auctionStarter), starterUnderlyingBalanceBefore);
+}
 
     // Mock oracle function for testing
     function getPrice(address, address, uint256 refSpot, bytes[] memory) external pure returns (uint256) {
