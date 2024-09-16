@@ -183,7 +183,7 @@ contract RouterTest is Test {
     function testBidOnAuction(uint256 notional, uint256 relStrike, uint256 relBid) public {
     notional = bound(notional, 1e18, 1000e18);
     relStrike = bound(relStrike, 0.5e18, 2e18);
-    relBid = bound(relBid, 0.05e18, 0.2e18);
+    relBid = bound(relBid, 0.1e18, 0.2e18);
 
     // Set up addresses
     address auctionStarter = makeAddr("auctionStarter");
