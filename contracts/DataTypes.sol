@@ -53,7 +53,6 @@ library DataTypes {
 
     enum BidStatus {
         Success,
-        InvalidAmount,
         SpotPriceTooLow,
         OutOfRangeSpotPrice,
         AuctionAlreadySuccessful,

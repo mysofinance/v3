@@ -16,9 +16,9 @@ contract Escrow is InitializableERC20 {
 
     address public router;
     address public owner;
-    uint256 public earliestExercise;
     bool public isAuction;
     bool public optionMinted;
+    uint256 public premiumPaid;
 
     DataTypes.OptionInfo public optionInfo;
     DataTypes.AuctionParams public auctionParams;
@@ -130,6 +130,7 @@ contract Escrow is InitializableERC20 {
 
         optionInfo = rfqInitialization.optionInfo;
         optionMinted = true;
+        premiumPaid = rfqInitialization.rfqQuote.premium;
         _mint(optionReceiver, rfqInitialization.optionInfo.notional);
 
         _initialize(
@@ -141,7 +142,6 @@ contract Escrow is InitializableERC20 {
 
     function handleAuctionBid(
         uint256 relBid,
-        uint256 amount,
         address optionReceiver,
         uint256 _refSpot,
         bytes[] memory _data
@@ -161,7 +161,6 @@ contract Escrow is InitializableERC20 {
         }
         DataTypes.BidPreview memory preview = previewBid(
             relBid,
-            amount,
             _refSpot,
             _data
         );
@@ -181,10 +180,9 @@ contract Escrow is InitializableERC20 {
         optionInfo.expiry = _expiry;
         optionInfo.earliestExercise = _earliestExercise;
 
-        earliestExercise = _earliestExercise;
-
         optionMinted = true;
-        _mint(optionReceiver, amount);
+        premiumPaid = _premium;
+        _mint(optionReceiver, optionInfo.notional);
     }
 
     function handleCallExercise(
@@ -375,7 +373,6 @@ contract Escrow is InitializableERC20 {
 
     function previewBid(
         uint256 relBid,
-        uint256 amount,
         uint256 _refSpot,
         bytes[] memory _data
     ) public view returns (DataTypes.BidPreview memory preview) {
@@ -397,20 +394,6 @@ contract Escrow is InitializableERC20 {
             return
                 DataTypes.BidPreview({
                     status: DataTypes.BidStatus.AuctionAlreadySuccessful,
-                    settlementToken: address(0),
-                    strike: 0,
-                    expiry: 0,
-                    earliestExercise: 0,
-                    premium: 0,
-                    oracleSpotPrice: 0,
-                    currAsk: _currAsk
-                });
-        }
-
-        if (amount != optionInfo.notional) {
-            return
-                DataTypes.BidPreview({
-                    status: DataTypes.BidStatus.InvalidAmount,
                     settlementToken: address(0),
                     strike: 0,
                     expiry: 0,
@@ -473,10 +456,11 @@ contract Escrow is InitializableERC20 {
                 });
         }
 
+        uint256 notional = optionInfo.notional;
         if (
             IERC20Metadata(optionInfo.underlyingToken).balanceOf(
                 address(this)
-            ) < amount
+            ) < notional
         ) {
             return
                 DataTypes.BidPreview({
@@ -491,7 +475,7 @@ contract Escrow is InitializableERC20 {
                 });
         }
 
-        uint256 premium = (relBid * optionInfo.notional * oracleSpotPrice) /
+        uint256 premium = (_currAsk * notional * oracleSpotPrice) /
             BASE /
             10 ** IERC20Metadata(optionInfo.underlyingToken).decimals();
         uint256 strikePrice = (oracleSpotPrice * auctionParams.relStrike) /
