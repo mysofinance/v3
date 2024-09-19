@@ -163,7 +163,10 @@ contract Router {
     function exerciseCall(
         address escrow,
         address underlyingReceiver,
-        uint256 underlyingAmount
+        uint256 underlyingAmount,
+        bool settleInUnderlying,
+        uint256 refSpot,
+        bytes[] memory data
     ) external {
         if (!isEscrow[escrow]) {
             revert();
@@ -172,13 +175,18 @@ contract Router {
             .handleCallExercise(
                 msg.sender,
                 underlyingReceiver,
-                underlyingAmount
+                underlyingAmount,
+                settleInUnderlying,
+                refSpot,
+                data
             );
-        IERC20Metadata(settlementToken).safeTransferFrom(
-            msg.sender,
-            Escrow(escrow).owner(),
-            settlementAmount
-        );
+        if (!settleInUnderlying) {
+            IERC20Metadata(settlementToken).safeTransferFrom(
+                msg.sender,
+                Escrow(escrow).owner(),
+                settlementAmount
+            );
+        }
         emit ExerciseCall(escrow, underlyingReceiver, underlyingAmount);
     }
 

@@ -10,6 +10,7 @@ library DataTypes {
         uint256 expiry;
         uint256 earliestExercise;
         AdvancedEscrowSettings advancedEscrowSettings;
+        address oracle;
     }
 
     struct AuctionParams {

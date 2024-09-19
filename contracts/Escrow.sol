@@ -128,17 +128,7 @@ contract Escrow is InitializableERC20 {
 
         rfqInitialization = _rfqInitialization;
 
-        optionInfo.underlyingToken = rfqInitialization
-            .optionInfo
-            .underlyingToken;
-        optionInfo.settlementToken = rfqInitialization
-            .optionInfo
-            .settlementToken;
-        optionInfo.notional = rfqInitialization.optionInfo.notional;
-        optionInfo.advancedEscrowSettings = rfqInitialization
-            .optionInfo
-            .advancedEscrowSettings;
-
+        optionInfo = rfqInitialization.optionInfo;
         optionMinted = true;
         _mint(optionReceiver, rfqInitialization.optionInfo.notional);
 
@@ -200,7 +190,10 @@ contract Escrow is InitializableERC20 {
     function handleCallExercise(
         address exerciser,
         address underlyingReceiver,
-        uint256 underlyingAmount
+        uint256 underlyingAmount,
+        bool settleInUnderlying,
+        uint256 refSpot,
+        bytes[] memory data
     ) external returns (address settlementToken, uint256 settlementAmount) {
         if (msg.sender != router) {
             revert();
@@ -214,15 +207,42 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
+        if (underlyingAmount > optionInfo.notional) {
+            revert();
+        }
         settlementToken = optionInfo.settlementToken;
-        settlementAmount =
-            (optionInfo.strike * underlyingAmount) /
-            optionInfo.notional;
-        _burn(exerciser, underlyingAmount);
-        IERC20Metadata(optionInfo.underlyingToken).safeTransfer(
+        address underlyingToken = optionInfo.underlyingToken;
+        uint256 underlyingReceiverAmount;
+        if (settleInUnderlying) {
+            uint256 settlementAmountInUnderlying = ((optionInfo.strike *
+                underlyingAmount) *
+                IOracle(optionInfo.oracle).getPrice(
+                    settlementToken,
+                    underlyingToken,
+                    refSpot,
+                    data
+                )) / (10 ** IERC20Metadata(underlyingToken).decimals());
+            if (settlementAmountInUnderlying > underlyingAmount) {
+                revert();
+            }
+            underlyingReceiverAmount =
+                underlyingAmount -
+                settlementAmountInUnderlying;
+            IERC20Metadata(underlyingToken).safeTransfer(
+                owner,
+                settlementAmountInUnderlying
+            );
+        } else {
+            settlementAmount =
+                (optionInfo.strike * underlyingAmount) /
+                (10 ** IERC20Metadata(underlyingToken).decimals());
+            underlyingReceiverAmount = underlyingAmount;
+        }
+        IERC20Metadata(underlyingToken).safeTransfer(
             underlyingReceiver,
-            underlyingAmount
+            underlyingReceiverAmount
         );
+        _burn(exerciser, underlyingAmount);
     }
 
     function handleBorrow(
