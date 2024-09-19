@@ -30,10 +30,16 @@ contract Router {
         address indexed newEscrow,
         DataTypes.AuctionInitialization auctionInitialization
     );
+    event Withdraw(
+        address indexed sender,
+        address indexed escrow,
+        address to,
+        address indexed token,
+        uint256 amount
+    );
     event BidOnAuction(
         address indexed escrow,
         uint256 relBid,
-        uint256 amount,
         address optionReceiver,
         uint256 _refSpot
     );
@@ -117,11 +123,26 @@ contract Router {
         );
     }
 
+    function withdraw(
+        address escrow,
+        address to,
+        address token,
+        uint256 amount
+    ) external {
+        if (!isEscrow[escrow]) {
+            revert();
+        }
+        if (msg.sender != Escrow(escrow).owner()) {
+            revert();
+        }
+        Escrow(escrow).handleWithdraw(to, token, amount);
+        emit Withdraw(msg.sender, escrow, to, token, amount);
+    }
+
     function bidOnAuction(
         address escrow,
         address optionReceiver,
         uint256 relBid,
-        uint256 amount,
         uint256 _refSpot,
         bytes[] memory _data
     )
@@ -147,7 +168,6 @@ contract Router {
             _oracleSpotPrice
         ) = Escrow(escrow).handleAuctionBid(
             relBid,
-            amount,
             optionReceiver,
             _refSpot,
             _data
@@ -157,7 +177,7 @@ contract Router {
             Escrow(escrow).owner(),
             _premium
         );
-        emit BidOnAuction(escrow, relBid, amount, optionReceiver, _refSpot);
+        emit BidOnAuction(escrow, relBid, optionReceiver, _refSpot);
     }
 
     function exerciseCall(
