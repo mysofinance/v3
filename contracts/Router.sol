@@ -12,7 +12,10 @@ import {DataTypes} from "./DataTypes.sol";
 contract Router {
     using SafeERC20 for IERC20Metadata;
 
+    uint256 public constant MAX_FEE = 0.2 ether;
+    uint256 public constant BASE = 1 ether;
     address public immutable escrowImpl;
+    address public immutable feeHandler;
     uint256 public numEscrows;
 
     mapping(address => bool) public isEscrow;
@@ -64,8 +67,9 @@ contract Router {
         DataTypes.RFQInitialization rfqInitialization
     );
 
-    constructor(address _escrowImpl) {
+    constructor(address _escrowImpl, address _feeHandler) {
         escrowImpl = _escrowImpl;
+        feeHandler = _feeHandler;
     }
 
     function startAuction(
@@ -144,7 +148,8 @@ contract Router {
         address optionReceiver,
         uint256 relBid,
         uint256 _refSpot,
-        bytes[] memory _data
+        bytes[] memory _data,
+        address distPartner
     )
         external
         returns (
@@ -172,11 +177,28 @@ contract Router {
             _refSpot,
             _data
         );
+        (uint256 fee, uint256 distPartnerFeeShare) = IFeeHandler(feeHandler).getFees(distPartner);
+        if (fee > MAX_FEE) {
+            revert();
+        }
+        uint256 protocolFee = _premium * fee * (BASE - distPartnerFeeShare) / BASE;
+        uint256 distPartnerFee = _premium * fee * distPartnerFeeShare / BASE;
         IERC20Metadata(settlementToken).safeTransferFrom(
             msg.sender,
             Escrow(escrow).owner(),
-            _premium
+            _premium - distPartnerFee - protocolFee
         );
+        IERC20Metadata(settlementToken).safeTransferFrom(
+            msg.sender,
+            distPartner,
+            distPartnerFee
+        );
+        IERC20Metadata(settlementToken).safeTransferFrom(
+            msg.sender,
+            address(this),
+            protocolFee
+        );
+        IFeeHandler(feeHandler).collect(protocolFee);
         emit BidOnAuction(escrow, relBid, optionReceiver, _refSpot);
     }
 
