@@ -8,72 +8,81 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract FeeHandler is Ownable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 public constant MAX_FEE = 0.2 ether;
     uint256 public constant BASE = 1 ether;
+    uint256 public constant MAX_MATCH_FEE = 0.2 ether;
+    uint256 public constant MAX_EXERCISE_FEE = 0.005 ether;
 
-    uint256 public totalFeePct;
-    uint256 public distPartnerFeeShare;
+    uint256 public matchFee;
+    uint256 public matchFeeDistPartnerShare;
+    uint256 public exerciseFee;
+
     mapping(address => bool) public isDistPartner;
 
-    event Collect(address indexed token, uint256 amount);
-    event SetFees(uint256 totalFeePct, uint256 distPartnerFeeShare);
+    event PayFee(address indexed token, uint256 amount);
+    event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
+    event SetExerciseFee(uint256 exerciseFee);
     event SetDistributionPartners(address[] accounts, bool[] isDistPartner);
 
-    error FeeExceedsMaximum(uint256 maxFee);
-    error InvalidPartnerFeeShare(uint256 maxShare);
-    error FeeAlreadySet();
+    error InvalidMatchFee();
+    error InvalidPartnerFeeShare();
+    error InvalidExerciseFee();
 
     constructor(
         address initOwner,
-        uint256 _totalFeePct,
-        uint256 _distPartnerFeeShare
+        uint256 _matchFee,
+        uint256 _distPartnerFeeShare,
+        uint256 _exerciseFee
     ) Ownable(initOwner) {
-        setFees(_totalFeePct, _distPartnerFeeShare);
+        setMatchFeeInfo(_matchFee, _distPartnerFeeShare);
+        setExerciseFee(_exerciseFee);
     }
 
-    function calcFees(
-        address /*premiumToken*/,
-        uint256 premium,
-        address distPartner
-    ) external view returns (uint256 protocolFee, uint256 distPartnerFee) {
-        uint256 _distPartnerFeeShare = isDistPartner[distPartner]
-            ? distPartnerFeeShare
-            : 0;
-        protocolFee =
-            (premium * totalFeePct * (BASE - _distPartnerFeeShare)) /
-            BASE;
-        distPartnerFee = (premium * totalFeePct * _distPartnerFeeShare) / BASE;
-    }
-
-    function collect(address token, uint256 amount) external {
+    function payFee(address token, uint256 amount) external {
         IERC20Metadata(token).safeTransferFrom(
             msg.sender,
             address(this),
             amount
         );
-        emit Collect(token, amount);
+        emit PayFee(token, amount);
     }
 
-    function setFees(
-        uint256 _totalFeePct,
+    function getMatchFeeInfo(
+        address distPartner
+    )
+        external
+        view
+        returns (uint256 _matchFee, uint256 _matchFeeDistPartnerShare)
+    {
+        _matchFee = matchFee;
+        _matchFeeDistPartnerShare = isDistPartner[distPartner]
+            ? matchFeeDistPartnerShare
+            : 0;
+    }
+
+    function setMatchFeeInfo(
+        uint256 _matchFee,
         uint256 _distPartnerFeeShare
     ) public onlyOwner {
-        if (_totalFeePct > MAX_FEE) {
-            revert FeeExceedsMaximum(MAX_FEE);
-        }
-        if (_distPartnerFeeShare > BASE) {
-            revert InvalidPartnerFeeShare(BASE);
+        if (_matchFee > MAX_MATCH_FEE || _matchFee == matchFee) {
+            revert InvalidMatchFee();
         }
         if (
-            _totalFeePct == totalFeePct ||
-            _distPartnerFeeShare == distPartnerFeeShare
+            _distPartnerFeeShare > BASE ||
+            _distPartnerFeeShare == matchFeeDistPartnerShare
         ) {
-            revert FeeAlreadySet();
+            revert InvalidPartnerFeeShare();
         }
-        totalFeePct = _totalFeePct;
-        distPartnerFeeShare = _distPartnerFeeShare;
+        matchFee = _matchFee;
+        matchFeeDistPartnerShare = _distPartnerFeeShare;
+        emit SetMatchFeeInfo(_matchFee, _distPartnerFeeShare);
+    }
 
-        emit SetFees(_totalFeePct, _distPartnerFeeShare);
+    function setExerciseFee(uint256 _exerciseFee) public onlyOwner {
+        if (_exerciseFee > MAX_EXERCISE_FEE || _exerciseFee == exerciseFee) {
+            revert InvalidExerciseFee();
+        }
+        exerciseFee = _exerciseFee;
+        emit SetExerciseFee(_exerciseFee);
     }
 
     function setDistPartners(
@@ -87,7 +96,7 @@ contract FeeHandler is Ownable {
             if (isDistPartner[accounts[i]] == _isDistPartner[i]) {
                 revert();
             }
-            isDistPartner[accounts[i]] == _isDistPartner[i];
+            isDistPartner[accounts[i]] = _isDistPartner[i];
             unchecked {
                 ++i;
             }
