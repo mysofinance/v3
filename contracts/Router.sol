@@ -8,7 +8,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Escrow} from "./Escrow.sol";
-import {FeeHandler} from "./FeeHandler.sol";
+import {FeeHandler} from "./periphery/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
 
 contract Router is Ownable {
