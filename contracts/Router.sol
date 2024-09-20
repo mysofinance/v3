@@ -48,12 +48,15 @@ contract Router is Ownable {
         address indexed escrow,
         uint256 relBid,
         address optionReceiver,
-        uint256 _refSpot
+        uint256 refSpot,
+        uint256 protocolFee,
+        uint256 distPartnerFee
     );
     event ExerciseCall(
         address indexed escrow,
         address underlyingReceiver,
-        uint256 underlyingAmount
+        uint256 underlyingAmount,
+        uint256 exerciseFeeAmount
     );
     event Borrow(
         address indexed escrow,
@@ -68,7 +71,9 @@ contract Router is Ownable {
     event TakeQuote(
         address indexed escrowOwner,
         address indexed escrow,
-        DataTypes.RFQInitialization rfqInitialization
+        DataTypes.RFQInitialization rfqInitialization,
+        uint256 protocolFee,
+        uint256 distPartnerFee
     );
     event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
 
@@ -214,7 +219,14 @@ contract Router is Ownable {
             FeeHandler(feeHandler).payFee(settlementToken, _protocolFee);
         }
 
-        emit BidOnAuction(escrow, relBid, optionReceiver, _refSpot);
+        emit BidOnAuction(
+            escrow,
+            relBid,
+            optionReceiver,
+            _refSpot,
+            _protocolFee,
+            _distPartnerFee
+        );
     }
 
     function exerciseCall(
@@ -259,7 +271,12 @@ contract Router is Ownable {
                 );
             }
         }
-        emit ExerciseCall(escrow, underlyingReceiver, underlyingAmount);
+        emit ExerciseCall(
+            escrow,
+            underlyingReceiver,
+            underlyingAmount,
+            exerciseFeeAmount
+        );
     }
 
     function borrow(
@@ -364,7 +381,13 @@ contract Router is Ownable {
                 preview.protocolFee
             );
         }
-        emit TakeQuote(escrowOwner, escrow, rfqInitialization);
+        emit TakeQuote(
+            escrowOwner,
+            escrow,
+            rfqInitialization,
+            preview.protocolFee,
+            preview.distPartnerFee
+        );
     }
 
     function setFeeHandler(address newFeeHandler) external onlyOwner {

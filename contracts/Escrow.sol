@@ -87,7 +87,7 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (_auctionInitialization.auctionParams.oracle == address(0)) {
+        if (_auctionInitialization.oracle == address(0)) {
             revert();
         }
 
@@ -96,6 +96,7 @@ contract Escrow is InitializableERC20 {
         optionInfo.notional = _auctionInitialization.notional;
         optionInfo.advancedEscrowSettings = _auctionInitialization
             .advancedEscrowSettings;
+        optionInfo.oracle = _auctionInitialization.oracle;
 
         auctionParams = _auctionInitialization.auctionParams;
 
@@ -454,7 +455,7 @@ contract Escrow is InitializableERC20 {
                 });
         }
 
-        uint256 oracleSpotPrice = IOracle(auctionParams.oracle).getPrice(
+        uint256 oracleSpotPrice = IOracle(optionInfo.oracle).getPrice(
             optionInfo.underlyingToken,
             optionInfo.settlementToken,
             _oracleData
