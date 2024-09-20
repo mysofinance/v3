@@ -88,25 +88,4 @@ library DataTypes {
         uint256 protocolFee;
         uint256 distPartnerFee;
     }
-
-    enum CallExerciseStatus {
-        Success,
-        OptionNotMinted,
-        NotExercisable,
-        AmountExceedsNotional,
-        OutOfTheMoney
-    }
-
-    struct CallExercisePreview {
-        CallExerciseStatus status;
-        TokenAmount exerciserReceive;
-        TokenAmount exerciserPay;
-        TokenAmount callWriterReceive;
-        uint256 oracleSpotPrice;
-    }
-
-    struct TokenAmount {
-        address token;
-        uint256 amount;
-    }
 }
