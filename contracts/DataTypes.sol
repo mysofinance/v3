@@ -70,6 +70,8 @@ library DataTypes {
         uint256 premium;
         uint256 oracleSpotPrice;
         uint256 currAsk;
+        uint256 protocolFee;
+        uint256 distPartnerFee;
     }
 
     enum RFQStatus {
@@ -83,5 +85,28 @@ library DataTypes {
         RFQStatus status;
         bytes32 msgHash;
         address quoter;
+        uint256 protocolFee;
+        uint256 distPartnerFee;
+    }
+
+    enum CallExerciseStatus {
+        Success,
+        OptionNotMinted,
+        NotExercisable,
+        AmountExceedsNotional,
+        OutOfTheMoney
+    }
+
+    struct CallExercisePreview {
+        CallExerciseStatus status;
+        TokenAmount exerciserReceive;
+        TokenAmount exerciserPay;
+        TokenAmount callWriterReceive;
+        uint256 oracleSpotPrice;
+    }
+
+    struct TokenAmount {
+        address token;
+        uint256 amount;
     }
 }

@@ -6,16 +6,18 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Escrow} from "./Escrow.sol";
+import {FeeHandler} from "./FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-contract Router {
+contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
 
     uint256 public constant MAX_FEE = 0.2 ether;
     uint256 public constant BASE = 1 ether;
     address public immutable escrowImpl;
-    address public immutable feeHandler;
+    address public feeHandler;
     uint256 public numEscrows;
 
     mapping(address => bool) public isEscrow;
@@ -23,12 +25,12 @@ contract Router {
     address[] public escrows;
 
     event StartAuction(
-        address indexed owner,
+        address indexed escrowOwner,
         address indexed escrow,
         DataTypes.AuctionInitialization auctionInitialization
     );
     event WithdrawFromEscrowAndStartAuction(
-        address indexed owner,
+        address indexed escrowOwner,
         address indexed oldEscrow,
         address indexed newEscrow,
         DataTypes.AuctionInitialization auctionInitialization
@@ -62,24 +64,29 @@ contract Router {
         uint256 repayUnderlyingAmount
     );
     event TakeQuote(
-        address indexed owner,
+        address indexed escrowOwner,
         address indexed escrow,
         DataTypes.RFQInitialization rfqInitialization
     );
+    event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
 
-    constructor(address _escrowImpl, address _feeHandler) {
+    constructor(
+        address initOwner,
+        address _escrowImpl,
+        address _feeHandler
+    ) Ownable(initOwner) {
         escrowImpl = _escrowImpl;
         feeHandler = _feeHandler;
     }
 
     function startAuction(
-        address owner,
+        address escrowOwner,
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
         address escrow = _createEscrow();
         Escrow(escrow).initializeAuction(
             address(this),
-            owner,
+            escrowOwner,
             auctionInitialization
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
@@ -87,12 +94,12 @@ contract Router {
             escrow,
             auctionInitialization.notional
         );
-        emit StartAuction(owner, escrow, auctionInitialization);
+        emit StartAuction(escrowOwner, escrow, auctionInitialization);
     }
 
     function withdrawFromEscrowAndStartAuction(
         address oldEscrow,
-        address owner,
+        address escrowOwner,
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
         if (!isEscrow[oldEscrow]) {
@@ -111,7 +118,7 @@ contract Router {
         address newEscrow = _createEscrow();
         Escrow(newEscrow).initializeAuction(
             address(this),
-            owner,
+            escrowOwner,
             auctionInitialization
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
@@ -120,7 +127,7 @@ contract Router {
             auctionInitialization.notional
         );
         emit WithdrawFromEscrowAndStartAuction(
-            owner,
+            escrowOwner,
             oldEscrow,
             newEscrow,
             auctionInitialization
@@ -158,7 +165,9 @@ contract Router {
             uint256 _expiry,
             uint256 _earliestExercise,
             uint256 _premium,
-            uint256 _oracleSpotPrice
+            uint256 _oracleSpotPrice,
+            uint256 _protocolFee,
+            uint256 _distPartnerFee
         )
     {
         if (!isEscrow[escrow]) {
@@ -170,35 +179,37 @@ contract Router {
             _expiry,
             _earliestExercise,
             _premium,
-            _oracleSpotPrice
+            _oracleSpotPrice,
+            _protocolFee,
+            _distPartnerFee
         ) = Escrow(escrow).handleAuctionBid(
             relBid,
             optionReceiver,
             _refSpot,
-            _data
+            _data,
+            distPartner
         );
-        (uint256 fee, uint256 distPartnerFeeShare) = IFeeHandler(feeHandler).getFees(distPartner);
-        if (fee > MAX_FEE) {
-            revert();
-        }
-        uint256 protocolFee = _premium * fee * (BASE - distPartnerFeeShare) / BASE;
-        uint256 distPartnerFee = _premium * fee * distPartnerFeeShare / BASE;
         IERC20Metadata(settlementToken).safeTransferFrom(
             msg.sender,
             Escrow(escrow).owner(),
-            _premium - distPartnerFee - protocolFee
+            _premium - _distPartnerFee - _protocolFee
         );
-        IERC20Metadata(settlementToken).safeTransferFrom(
-            msg.sender,
-            distPartner,
-            distPartnerFee
-        );
-        IERC20Metadata(settlementToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            protocolFee
-        );
-        IFeeHandler(feeHandler).collect(protocolFee);
+        if (_distPartnerFee > 0) {
+            IERC20Metadata(settlementToken).safeTransferFrom(
+                msg.sender,
+                distPartner,
+                _distPartnerFee
+            );
+        }
+        if (_protocolFee > 0) {
+            IERC20Metadata(settlementToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                _protocolFee
+            );
+            FeeHandler(feeHandler).collect(settlementToken, _protocolFee);
+        }
+
         emit BidOnAuction(escrow, relBid, optionReceiver, _refSpot);
     }
 
@@ -222,7 +233,7 @@ contract Router {
                 refSpot,
                 data
             );
-        if (!settleInUnderlying) {
+        if (settlementAmount > 0) {
             IERC20Metadata(settlementToken).safeTransferFrom(
                 msg.sender,
                 Escrow(escrow).owner(),
@@ -276,11 +287,13 @@ contract Router {
     }
 
     function takeQuote(
-        address owner,
-        DataTypes.RFQInitialization calldata rfqInitialization
+        address escrowOwner,
+        DataTypes.RFQInitialization calldata rfqInitialization,
+        address distPartner
     ) external {
         DataTypes.TakeQuotePreview memory preview = previewTakeQuote(
-            rfqInitialization
+            rfqInitialization,
+            distPartner
         );
 
         if (preview.status != DataTypes.RFQStatus.Success) {
@@ -292,7 +305,7 @@ contract Router {
         address escrow = _createEscrow();
         Escrow(escrow).initializeRFQMatch(
             address(this),
-            owner,
+            escrowOwner,
             preview.quoter,
             rfqInitialization
         );
@@ -307,13 +320,62 @@ contract Router {
             .safeTransferFrom(
                 preview.quoter,
                 msg.sender,
-                rfqInitialization.rfqQuote.premium
+                rfqInitialization.rfqQuote.premium -
+                    preview.distPartnerFee -
+                    preview.protocolFee
             );
-        emit TakeQuote(owner, escrow, rfqInitialization);
+        if (preview.distPartnerFee > 0) {
+            IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
+                .safeTransferFrom(
+                    msg.sender,
+                    distPartner,
+                    preview.distPartnerFee
+                );
+        }
+        if (preview.protocolFee > 0) {
+            IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
+                .safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    preview.protocolFee
+                );
+            FeeHandler(feeHandler).collect(
+                rfqInitialization.optionInfo.settlementToken,
+                preview.protocolFee
+            );
+        }
+        emit TakeQuote(escrowOwner, escrow, rfqInitialization);
+    }
+
+    function setFeeHandler(address newFeeHandler) external onlyOwner {
+        address oldFeeHandler = feeHandler;
+        if (oldFeeHandler == newFeeHandler) {
+            revert();
+        }
+        feeHandler = newFeeHandler;
+        emit NewFeeHandler(oldFeeHandler, newFeeHandler);
+    }
+
+    function calcFees(
+        address premiumToken,
+        uint256 premium,
+        address distPartner
+    ) public view returns (uint256, uint256) {
+        (uint256 protocolFee, uint256 distPartnerFee) = FeeHandler(feeHandler)
+            .calcFees(premiumToken, premium, distPartner);
+        if (
+            feeHandler == address(0) ||
+            distPartnerFee + protocolFee >= premium ||
+            (protocolFee + distPartnerFee) * BASE > premium * MAX_FEE
+        ) {
+            (protocolFee, distPartnerFee) = (0, 0);
+        }
+        return (protocolFee, distPartnerFee);
     }
 
     function previewTakeQuote(
-        DataTypes.RFQInitialization calldata rfqInitialization
+        DataTypes.RFQInitialization calldata rfqInitialization,
+        address distPartner
     ) public view returns (DataTypes.TakeQuotePreview memory) {
         bytes32 msgHash = keccak256(
             abi.encode(
@@ -339,7 +401,9 @@ contract Router {
                 DataTypes.TakeQuotePreview({
                     status: DataTypes.RFQStatus.Expired,
                     msgHash: msgHash,
-                    quoter: quoter
+                    quoter: quoter,
+                    protocolFee: 0,
+                    distPartnerFee: 0
                 });
         }
 
@@ -348,7 +412,9 @@ contract Router {
                 DataTypes.TakeQuotePreview({
                     status: DataTypes.RFQStatus.AlreadyExecuted,
                     msgHash: msgHash,
-                    quoter: quoter
+                    quoter: quoter,
+                    protocolFee: 0,
+                    distPartnerFee: 0
                 });
         }
 
@@ -361,15 +427,23 @@ contract Router {
                 DataTypes.TakeQuotePreview({
                     status: DataTypes.RFQStatus.InsufficientFunding,
                     msgHash: msgHash,
-                    quoter: quoter
+                    quoter: quoter,
+                    protocolFee: 0,
+                    distPartnerFee: 0
                 });
         }
-
+        (uint256 protocolFee, uint256 distPartnerFee) = calcFees(
+            rfqInitialization.optionInfo.settlementToken,
+            rfqInitialization.rfqQuote.premium,
+            distPartner
+        );
         return
             DataTypes.TakeQuotePreview({
                 status: DataTypes.RFQStatus.Success,
                 msgHash: msgHash,
-                quoter: quoter
+                quoter: quoter,
+                protocolFee: protocolFee,
+                distPartnerFee: distPartnerFee
             });
     }
 
