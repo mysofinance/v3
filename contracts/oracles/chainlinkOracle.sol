@@ -121,57 +121,56 @@ abstract contract ChainlinkBase is IOracle {
     }
 
     /**
-     * @dev Returns the price of the collateral token in terms of the loan token.
+     * @dev Returns the price of the settlement token in terms of the underlying token.
      * @dev refSpotPrice is used for oracle slippage protection.
-     * @param collToken Address of the collateral token.
-     * @param loanToken Address of the loan token.
-     * @param refSpotPrice Reference spot price of the collateral token.
-     * @return collTokenPriceInLoanToken Price of collateral in loan token.
+     * @param settlementToken Address of the settlement token.
+     * @param underlyingToken Address of the underlying token.
+     * @param refSpotPrice Reference spot price of the settlement token.
+     * @return settlementTokenPriceInUnderlyingToken Price of settlement in underlying token.
      */
     function getPrice(
-        address collToken,
-        address loanToken,
+        address settlementToken,
+        address underlyingToken,
         uint256 refSpotPrice,
-        bytes[] calldata /* data */
-    ) external view virtual returns (uint256 collTokenPriceInLoanToken) {
-        (uint256 priceOfCollToken, uint256 priceOfLoanToken) = getRawPrices(
-            collToken,
-            loanToken
+        bytes[] calldata
+    ) external view virtual returns (uint256 settlementTokenPriceInUnderlyingToken) {
+        (uint256 priceOfSettlementToken, uint256 priceOfUnderlyingToken) = getRawPrices(
+            settlementToken,
+            underlyingToken
         );
 
-        uint256 loanTokenDecimals = IERC20Metadata(loanToken).decimals();
+        uint256 underlyingTokenDecimals = IERC20Metadata(underlyingToken).decimals();
 
-        // TODO: rename this maybe?
-        collTokenPriceInLoanToken = Math.mulDiv(
-            priceOfCollToken,
-            10 ** loanTokenDecimals,
-            priceOfLoanToken
+        settlementTokenPriceInUnderlyingToken = Math.mulDiv(
+            priceOfSettlementToken,
+            10 ** underlyingTokenDecimals,
+            priceOfUnderlyingToken
         );
 
-        // checed in escrow, so maybe omit this check
-        // if (collTokenPriceInLoanToken < refSpotPrice) {
-        //     revert OraclePriceDeviatesFromRefSpot(collTokenPriceInLoanToken, refSpotPrice);
+        // checked in escrow, so maybe omit this check
+        // if (settlementTokenPriceInUnderlyingToken < refSpotPrice) {
+        //     revert OraclePriceDeviatesFromRefSpot(settlementTokenPriceInUnderlyingToken, refSpotPrice);
         // }
     }
 
     /**
      * @dev Returns the raw prices of two tokens.
-     * @param collToken Address of the collateral token.
-     * @param loanToken Address of the loan token.
-     * @return collTokenPriceRaw Raw price of collateral token.
-     * @return loanTokenPriceRaw Raw price of loan token.
+     * @param settlementToken Address of the settlement token.
+     * @param underlyingToken Address of the underlying token.
+     * @return settlementTokenPriceRaw Raw price of settlement token.
+     * @return underlyingTokenPriceRaw Raw price of underlying token.
      */
     function getRawPrices(
-        address collToken,
-        address loanToken
+        address settlementToken,
+        address underlyingToken
     )
         public
         view
         virtual
-        returns (uint256 collTokenPriceRaw, uint256 loanTokenPriceRaw)
+        returns (uint256 settlementTokenPriceRaw, uint256 underlyingTokenPriceRaw)
     {
-        collTokenPriceRaw = _getPriceOfToken(collToken);
-        loanTokenPriceRaw = _getPriceOfToken(loanToken);
+        settlementTokenPriceRaw = _getPriceOfToken(settlementToken);
+        underlyingTokenPriceRaw = _getPriceOfToken(underlyingToken);
     }
 
     /**
