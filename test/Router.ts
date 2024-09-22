@@ -89,6 +89,7 @@ describe("Router Contract", function () {
           borrowingAllowed: true,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
+          premiumPaidInUnderlying: false
         },
         oracle: mockOracle.target,
       };
@@ -124,6 +125,7 @@ describe("Router Contract", function () {
           borrowingAllowed: true,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
+          premiumPaidInUnderlying: false
         },
         oracle: mockOracle.target,
       };
@@ -187,6 +189,7 @@ describe("Router Contract", function () {
             borrowingAllowed: true,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
+            premiumPaidInUnderlying: false
           },
           oracle: ethers.ZeroAddress,
         },
