@@ -122,17 +122,15 @@ abstract contract ChainlinkBase is IOracle {
 
     /**
      * @dev Returns the price of the settlement token in terms of the underlying token.
-     * @dev refSpotPrice is used for oracle slippage protection.
      * @param settlementToken Address of the settlement token.
      * @param underlyingToken Address of the underlying token.
-     * @param refSpotPrice Reference spot price of the settlement token.
+    * @param data Additional data that may be required to fetch the price.
      * @return settlementTokenPriceInUnderlyingToken Price of settlement in underlying token.
      */
     function getPrice(
         address settlementToken,
         address underlyingToken,
-        uint256 refSpotPrice,
-        bytes[] calldata
+        bytes[] data
     ) external view virtual returns (uint256 settlementTokenPriceInUnderlyingToken) {
         (uint256 priceOfSettlementToken, uint256 priceOfUnderlyingToken) = getRawPrices(
             settlementToken,
@@ -146,11 +144,6 @@ abstract contract ChainlinkBase is IOracle {
             10 ** underlyingTokenDecimals,
             priceOfUnderlyingToken
         );
-
-        // checked in escrow, so maybe omit this check
-        // if (settlementTokenPriceInUnderlyingToken < refSpotPrice) {
-        //     revert OraclePriceDeviatesFromRefSpot(settlementTokenPriceInUnderlyingToken, refSpotPrice);
-        // }
     }
 
     /**
