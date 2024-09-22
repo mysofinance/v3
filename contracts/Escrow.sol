@@ -17,6 +17,7 @@ contract Escrow is InitializableERC20 {
 
     address public router;
     address public owner;
+    address public premiumPaymentToken;
     bool public isAuction;
     bool public optionMinted;
     uint256 public premiumPaid;
@@ -160,20 +161,13 @@ contract Escrow is InitializableERC20 {
     )
         external
         returns (
-            address settlementToken,
-            uint256 _strike,
-            uint256 _expiry,
-            uint256 _earliestExercise,
-            uint256 _premium,
-            uint256 _oracleSpotPrice,
-            uint256 _protocolFee,
-            uint256 _distPartnerFee
+            DataTypes.BidPreview memory preview
         )
     {
         if (msg.sender != router) {
             revert();
         }
-        DataTypes.BidPreview memory preview = previewBid(
+        preview = previewBid(
             relBid,
             _refSpot,
             _oracleData,
@@ -184,21 +178,13 @@ contract Escrow is InitializableERC20 {
             revert();
         }
 
-        settlementToken = preview.settlementToken;
-        _strike = preview.strike;
-        _expiry = preview.expiry;
-        _earliestExercise = preview.earliestExercise;
-        _premium = preview.premium;
-        _oracleSpotPrice = preview.oracleSpotPrice;
-        _protocolFee = preview.protocolFee;
-        _distPartnerFee = preview.distPartnerFee;
-
-        optionInfo.strike = _strike;
-        optionInfo.expiry = _expiry;
-        optionInfo.earliestExercise = _earliestExercise;
+        optionInfo.strike = preview.strike;
+        optionInfo.expiry = preview.expiry;
+        optionInfo.earliestExercise = preview.earliestExercise;
 
         optionMinted = true;
-        premiumPaid = _premium;
+        premiumPaymentToken = preview.premiumPaidInUnderlying ? preview.underlyingToken: preview.settlementToken;
+        premiumPaid = preview.premium;
         _mint(optionReceiver, optionInfo.notional);
     }
 
@@ -237,6 +223,8 @@ contract Escrow is InitializableERC20 {
         uint256 strike = optionInfo.strike;
         uint256 underlyingTokenDecimals = IERC20Metadata(underlyingToken)
             .decimals();
+        uint256 settlementTokenDecimals = IERC20Metadata(settlementToken)
+            .decimals();
 
         settlementToken = optionInfo.settlementToken;
         settlementAmount =
@@ -253,7 +241,7 @@ contract Escrow is InitializableERC20 {
                         underlyingToken,
                         oracleData
                     )) /
-                (10 ** underlyingTokenDecimals);
+                ((10 ** underlyingTokenDecimals) * (10 ** settlementTokenDecimals));
             if (
                 exerciseCostInUnderlying > underlyingExerciseAmount ||
                 exerciseCostInUnderlying == 0
@@ -413,6 +401,7 @@ contract Escrow is InitializableERC20 {
                 DataTypes.BidPreview({
                     status: DataTypes.BidStatus.NotAnAuction,
                     settlementToken: address(0),
+                    underlyingToken: address(0),
                     strike: 0,
                     expiry: 0,
                     earliestExercise: 0,
@@ -420,7 +409,8 @@ contract Escrow is InitializableERC20 {
                     oracleSpotPrice: 0,
                     currAsk: _currAsk,
                     protocolFee: 0,
-                    distPartnerFee: 0
+                    distPartnerFee: 0,
+                    premiumPaidInUnderlying: false
                 });
         }
         if (optionMinted) {
@@ -428,6 +418,7 @@ contract Escrow is InitializableERC20 {
                 DataTypes.BidPreview({
                     status: DataTypes.BidStatus.AuctionAlreadySuccessful,
                     settlementToken: address(0),
+                    underlyingToken: address(0),
                     strike: 0,
                     expiry: 0,
                     earliestExercise: 0,
@@ -435,7 +426,8 @@ contract Escrow is InitializableERC20 {
                     oracleSpotPrice: 0,
                     currAsk: _currAsk,
                     protocolFee: 0,
-                    distPartnerFee: 0
+                    distPartnerFee: 0,
+                    premiumPaidInUnderlying: false
                 });
         }
 
@@ -444,6 +436,7 @@ contract Escrow is InitializableERC20 {
                 DataTypes.BidPreview({
                     status: DataTypes.BidStatus.PremiumTooLow,
                     settlementToken: address(0),
+                    underlyingToken: address(0),
                     strike: 0,
                     expiry: 0,
                     earliestExercise: 0,
@@ -451,7 +444,8 @@ contract Escrow is InitializableERC20 {
                     oracleSpotPrice: 0,
                     currAsk: _currAsk,
                     protocolFee: 0,
-                    distPartnerFee: 0
+                    distPartnerFee: 0,
+                    premiumPaidInUnderlying: false
                 });
         }
 
@@ -466,6 +460,7 @@ contract Escrow is InitializableERC20 {
                 DataTypes.BidPreview({
                     status: DataTypes.BidStatus.SpotPriceTooLow,
                     settlementToken: address(0),
+                    underlyingToken: address(0),
                     strike: 0,
                     expiry: 0,
                     earliestExercise: 0,
@@ -473,7 +468,8 @@ contract Escrow is InitializableERC20 {
                     oracleSpotPrice: oracleSpotPrice,
                     currAsk: _currAsk,
                     protocolFee: 0,
-                    distPartnerFee: 0
+                    distPartnerFee: 0,
+                    premiumPaidInUnderlying: false
                 });
         }
 
@@ -485,6 +481,7 @@ contract Escrow is InitializableERC20 {
                 DataTypes.BidPreview({
                     status: DataTypes.BidStatus.OutOfRangeSpotPrice,
                     settlementToken: address(0),
+                    underlyingToken: address(0),
                     strike: 0,
                     expiry: 0,
                     earliestExercise: 0,
@@ -492,7 +489,8 @@ contract Escrow is InitializableERC20 {
                     oracleSpotPrice: oracleSpotPrice,
                     currAsk: _currAsk,
                     protocolFee: 0,
-                    distPartnerFee: 0
+                    distPartnerFee: 0,
+                    premiumPaidInUnderlying: false
                 });
         }
 
@@ -506,6 +504,7 @@ contract Escrow is InitializableERC20 {
                 DataTypes.BidPreview({
                     status: DataTypes.BidStatus.InsufficientFunding,
                     settlementToken: address(0),
+                    underlyingToken: address(0),
                     strike: 0,
                     expiry: 0,
                     earliestExercise: 0,
@@ -513,13 +512,22 @@ contract Escrow is InitializableERC20 {
                     oracleSpotPrice: oracleSpotPrice,
                     currAsk: _currAsk,
                     protocolFee: 0,
-                    distPartnerFee: 0
+                    distPartnerFee: 0,
+                    premiumPaidInUnderlying: false
                 });
         }
 
-        uint256 premium = (_currAsk * notional * oracleSpotPrice) /
-            BASE /
-            10 ** IERC20Metadata(optionInfo.underlyingToken).decimals();
+        bool isPremiumPaidInUnderlying = optionInfo
+            .advancedEscrowSettings
+            .premiumPaidInUnderlying;
+
+        uint256 premium = isPremiumPaidInUnderlying
+            ? (_currAsk * notional *  10 ** IERC20Metadata(optionInfo.settlementToken).decimals()) /
+                BASE /
+                oracleSpotPrice
+            : (_currAsk * notional * oracleSpotPrice) /
+                BASE /
+                10 ** IERC20Metadata(optionInfo.underlyingToken).decimals();
         uint256 strikePrice = (oracleSpotPrice * auctionParams.relStrike) /
             BASE;
         uint256 expiryTime = block.timestamp + auctionParams.tenor;
@@ -532,6 +540,7 @@ contract Escrow is InitializableERC20 {
             DataTypes.BidPreview({
                 status: DataTypes.BidStatus.Success,
                 settlementToken: optionInfo.settlementToken,
+                underlyingToken: optionInfo.underlyingToken,
                 strike: strikePrice,
                 expiry: expiryTime,
                 earliestExercise: earliestExerciseTime,
@@ -539,7 +548,8 @@ contract Escrow is InitializableERC20 {
                 oracleSpotPrice: oracleSpotPrice,
                 currAsk: _currAsk,
                 protocolFee: protocolFee,
-                distPartnerFee: distPartnerFee
+                distPartnerFee: distPartnerFee,
+                premiumPaidInUnderlying: isPremiumPaidInUnderlying
             });
     }
 

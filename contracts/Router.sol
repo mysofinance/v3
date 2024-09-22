@@ -169,28 +169,14 @@ contract Router is Ownable {
     )
         external
         returns (
-            address settlementToken,
-            uint256 _strike,
-            uint256 _expiry,
-            uint256 _earliestExercise,
-            uint256 _premium,
-            uint256 _oracleSpotPrice,
-            uint256 _protocolFee,
-            uint256 _distPartnerFee
+            DataTypes.BidPreview memory preview
         )
     {
         if (!isEscrow[escrow]) {
             revert();
         }
         (
-            settlementToken,
-            _strike,
-            _expiry,
-            _earliestExercise,
-            _premium,
-            _oracleSpotPrice,
-            _protocolFee,
-            _distPartnerFee
+            preview
         ) = Escrow(escrow).handleAuctionBid(
             relBid,
             optionReceiver,
@@ -198,25 +184,26 @@ contract Router is Ownable {
             _oracleData,
             distPartner
         );
+        address settlementToken = preview.premiumPaidInUnderlying ? preview.underlyingToken : preview.settlementToken;
         IERC20Metadata(settlementToken).safeTransferFrom(
             msg.sender,
             Escrow(escrow).owner(),
-            _premium - _distPartnerFee - _protocolFee
+            preview.premium - preview.distPartnerFee - preview.protocolFee
         );
-        if (_distPartnerFee > 0) {
+        if (preview.distPartnerFee > 0) {
             IERC20Metadata(settlementToken).safeTransferFrom(
                 msg.sender,
                 distPartner,
-                _distPartnerFee
+                preview.distPartnerFee
             );
         }
-        if (_protocolFee > 0) {
+        if (preview.protocolFee > 0) {
             IERC20Metadata(settlementToken).safeTransferFrom(
                 msg.sender,
                 address(this),
-                _protocolFee
+                preview.protocolFee
             );
-            FeeHandler(feeHandler).payFee(settlementToken, _protocolFee);
+            FeeHandler(feeHandler).payFee(settlementToken, preview.protocolFee);
         }
 
         emit BidOnAuction(
@@ -224,8 +211,8 @@ contract Router is Ownable {
             relBid,
             optionReceiver,
             _refSpot,
-            _protocolFee,
-            _distPartnerFee
+            preview.protocolFee,
+            preview.distPartnerFee
         );
     }
 

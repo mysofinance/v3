@@ -34,6 +34,7 @@ library DataTypes {
     struct AdvancedEscrowSettings {
         bool borrowingAllowed;
         bool votingDelegationAllowed;
+        bool premiumPaidInUnderlying;
         address allowedDelegateRegistry;
     }
 
@@ -64,6 +65,7 @@ library DataTypes {
     struct BidPreview {
         BidStatus status;
         address settlementToken;
+        address underlyingToken;
         uint256 strike;
         uint256 expiry;
         uint256 earliestExercise;
@@ -72,6 +74,7 @@ library DataTypes {
         uint256 currAsk;
         uint256 protocolFee;
         uint256 distPartnerFee;
+        bool premiumPaidInUnderlying;
     }
 
     enum RFQStatus {
