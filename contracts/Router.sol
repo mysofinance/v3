@@ -241,18 +241,16 @@ contract Router is Ownable {
             );
         }
         address _feeHandler = feeHandler;
-        if (_feeHandler != address(0)) {
-            if (exerciseFeeAmount > 0) {
-                IERC20Metadata(settlementToken).safeTransferFrom(
-                    msg.sender,
-                    feeHandler,
-                    exerciseFeeAmount
-                );
-                FeeHandler(_feeHandler).provisionFees(
-                    settlementToken,
-                    exerciseFeeAmount
-                );
-            }
+        if (_feeHandler != address(0) && exerciseFeeAmount > 0) {
+            IERC20Metadata(settlementToken).safeTransferFrom(
+                msg.sender,
+                feeHandler,
+                exerciseFeeAmount
+            );
+            FeeHandler(_feeHandler).provisionFees(
+                settlementToken,
+                exerciseFeeAmount
+            );
         }
         emit Exercise(
             escrow,
@@ -285,18 +283,16 @@ contract Router is Ownable {
             collateralAmount
         );
         address _feeHandler = feeHandler;
-        if (_feeHandler != address(0)) {
-            if (collateralFeeAmount > 0) {
-                IERC20Metadata(settlementToken).safeTransferFrom(
-                    msg.sender,
-                    feeHandler,
-                    collateralFeeAmount
-                );
-                FeeHandler(_feeHandler).provisionFees(
-                    settlementToken,
-                    collateralFeeAmount
-                );
-            }
+        if (_feeHandler != address(0) && collateralFeeAmount > 0) {
+            IERC20Metadata(settlementToken).safeTransferFrom(
+                msg.sender,
+                feeHandler,
+                collateralFeeAmount
+            );
+            FeeHandler(_feeHandler).provisionFees(
+                settlementToken,
+                collateralFeeAmount
+            );
         }
         emit Borrow(
             escrow,
