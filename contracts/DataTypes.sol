@@ -12,24 +12,6 @@ library DataTypes {
         AdvancedSettings advancedSettings;
     }
 
-    struct AuctionParams {
-        uint256 relStrike;
-        uint256 tenor;
-        uint256 earliestExerciseTenor;
-        uint256 relPremiumStart;
-        uint256 relPremiumFloor;
-        uint256 decayDuration;
-        uint256 minSpot;
-        uint256 maxSpot;
-        uint256 decayStartTime;
-    }
-
-    struct RFQQuote {
-        uint256 premium;
-        uint256 validUntil;
-        bytes signature;
-    }
-
     struct AdvancedSettings {
         address oracle;
         bool premiumPaidInUnderlying;
@@ -42,14 +24,31 @@ library DataTypes {
         address underlyingToken;
         address settlementToken;
         uint256 notional;
-        address oracle;
         AuctionParams auctionParams;
         AdvancedSettings advancedSettings;
+    }
+
+    struct AuctionParams {
+        uint256 relStrike;
+        uint256 tenor;
+        uint256 earliestExerciseTenor;
+        uint256 relPremiumStart;
+        uint256 relPremiumFloor;
+        uint256 decayDuration;
+        uint256 minSpot;
+        uint256 maxSpot;
+        uint256 decayStartTime;
     }
 
     struct RFQInitialization {
         OptionInfo optionInfo;
         RFQQuote rfqQuote;
+    }
+
+    struct RFQQuote {
+        uint256 premium;
+        uint256 validUntil;
+        bytes signature;
     }
 
     enum BidStatus {

@@ -52,7 +52,7 @@ contract Router is Ownable {
         uint256 protocolFee,
         uint256 distPartnerFee
     );
-    event ExerciseCall(
+    event Exercise(
         address indexed escrow,
         address underlyingReceiver,
         uint256 underlyingAmount,
@@ -61,7 +61,8 @@ contract Router is Ownable {
     event Borrow(
         address indexed escrow,
         address underlyingReceiver,
-        uint256 underlyingAmount
+        uint256 underlyingAmount,
+        uint256 collateralFeeAmount
     );
     event Repay(
         address indexed escrow,
@@ -211,7 +212,7 @@ contract Router is Ownable {
         );
     }
 
-    function exerciseCall(
+    function exercise(
         address escrow,
         address underlyingReceiver,
         uint256 underlyingAmount,
@@ -225,7 +226,7 @@ contract Router is Ownable {
             address settlementToken,
             uint256 settlementAmount,
             uint256 exerciseFeeAmount
-        ) = Escrow(escrow).handleCallExercise(
+        ) = Escrow(escrow).handleExercise(
                 msg.sender,
                 underlyingReceiver,
                 underlyingAmount,
@@ -253,7 +254,7 @@ contract Router is Ownable {
                 );
             }
         }
-        emit ExerciseCall(
+        emit Exercise(
             escrow,
             underlyingReceiver,
             underlyingAmount,
@@ -269,8 +270,11 @@ contract Router is Ownable {
         if (!isEscrow[escrow]) {
             revert();
         }
-        (address settlementToken, uint256 collateralAmount) = Escrow(escrow)
-            .handleBorrow(
+        (
+            address settlementToken,
+            uint256 collateralAmount,
+            uint256 collateralFeeAmount
+        ) = Escrow(escrow).handleBorrow(
                 msg.sender,
                 underlyingReceiver,
                 borrowUnderlyingAmount
@@ -280,7 +284,26 @@ contract Router is Ownable {
             escrow,
             collateralAmount
         );
-        emit Borrow(escrow, underlyingReceiver, borrowUnderlyingAmount);
+        address _feeHandler = feeHandler;
+        if (_feeHandler != address(0)) {
+            if (collateralFeeAmount > 0) {
+                IERC20Metadata(settlementToken).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    collateralFeeAmount
+                );
+                FeeHandler(_feeHandler).payFee(
+                    settlementToken,
+                    collateralFeeAmount
+                );
+            }
+        }
+        emit Borrow(
+            escrow,
+            underlyingReceiver,
+            borrowUnderlyingAmount,
+            collateralFeeAmount
+        );
     }
 
     function repay(
@@ -420,7 +443,12 @@ contract Router is Ownable {
         address distPartner
     ) public view returns (DataTypes.TakeQuotePreview memory) {
         bytes32 msgHash = keccak256(
-            abi.encode(block.chainid, rfqInitialization)
+            abi.encode(
+                block.chainid,
+                rfqInitialization.optionInfo,
+                rfqInitialization.rfqQuote.premium,
+                rfqInitialization.rfqQuote.validUntil
+            )
         );
 
         address quoter = ECDSA.recover(
@@ -467,15 +495,15 @@ contract Router is Ownable {
                 status: DataTypes.RFQStatus.Success,
                 msgHash: msgHash,
                 quoter: quoter,
-                protocolFee: protocolFee,
-                distPartnerFee: distPartnerFee,
                 premium: rfqInitialization.rfqQuote.premium,
                 premiumToken: rfqInitialization
                     .optionInfo
                     .advancedSettings
                     .premiumPaidInUnderlying
                     ? rfqInitialization.optionInfo.underlyingToken
-                    : rfqInitialization.optionInfo.settlementToken
+                    : rfqInitialization.optionInfo.settlementToken,
+                protocolFee: protocolFee,
+                distPartnerFee: distPartnerFee
             });
     }
 
@@ -517,10 +545,10 @@ contract Router is Ownable {
                 status: status,
                 msgHash: msgHash,
                 quoter: quoter,
-                protocolFee: 0,
-                distPartnerFee: 0,
                 premium: 0,
-                premiumToken: address(0)
+                premiumToken: address(0),
+                protocolFee: 0,
+                distPartnerFee: 0
             });
     }
 }

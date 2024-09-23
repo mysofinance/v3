@@ -90,8 +90,8 @@ describe("Router Contract", function () {
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
           premiumPaidInUnderlying: false,
+          oracle: mockOracle.target,
         },
-        oracle: mockOracle.target,
       };
 
       // Approve and start auction
@@ -126,8 +126,8 @@ describe("Router Contract", function () {
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
           premiumPaidInUnderlying: false,
+          oracle: mockOracle.target,
         },
-        oracle: mockOracle.target,
       };
 
       // Approve and start auction
@@ -190,8 +190,8 @@ describe("Router Contract", function () {
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
             premiumPaidInUnderlying: false,
+            oracle: ethers.ZeroAddress,
           },
-          oracle: ethers.ZeroAddress,
         },
         rfqQuote: {
           premium: ethers.parseEther("10"),
@@ -203,28 +203,38 @@ describe("Router Contract", function () {
       const abiCoder = new ethers.AbiCoder();
       const payload = abiCoder.encode(
         [
-          "uint256",
-          "address",
-          "address",
-          "uint256",
-          "uint256",
-          "uint256",
-          "uint256",
+          "uint256", // CHAIN_ID
+          // OptionInfo
+          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(address,bool,bool,bool,address))",
+          // RFQQuote (only includes premium and validUntil)
           "uint256",
           "uint256",
         ],
         [
           CHAIN_ID,
-          rfqInitialization.optionInfo.underlyingToken,
-          rfqInitialization.optionInfo.settlementToken,
-          rfqInitialization.optionInfo.notional,
-          rfqInitialization.optionInfo.strike,
-          rfqInitialization.optionInfo.expiry,
-          rfqInitialization.optionInfo.earliestExercise,
-          rfqInitialization.rfqQuote.premium,
-          rfqInitialization.rfqQuote.validUntil,
+          [
+            rfqInitialization.optionInfo.underlyingToken,
+            rfqInitialization.optionInfo.settlementToken,
+            rfqInitialization.optionInfo.notional,
+            rfqInitialization.optionInfo.strike,
+            rfqInitialization.optionInfo.expiry,
+            rfqInitialization.optionInfo.earliestExercise,
+            [
+              rfqInitialization.optionInfo.advancedSettings.oracle,
+              rfqInitialization.optionInfo.advancedSettings
+                .premiumPaidInUnderlying,
+              rfqInitialization.optionInfo.advancedSettings.borrowingAllowed,
+              rfqInitialization.optionInfo.advancedSettings
+                .votingDelegationAllowed,
+              rfqInitialization.optionInfo.advancedSettings
+                .allowedDelegateRegistry,
+            ],
+          ],
+          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
+          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
         ]
       );
+
       const payloadHash = ethers.keccak256(payload);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       await settlementToken
@@ -236,6 +246,7 @@ describe("Router Contract", function () {
         rfqInitialization,
         ethers.ZeroAddress
       );
+      expect(preview.msgHash).to.be.equal(payloadHash);
 
       await underlyingToken
         .connect(user1)

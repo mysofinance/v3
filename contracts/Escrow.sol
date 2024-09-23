@@ -87,7 +87,7 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (_auctionInitialization.oracle == address(0)) {
+        if (_auctionInitialization.advancedSettings.oracle == address(0)) {
             revert();
         }
 
@@ -174,7 +174,7 @@ contract Escrow is InitializableERC20 {
         _mint(optionReceiver, optionInfo.notional);
     }
 
-    function handleCallExercise(
+    function handleExercise(
         address exerciser,
         address underlyingReceiver,
         uint256 underlyingExerciseAmount,
@@ -252,7 +252,14 @@ contract Escrow is InitializableERC20 {
         address borrower,
         address underlyingReceiver,
         uint256 underlyingBorrowAmount
-    ) external returns (address settlementToken, uint256 collateralAmount) {
+    )
+        external
+        returns (
+            address settlementToken,
+            uint256 collateralAmount,
+            uint256 collateralFeeAmount
+        )
+    {
         if (msg.sender != router) {
             revert();
         }
@@ -272,6 +279,7 @@ contract Escrow is InitializableERC20 {
         collateralAmount =
             (optionInfo.strike * underlyingBorrowAmount) /
             optionInfo.notional;
+        collateralFeeAmount = (collateralAmount * exerciseFee) / BASE;
         borrowedUnderlyingAmounts[borrower] += underlyingBorrowAmount;
         _burn(borrower, underlyingBorrowAmount);
         IERC20Metadata(optionInfo.underlyingToken).safeTransfer(
@@ -447,13 +455,13 @@ contract Escrow is InitializableERC20 {
                 expiry: expiryTime,
                 earliestExercise: earliestExerciseTime,
                 premium: premium,
+                premiumToken: isPremiumPaidInUnderlying
+                    ? underlyingToken
+                    : settlementToken,
                 oracleSpotPrice: oracleSpotPrice,
                 currAsk: _currAsk,
                 protocolFee: protocolFee,
-                distPartnerFee: distPartnerFee,
-                premiumToken: isPremiumPaidInUnderlying
-                    ? underlyingToken
-                    : settlementToken
+                distPartnerFee: distPartnerFee
             });
     }
 
@@ -503,11 +511,11 @@ contract Escrow is InitializableERC20 {
                 expiry: 0,
                 earliestExercise: 0,
                 premium: 0,
+                premiumToken: address(0),
                 oracleSpotPrice: 0,
                 currAsk: 0,
                 protocolFee: 0,
-                distPartnerFee: 0,
-                premiumToken: address(0)
+                distPartnerFee: 0
             });
     }
 }
