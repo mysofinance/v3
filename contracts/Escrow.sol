@@ -446,11 +446,11 @@ contract Escrow is InitializableERC20 {
             return _createBidPreview(DataTypes.BidStatus.InsufficientFunding);
         }
 
-        bool ispremiumTokenIsUnderlying = optionInfo
+        bool premiumTokenIsUnderlying = optionInfo
             .advancedSettings
             .premiumTokenIsUnderlying;
 
-        uint256 premium = ispremiumTokenIsUnderlying
+        uint256 premium = premiumTokenIsUnderlying
             ? (_currAsk * notional) / BASE
             : (_currAsk * notional * oracleSpotPrice) /
                 BASE /
@@ -473,7 +473,7 @@ contract Escrow is InitializableERC20 {
                 expiry: expiryTime,
                 earliestExercise: earliestExerciseTime,
                 premium: premium,
-                premiumToken: ispremiumTokenIsUnderlying
+                premiumToken: premiumTokenIsUnderlying
                     ? underlyingToken
                     : settlementToken,
                 oracleSpotPrice: oracleSpotPrice,

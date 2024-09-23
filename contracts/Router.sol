@@ -193,10 +193,10 @@ contract Router is Ownable {
         if (preview.protocolFee > 0) {
             IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 msg.sender,
-                address(this),
+                feeHandler,
                 preview.protocolFee
             );
-            FeeHandler(feeHandler).payFee(
+            FeeHandler(feeHandler).feeCollected(
                 preview.premiumToken,
                 preview.protocolFee
             );
@@ -245,10 +245,10 @@ contract Router is Ownable {
             if (exerciseFeeAmount > 0) {
                 IERC20Metadata(settlementToken).safeTransferFrom(
                     msg.sender,
-                    address(this),
+                    feeHandler,
                     exerciseFeeAmount
                 );
-                FeeHandler(_feeHandler).payFee(
+                FeeHandler(_feeHandler).feeCollected(
                     settlementToken,
                     exerciseFeeAmount
                 );
@@ -289,10 +289,10 @@ contract Router is Ownable {
             if (collateralFeeAmount > 0) {
                 IERC20Metadata(settlementToken).safeTransferFrom(
                     msg.sender,
-                    address(this),
+                    feeHandler,
                     collateralFeeAmount
                 );
-                FeeHandler(_feeHandler).payFee(
+                FeeHandler(_feeHandler).feeCollected(
                     settlementToken,
                     collateralFeeAmount
                 );
@@ -375,10 +375,10 @@ contract Router is Ownable {
         if (preview.protocolFee > 0) {
             IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 msg.sender,
-                address(this),
+                feeHandler,
                 preview.protocolFee
             );
-            FeeHandler(feeHandler).payFee(
+            FeeHandler(feeHandler).feeCollected(
                 preview.premiumToken,
                 preview.protocolFee
             );

@@ -12,13 +12,14 @@ contract FeeHandler is Ownable {
     uint256 internal constant MAX_MATCH_FEE = 0.2 ether;
     uint256 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
+    address public router;
     uint256 public matchFee;
     uint256 public matchFeeDistPartnerShare;
     uint256 public exerciseFee;
 
     mapping(address => bool) public isDistPartner;
 
-    event PayFee(address indexed token, uint256 amount);
+    event FeeCollected(address indexed token, uint256 amount);
     event Withdraw(address indexed to, address indexed token, uint256 amount);
     event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
     event SetExerciseFee(uint256 exerciseFee);
@@ -30,21 +31,22 @@ contract FeeHandler is Ownable {
 
     constructor(
         address initOwner,
+        address _router,
         uint256 _matchFee,
         uint256 _distPartnerFeeShare,
         uint256 _exerciseFee
     ) Ownable(initOwner) {
+        _router = router;
         setMatchFeeInfo(_matchFee, _distPartnerFeeShare);
         setExerciseFee(_exerciseFee);
     }
 
-    function payFee(address token, uint256 amount) external {
-        IERC20Metadata(token).safeTransferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-        emit PayFee(token, amount);
+    function feeCollected(address token, uint256 amount) external {
+        if (msg.sender != router) {
+            revert();
+        }
+        // @dev: placeholder for distribution logic
+        emit FeeCollected(token, amount);
     }
 
     function withdraw(
