@@ -277,6 +277,9 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
+        if (underlyingBorrowAmount == 0) {
+            revert();
+        }
         if (
             (totalBorrowed + underlyingBorrowAmount) * BASE >
             optionInfo.notional * optionInfo.advancedSettings.borrowCap
@@ -319,7 +322,10 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (optionInfo.advancedSettings.borrowCap == 0) {
+        if (underlyingRepayAmount == 0) {
+            revert();
+        }
+        if (totalBorrowed == 0 || optionInfo.advancedSettings.borrowCap == 0) {
             revert();
         }
         if (underlyingRepayAmount > borrowedUnderlyingAmounts[borrower]) {
