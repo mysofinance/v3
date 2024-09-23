@@ -17,7 +17,6 @@ contract Escrow is InitializableERC20 {
 
     address public router;
     address public owner;
-    address public premiumPaymentToken;
     bool public isAuction;
     bool public optionMinted;
     uint256 public premiumPaid;
@@ -183,7 +182,6 @@ contract Escrow is InitializableERC20 {
         optionInfo.earliestExercise = preview.earliestExercise;
 
         optionMinted = true;
-        premiumPaymentToken = preview.premiumPaidInUnderlying ? preview.underlyingToken: preview.settlementToken;
         premiumPaid = preview.premium;
         _mint(optionReceiver, optionInfo.notional);
     }
