@@ -85,11 +85,11 @@ describe("Router Contract", function () {
           maxSpot: ethers.parseUnits("1", 6),
           decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
         },
-        advancedEscrowSettings: {
+        advancedSettings: {
           borrowingAllowed: true,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-          premiumPaidInUnderlying: false
+          premiumPaidInUnderlying: false,
         },
         oracle: mockOracle.target,
       };
@@ -121,11 +121,11 @@ describe("Router Contract", function () {
           maxSpot: ethers.parseUnits("1", 6),
           decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
         },
-        advancedEscrowSettings: {
+        advancedSettings: {
           borrowingAllowed: true,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-          premiumPaidInUnderlying: false
+          premiumPaidInUnderlying: false,
         },
         oracle: mockOracle.target,
       };
@@ -185,11 +185,11 @@ describe("Router Contract", function () {
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedEscrowSettings: {
+          advancedSettings: {
             borrowingAllowed: true,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-            premiumPaidInUnderlying: false
+            premiumPaidInUnderlying: false,
           },
           oracle: ethers.ZeroAddress,
         },

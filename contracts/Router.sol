@@ -166,44 +166,39 @@ contract Router is Ownable {
         uint256 _refSpot,
         bytes[] memory _oracleData,
         address distPartner
-    )
-        external
-        returns (
-            DataTypes.BidPreview memory preview
-        )
-    {
+    ) external returns (DataTypes.BidPreview memory preview) {
         if (!isEscrow[escrow]) {
             revert();
         }
-        (
-            preview
-        ) = Escrow(escrow).handleAuctionBid(
+        preview = Escrow(escrow).handleAuctionBid(
             relBid,
             optionReceiver,
             _refSpot,
             _oracleData,
             distPartner
         );
-        address settlementToken = preview.premiumPaidInUnderlying ? preview.underlyingToken : preview.settlementToken;
-        IERC20Metadata(settlementToken).safeTransferFrom(
+        IERC20Metadata(preview.premiumToken).safeTransferFrom(
             msg.sender,
             Escrow(escrow).owner(),
             preview.premium - preview.distPartnerFee - preview.protocolFee
         );
         if (preview.distPartnerFee > 0) {
-            IERC20Metadata(settlementToken).safeTransferFrom(
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 msg.sender,
                 distPartner,
                 preview.distPartnerFee
             );
         }
         if (preview.protocolFee > 0) {
-            IERC20Metadata(settlementToken).safeTransferFrom(
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 msg.sender,
                 address(this),
                 preview.protocolFee
             );
-            FeeHandler(feeHandler).payFee(settlementToken, preview.protocolFee);
+            FeeHandler(feeHandler).payFee(
+                preview.premiumToken,
+                preview.protocolFee
+            );
         }
 
         emit BidOnAuction(
@@ -340,31 +335,28 @@ contract Router is Ownable {
                 escrow,
                 rfqInitialization.optionInfo.notional
             );
-        IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
-            .safeTransferFrom(
-                preview.quoter,
-                msg.sender,
-                rfqInitialization.rfqQuote.premium -
-                    preview.distPartnerFee -
-                    preview.protocolFee
-            );
+        IERC20Metadata(preview.premiumToken).safeTransferFrom(
+            preview.quoter,
+            msg.sender,
+            rfqInitialization.rfqQuote.premium -
+                preview.distPartnerFee -
+                preview.protocolFee
+        );
         if (preview.distPartnerFee > 0) {
-            IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
-                .safeTransferFrom(
-                    msg.sender,
-                    distPartner,
-                    preview.distPartnerFee
-                );
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
+                msg.sender,
+                distPartner,
+                preview.distPartnerFee
+            );
         }
         if (preview.protocolFee > 0) {
-            IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
-                .safeTransferFrom(
-                    msg.sender,
-                    address(this),
-                    preview.protocolFee
-                );
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
+                msg.sender,
+                address(this),
+                preview.protocolFee
+            );
             FeeHandler(feeHandler).payFee(
-                rfqInitialization.optionInfo.settlementToken,
+                preview.premiumToken,
                 preview.protocolFee
             );
         }
@@ -428,17 +420,7 @@ contract Router is Ownable {
         address distPartner
     ) public view returns (DataTypes.TakeQuotePreview memory) {
         bytes32 msgHash = keccak256(
-            abi.encode(
-                block.chainid,
-                rfqInitialization.optionInfo.underlyingToken,
-                rfqInitialization.optionInfo.settlementToken,
-                rfqInitialization.optionInfo.notional,
-                rfqInitialization.optionInfo.strike,
-                rfqInitialization.optionInfo.expiry,
-                rfqInitialization.optionInfo.earliestExercise,
-                rfqInitialization.rfqQuote.premium,
-                rfqInitialization.rfqQuote.validUntil
-            )
+            abi.encode(block.chainid, rfqInitialization)
         );
 
         address quoter = ECDSA.recover(
@@ -448,24 +430,20 @@ contract Router is Ownable {
 
         if (block.timestamp > rfqInitialization.rfqQuote.validUntil) {
             return
-                DataTypes.TakeQuotePreview({
-                    status: DataTypes.RFQStatus.Expired,
-                    msgHash: msgHash,
-                    quoter: quoter,
-                    protocolFee: 0,
-                    distPartnerFee: 0
-                });
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.Expired,
+                    msgHash,
+                    quoter
+                );
         }
 
         if (isQuoteUsed[msgHash]) {
             return
-                DataTypes.TakeQuotePreview({
-                    status: DataTypes.RFQStatus.AlreadyExecuted,
-                    msgHash: msgHash,
-                    quoter: quoter,
-                    protocolFee: 0,
-                    distPartnerFee: 0
-                });
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.AlreadyExecuted,
+                    msgHash,
+                    quoter
+                );
         }
 
         uint256 balance = IERC20Metadata(
@@ -474,13 +452,11 @@ contract Router is Ownable {
 
         if (balance < rfqInitialization.rfqQuote.premium) {
             return
-                DataTypes.TakeQuotePreview({
-                    status: DataTypes.RFQStatus.InsufficientFunding,
-                    msgHash: msgHash,
-                    quoter: quoter,
-                    protocolFee: 0,
-                    distPartnerFee: 0
-                });
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.InsufficientFunding,
+                    msgHash,
+                    quoter
+                );
         }
         (uint256 protocolFee, uint256 distPartnerFee) = getMatchFees(
             distPartner,
@@ -492,7 +468,14 @@ contract Router is Ownable {
                 msgHash: msgHash,
                 quoter: quoter,
                 protocolFee: protocolFee,
-                distPartnerFee: distPartnerFee
+                distPartnerFee: distPartnerFee,
+                premium: rfqInitialization.rfqQuote.premium,
+                premiumToken: rfqInitialization
+                    .optionInfo
+                    .advancedSettings
+                    .premiumPaidInUnderlying
+                    ? rfqInitialization.optionInfo.underlyingToken
+                    : rfqInitialization.optionInfo.settlementToken
             });
     }
 
@@ -522,5 +505,22 @@ contract Router is Ownable {
         isEscrow[escrow] = true;
         escrows.push(escrow);
         return escrow;
+    }
+
+    function _createTakeQuotePreview(
+        DataTypes.RFQStatus status,
+        bytes32 msgHash,
+        address quoter
+    ) internal pure returns (DataTypes.TakeQuotePreview memory) {
+        return
+            DataTypes.TakeQuotePreview({
+                status: status,
+                msgHash: msgHash,
+                quoter: quoter,
+                protocolFee: 0,
+                distPartnerFee: 0,
+                premium: 0,
+                premiumToken: address(0)
+            });
     }
 }

@@ -9,8 +9,7 @@ library DataTypes {
         uint256 strike;
         uint256 expiry;
         uint256 earliestExercise;
-        AdvancedEscrowSettings advancedEscrowSettings;
-        address oracle;
+        AdvancedSettings advancedSettings;
     }
 
     struct AuctionParams {
@@ -31,10 +30,11 @@ library DataTypes {
         bytes signature;
     }
 
-    struct AdvancedEscrowSettings {
+    struct AdvancedSettings {
+        address oracle;
+        bool premiumPaidInUnderlying;
         bool borrowingAllowed;
         bool votingDelegationAllowed;
-        bool premiumPaidInUnderlying;
         address allowedDelegateRegistry;
     }
 
@@ -44,7 +44,7 @@ library DataTypes {
         uint256 notional;
         address oracle;
         AuctionParams auctionParams;
-        AdvancedEscrowSettings advancedEscrowSettings;
+        AdvancedSettings advancedSettings;
     }
 
     struct RFQInitialization {
@@ -70,11 +70,11 @@ library DataTypes {
         uint256 expiry;
         uint256 earliestExercise;
         uint256 premium;
-        uint256 oracleSpotPrice;
-        uint256 currAsk;
+        address premiumToken;
         uint256 protocolFee;
         uint256 distPartnerFee;
-        bool premiumPaidInUnderlying;
+        uint256 oracleSpotPrice;
+        uint256 currAsk;
     }
 
     enum RFQStatus {
@@ -88,6 +88,8 @@ library DataTypes {
         RFQStatus status;
         bytes32 msgHash;
         address quoter;
+        uint256 premium;
+        address premiumToken;
         uint256 protocolFee;
         uint256 distPartnerFee;
     }
