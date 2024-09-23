@@ -8,9 +8,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract FeeHandler is Ownable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 public constant BASE = 1 ether;
-    uint256 public constant MAX_MATCH_FEE = 0.2 ether;
-    uint256 public constant MAX_EXERCISE_FEE = 0.005 ether;
+    uint256 internal constant BASE = 1 ether;
+    uint256 internal constant MAX_MATCH_FEE = 0.2 ether;
+    uint256 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
     uint256 public matchFee;
     uint256 public matchFeeDistPartnerShare;
