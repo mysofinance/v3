@@ -23,7 +23,6 @@ library DataTypes {
         uint256 minSpot;
         uint256 maxSpot;
         uint256 decayStartTime;
-        address oracle;
     }
 
     struct RFQQuote {
@@ -42,6 +41,7 @@ library DataTypes {
         address underlyingToken;
         address settlementToken;
         uint256 notional;
+        address oracle;
         AuctionParams auctionParams;
         AdvancedEscrowSettings advancedEscrowSettings;
     }
@@ -70,6 +70,8 @@ library DataTypes {
         uint256 premium;
         uint256 oracleSpotPrice;
         uint256 currAsk;
+        uint256 protocolFee;
+        uint256 distPartnerFee;
     }
 
     enum RFQStatus {
@@ -83,5 +85,7 @@ library DataTypes {
         RFQStatus status;
         bytes32 msgHash;
         address quoter;
+        uint256 protocolFee;
+        uint256 distPartnerFee;
     }
 }
