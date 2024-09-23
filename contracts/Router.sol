@@ -196,7 +196,7 @@ contract Router is Ownable {
                 feeHandler,
                 preview.protocolFee
             );
-            FeeHandler(feeHandler).feeCollected(
+            FeeHandler(feeHandler).provisionFees(
                 preview.premiumToken,
                 preview.protocolFee
             );
@@ -248,7 +248,7 @@ contract Router is Ownable {
                     feeHandler,
                     exerciseFeeAmount
                 );
-                FeeHandler(_feeHandler).feeCollected(
+                FeeHandler(_feeHandler).provisionFees(
                     settlementToken,
                     exerciseFeeAmount
                 );
@@ -292,7 +292,7 @@ contract Router is Ownable {
                     feeHandler,
                     collateralFeeAmount
                 );
-                FeeHandler(_feeHandler).feeCollected(
+                FeeHandler(_feeHandler).provisionFees(
                     settlementToken,
                     collateralFeeAmount
                 );
@@ -378,7 +378,7 @@ contract Router is Ownable {
                 feeHandler,
                 preview.protocolFee
             );
-            FeeHandler(feeHandler).feeCollected(
+            FeeHandler(feeHandler).provisionFees(
                 preview.premiumToken,
                 preview.protocolFee
             );

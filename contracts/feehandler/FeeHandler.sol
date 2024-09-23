@@ -19,7 +19,7 @@ contract FeeHandler is Ownable {
 
     mapping(address => bool) public isDistPartner;
 
-    event FeeCollected(address indexed token, uint256 amount);
+    event ProvisionFees(address indexed token, uint256 amount);
     event Withdraw(address indexed to, address indexed token, uint256 amount);
     event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
     event SetExerciseFee(uint256 exerciseFee);
@@ -41,12 +41,12 @@ contract FeeHandler is Ownable {
         setExerciseFee(_exerciseFee);
     }
 
-    function feeCollected(address token, uint256 amount) external {
+    function provisionFees(address token, uint256 amount) external {
         if (msg.sender != router) {
             revert();
         }
         // @dev: placeholder for distribution logic
-        emit FeeCollected(token, amount);
+        emit ProvisionFees(token, amount);
     }
 
     function withdraw(
