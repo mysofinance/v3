@@ -522,9 +522,8 @@ contract Escrow is InitializableERC20 {
             .premiumPaidInUnderlying;
 
         uint256 premium = isPremiumPaidInUnderlying
-            ? (_currAsk * notional *  10 ** IERC20Metadata(optionInfo.settlementToken).decimals()) /
-                BASE /
-                oracleSpotPrice
+            ? (_currAsk * notional) /
+                BASE
             : (_currAsk * notional * oracleSpotPrice) /
                 BASE /
                 10 ** IERC20Metadata(optionInfo.underlyingToken).decimals();
