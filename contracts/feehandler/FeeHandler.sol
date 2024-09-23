@@ -19,6 +19,7 @@ contract FeeHandler is Ownable {
     mapping(address => bool) public isDistPartner;
 
     event PayFee(address indexed token, uint256 amount);
+    event Withdraw(address indexed to, address indexed token, uint256 amount);
     event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
     event SetExerciseFee(uint256 exerciseFee);
     event SetDistributionPartners(address[] accounts, bool[] isDistPartner);
@@ -44,6 +45,15 @@ contract FeeHandler is Ownable {
             amount
         );
         emit PayFee(token, amount);
+    }
+
+    function withdraw(
+        address to,
+        address token,
+        uint256 amount
+    ) external onlyOwner {
+        IERC20Metadata(token).safeTransfer(to, amount);
+        emit Withdraw(to, token, amount);
     }
 
     function getMatchFeeInfo(
