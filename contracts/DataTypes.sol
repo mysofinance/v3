@@ -92,4 +92,20 @@ library DataTypes {
         uint256 protocolFee;
         uint256 distPartnerFee;
     }
+
+    struct SwapQuote {
+        address takerToken;
+        uint256 takerAmount;
+        address makerToken;
+        uint256 makerAmount;
+        uint256 swapRate;
+        uint256 validUntil;
+        bytes signature;
+    }
+
+    struct TakeSwapQuotePreview {
+        RFQStatus status;
+        bytes32 msgHash;
+        address quoter;
+    }
 }

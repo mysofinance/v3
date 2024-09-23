@@ -392,6 +392,18 @@ contract Router is Ownable {
         );
     }
 
+    function takeSwapQuote(DataTypes.SwapQuote calldata swapQuote) external {
+        DataTypes.TakeSwapQuotePreview memory preview = previewTakeSwapQuote(
+            swapQuote
+        );
+
+        if (preview.status != DataTypes.RFQStatus.Success) {
+            revert();
+        }
+
+        // @dev: placeholder
+    }
+
     function setFeeHandler(address newFeeHandler) external onlyOwner {
         address oldFeeHandler = feeHandler;
         if (oldFeeHandler == newFeeHandler) {
@@ -506,6 +518,10 @@ contract Router is Ownable {
                 distPartnerFee: distPartnerFee
             });
     }
+
+    function previewTakeSwapQuote(
+        DataTypes.SwapQuote calldata swapQuote
+    ) public view returns (DataTypes.TakeSwapQuotePreview memory) {}
 
     function getEscrows(
         uint256 from,
