@@ -21,6 +21,7 @@ contract Escrow is InitializableERC20 {
     bool public optionMinted;
     uint256 public premiumPaid;
     uint256 public exerciseFee;
+    uint256 public totalBorrowed;
 
     DataTypes.OptionInfo public optionInfo;
     DataTypes.AuctionParams public auctionParams;
@@ -90,7 +91,9 @@ contract Escrow is InitializableERC20 {
         if (_auctionInitialization.advancedSettings.oracle == address(0)) {
             revert();
         }
-
+        if (_auctionInitialization.advancedSettings.borrowCap > BASE) {
+            revert();
+        }
         optionInfo.underlyingToken = _auctionInitialization.underlyingToken;
         optionInfo.settlementToken = _auctionInitialization.settlementToken;
         optionInfo.notional = _auctionInitialization.notional;
@@ -133,7 +136,9 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-
+        if (optionInfo.advancedSettings.borrowCap > BASE) {
+            revert();
+        }
         rfqInitialization = _rfqInitialization;
 
         optionInfo = rfqInitialization.optionInfo;
@@ -272,14 +277,20 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (!optionInfo.advancedSettings.borrowingAllowed) {
+        if (
+            (totalBorrowed + underlyingBorrowAmount) * BASE >
+            optionInfo.notional * optionInfo.advancedSettings.borrowCap
+        ) {
             revert();
         }
         settlementToken = optionInfo.settlementToken;
         collateralAmount =
             (optionInfo.strike * underlyingBorrowAmount) /
             optionInfo.notional;
+        // @dev: apply exercise fee to ensure equivalence between
+        // "borrowing and not repaying" and "regular exercise"
         collateralFeeAmount = (collateralAmount * exerciseFee) / BASE;
+        totalBorrowed += underlyingBorrowAmount;
         borrowedUnderlyingAmounts[borrower] += underlyingBorrowAmount;
         _burn(borrower, underlyingBorrowAmount);
         IERC20Metadata(optionInfo.underlyingToken).safeTransfer(
@@ -308,7 +319,7 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (!optionInfo.advancedSettings.borrowingAllowed) {
+        if (optionInfo.advancedSettings.borrowCap == 0) {
             revert();
         }
         if (underlyingRepayAmount > borrowedUnderlyingAmounts[borrower]) {
@@ -318,6 +329,7 @@ contract Escrow is InitializableERC20 {
         unlockedCollateralAmount =
             (optionInfo.strike * underlyingRepayAmount) /
             optionInfo.notional;
+        totalBorrowed -= underlyingRepayAmount;
         borrowedUnderlyingAmounts[borrower] -= underlyingRepayAmount;
         _mint(borrower, underlyingRepayAmount);
         IERC20Metadata(optionInfo.settlementToken).safeTransfer(
@@ -428,11 +440,11 @@ contract Escrow is InitializableERC20 {
             return _createBidPreview(DataTypes.BidStatus.InsufficientFunding);
         }
 
-        bool isPremiumPaidInUnderlying = optionInfo
+        bool ispremiumTokenIsUnderlying = optionInfo
             .advancedSettings
-            .premiumPaidInUnderlying;
+            .premiumTokenIsUnderlying;
 
-        uint256 premium = isPremiumPaidInUnderlying
+        uint256 premium = ispremiumTokenIsUnderlying
             ? (_currAsk * notional) / BASE
             : (_currAsk * notional * oracleSpotPrice) /
                 BASE /
@@ -455,7 +467,7 @@ contract Escrow is InitializableERC20 {
                 expiry: expiryTime,
                 earliestExercise: earliestExerciseTime,
                 premium: premium,
-                premiumToken: isPremiumPaidInUnderlying
+                premiumToken: ispremiumTokenIsUnderlying
                     ? underlyingToken
                     : settlementToken,
                 oracleSpotPrice: oracleSpotPrice,

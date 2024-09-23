@@ -13,9 +13,9 @@ library DataTypes {
     }
 
     struct AdvancedSettings {
+        uint256 borrowCap;
         address oracle;
-        bool premiumPaidInUnderlying;
-        bool borrowingAllowed;
+        bool premiumTokenIsUnderlying;
         bool votingDelegationAllowed;
         address allowedDelegateRegistry;
     }

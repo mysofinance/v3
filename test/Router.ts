@@ -86,10 +86,10 @@ describe("Router Contract", function () {
           decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
         },
         advancedSettings: {
-          borrowingAllowed: true,
+          borrowCap: 0,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-          premiumPaidInUnderlying: false,
+          premiumTokenIsUnderlying: false,
           oracle: mockOracle.target,
         },
       };
@@ -122,10 +122,10 @@ describe("Router Contract", function () {
           decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
         },
         advancedSettings: {
-          borrowingAllowed: true,
+          borrowCap: 0,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-          premiumPaidInUnderlying: false,
+          premiumTokenIsUnderlying: false,
           oracle: mockOracle.target,
         },
       };
@@ -186,10 +186,10 @@ describe("Router Contract", function () {
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
-            borrowingAllowed: true,
+            borrowCap: 0,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-            premiumPaidInUnderlying: false,
+            premiumTokenIsUnderlying: false,
             oracle: ethers.ZeroAddress,
           },
         },
@@ -205,7 +205,7 @@ describe("Router Contract", function () {
         [
           "uint256", // CHAIN_ID
           // OptionInfo
-          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(address,bool,bool,bool,address))",
+          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(uint256,address,bool,bool,address))",
           // RFQQuote (only includes premium and validUntil)
           "uint256",
           "uint256",
@@ -220,10 +220,10 @@ describe("Router Contract", function () {
             rfqInitialization.optionInfo.expiry,
             rfqInitialization.optionInfo.earliestExercise,
             [
+              rfqInitialization.optionInfo.advancedSettings.borrowCap,
               rfqInitialization.optionInfo.advancedSettings.oracle,
               rfqInitialization.optionInfo.advancedSettings
-                .premiumPaidInUnderlying,
-              rfqInitialization.optionInfo.advancedSettings.borrowingAllowed,
+                .premiumTokenIsUnderlying,
               rfqInitialization.optionInfo.advancedSettings
                 .votingDelegationAllowed,
               rfqInitialization.optionInfo.advancedSettings

@@ -499,7 +499,7 @@ contract Router is Ownable {
                 premiumToken: rfqInitialization
                     .optionInfo
                     .advancedSettings
-                    .premiumPaidInUnderlying
+                    .premiumTokenIsUnderlying
                     ? rfqInitialization.optionInfo.underlyingToken
                     : rfqInitialization.optionInfo.settlementToken,
                 protocolFee: protocolFee,
