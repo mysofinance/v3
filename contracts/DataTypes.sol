@@ -9,8 +9,23 @@ library DataTypes {
         uint256 strike;
         uint256 expiry;
         uint256 earliestExercise;
-        AdvancedEscrowSettings advancedEscrowSettings;
+        AdvancedSettings advancedSettings;
+    }
+
+    struct AdvancedSettings {
+        uint256 borrowCap;
         address oracle;
+        bool premiumTokenIsUnderlying;
+        bool votingDelegationAllowed;
+        address allowedDelegateRegistry;
+    }
+
+    struct AuctionInitialization {
+        address underlyingToken;
+        address settlementToken;
+        uint256 notional;
+        AuctionParams auctionParams;
+        AdvancedSettings advancedSettings;
     }
 
     struct AuctionParams {
@@ -25,30 +40,15 @@ library DataTypes {
         uint256 decayStartTime;
     }
 
+    struct RFQInitialization {
+        OptionInfo optionInfo;
+        RFQQuote rfqQuote;
+    }
+
     struct RFQQuote {
         uint256 premium;
         uint256 validUntil;
         bytes signature;
-    }
-
-    struct AdvancedEscrowSettings {
-        bool borrowingAllowed;
-        bool votingDelegationAllowed;
-        address allowedDelegateRegistry;
-    }
-
-    struct AuctionInitialization {
-        address underlyingToken;
-        address settlementToken;
-        uint256 notional;
-        address oracle;
-        AuctionParams auctionParams;
-        AdvancedEscrowSettings advancedEscrowSettings;
-    }
-
-    struct RFQInitialization {
-        OptionInfo optionInfo;
-        RFQQuote rfqQuote;
     }
 
     enum BidStatus {
@@ -64,14 +64,16 @@ library DataTypes {
     struct BidPreview {
         BidStatus status;
         address settlementToken;
+        address underlyingToken;
         uint256 strike;
         uint256 expiry;
         uint256 earliestExercise;
         uint256 premium;
-        uint256 oracleSpotPrice;
-        uint256 currAsk;
+        address premiumToken;
         uint256 protocolFee;
         uint256 distPartnerFee;
+        uint256 oracleSpotPrice;
+        uint256 currAsk;
     }
 
     enum RFQStatus {
@@ -85,7 +87,25 @@ library DataTypes {
         RFQStatus status;
         bytes32 msgHash;
         address quoter;
+        uint256 premium;
+        address premiumToken;
         uint256 protocolFee;
         uint256 distPartnerFee;
+    }
+
+    struct SwapQuote {
+        address takerToken;
+        uint256 takerAmount;
+        address makerToken;
+        uint256 makerAmount;
+        uint256 swapRate;
+        uint256 validUntil;
+        bytes signature;
+    }
+
+    struct TakeSwapQuotePreview {
+        RFQStatus status;
+        bytes32 msgHash;
+        address quoter;
     }
 }
