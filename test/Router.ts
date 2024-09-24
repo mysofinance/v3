@@ -29,12 +29,12 @@ describe("Router Contract", function () {
     settlementToken = await MockERC20.deploy(
       "Settlement Token",
       "Settlement Token",
-      6,
+      6
     );
     underlyingToken = await MockERC20.deploy(
       "Underlying Token",
       "Underlying Token",
-      18,
+      18
     );
 
     // Deploy Escrow implementation
@@ -43,7 +43,11 @@ describe("Router Contract", function () {
 
     // Deploy Router contract
     const Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(escrowImpl.target);
+    router = await Router.deploy(
+      owner.address,
+      escrowImpl.target,
+      ethers.ZeroAddress
+    );
 
     // Deploy mock oracle
     const MockOracle = await ethers.getContractFactory("MockOracle");
@@ -51,7 +55,7 @@ describe("Router Contract", function () {
     await mockOracle.setPrice(
       underlyingToken.target,
       settlementToken.target,
-      ethers.parseUnits("1", 6),
+      ethers.parseUnits("1", 6)
     );
 
     // Mint some tokens for the users
@@ -80,12 +84,13 @@ describe("Router Contract", function () {
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
           decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-          oracle: mockOracle.target,
         },
-        advancedEscrowSettings: {
-          borrowingAllowed: true,
+        advancedSettings: {
+          borrowCap: 0,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
+          premiumTokenIsUnderlying: false,
+          oracle: mockOracle.target,
         },
       };
 
@@ -94,9 +99,7 @@ describe("Router Contract", function () {
         .connect(owner)
         .approve(router.target, auctionInitialization.notional);
       await expect(
-        router
-          .connect(owner)
-          .startAuction(owner.address, auctionInitialization),
+        router.connect(owner).startAuction(owner.address, auctionInitialization)
       ).to.emit(router, "StartAuction");
     });
   });
@@ -117,12 +120,13 @@ describe("Router Contract", function () {
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
           decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-          oracle: mockOracle.target,
         },
-        advancedEscrowSettings: {
-          borrowingAllowed: true,
+        advancedSettings: {
+          borrowCap: 0,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
+          premiumTokenIsUnderlying: false,
+          oracle: mockOracle.target,
         },
       };
 
@@ -146,7 +150,12 @@ describe("Router Contract", function () {
       const amount = ethers.parseEther("100");
       const refSpot = ethers.parseUnits("1", 6);
       const data: any = [];
-      const preview = await escrow.previewBid(relBid, amount, refSpot, data);
+      const preview = await escrow.previewBid(
+        relBid,
+        refSpot,
+        data,
+        ethers.ZeroAddress
+      );
 
       const optionReceiver = user1.address;
       await expect(
@@ -156,13 +165,13 @@ describe("Router Contract", function () {
             escrowAddress,
             optionReceiver,
             relBid,
-            amount,
             refSpot,
             data,
-          ),
+            ethers.ZeroAddress
+          )
       )
         .to.emit(router, "BidOnAuction")
-        .withArgs(escrowAddress, relBid, amount, user1.address, refSpot);
+        .withArgs(escrowAddress, relBid, user1.address, refSpot, 0, 0);
     });
   });
 
@@ -176,10 +185,12 @@ describe("Router Contract", function () {
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedEscrowSettings: {
-            borrowingAllowed: true,
+          advancedSettings: {
+            borrowCap: 0,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
+            premiumTokenIsUnderlying: false,
+            oracle: ethers.ZeroAddress,
           },
         },
         rfqQuote: {
@@ -192,28 +203,38 @@ describe("Router Contract", function () {
       const abiCoder = new ethers.AbiCoder();
       const payload = abiCoder.encode(
         [
-          "uint256",
-          "address",
-          "address",
-          "uint256",
-          "uint256",
-          "uint256",
-          "uint256",
+          "uint256", // CHAIN_ID
+          // OptionInfo
+          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(uint256,address,bool,bool,address))",
+          // RFQQuote (only includes premium and validUntil)
           "uint256",
           "uint256",
         ],
         [
           CHAIN_ID,
-          rfqInitialization.optionInfo.underlyingToken,
-          rfqInitialization.optionInfo.settlementToken,
-          rfqInitialization.optionInfo.notional,
-          rfqInitialization.optionInfo.strike,
-          rfqInitialization.optionInfo.expiry,
-          rfqInitialization.optionInfo.earliestExercise,
-          rfqInitialization.rfqQuote.premium,
-          rfqInitialization.rfqQuote.validUntil,
-        ],
+          [
+            rfqInitialization.optionInfo.underlyingToken,
+            rfqInitialization.optionInfo.settlementToken,
+            rfqInitialization.optionInfo.notional,
+            rfqInitialization.optionInfo.strike,
+            rfqInitialization.optionInfo.expiry,
+            rfqInitialization.optionInfo.earliestExercise,
+            [
+              rfqInitialization.optionInfo.advancedSettings.borrowCap,
+              rfqInitialization.optionInfo.advancedSettings.oracle,
+              rfqInitialization.optionInfo.advancedSettings
+                .premiumTokenIsUnderlying,
+              rfqInitialization.optionInfo.advancedSettings
+                .votingDelegationAllowed,
+              rfqInitialization.optionInfo.advancedSettings
+                .allowedDelegateRegistry,
+            ],
+          ],
+          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
+          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
+        ]
       );
+
       const payloadHash = ethers.keccak256(payload);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       await settlementToken
@@ -221,13 +242,19 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.parseEther("1000000000000000"));
       rfqInitialization.rfqQuote.signature = signature;
 
-      const preview = await router.previewTakeQuote(rfqInitialization);
+      const preview = await router.previewTakeQuote(
+        rfqInitialization,
+        ethers.ZeroAddress
+      );
+      expect(preview.msgHash).to.be.equal(payloadHash);
 
       await underlyingToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
       await expect(
-        router.connect(user1).takeQuote(user1.address, rfqInitialization),
+        router
+          .connect(user1)
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
       ).to.emit(router, "TakeQuote");
     });
   });
