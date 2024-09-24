@@ -15,18 +15,21 @@ contract Escrow is InitializableERC20 {
 
     uint256 internal constant BASE = 1 ether;
 
-    address public router;
-    address public owner;
-    bool public isAuction;
-    bool public optionMinted;
     uint256 public premiumPaid;
     uint256 public exerciseFee;
     uint256 public totalBorrowed;
 
+    address public router;
+    address public owner;
+
+    bool public isAuction;
+    bool public optionMinted;
+
+    mapping(address => uint256) public borrowedUnderlyingAmounts;
+
     DataTypes.OptionInfo public optionInfo;
     DataTypes.AuctionParams public auctionParams;
     DataTypes.RFQInitialization public rfqInitialization;
-    mapping(address => uint256) public borrowedUnderlyingAmounts;
 
     event OnChainVotingDelegation(address delegate);
     event OffChainVotingDelegation(
@@ -401,6 +404,7 @@ contract Escrow is InitializableERC20 {
         owner = newOwner;
         emit TransferOwnership(msg.sender, _owner, newOwner);
     }
+
     function previewBid(
         uint256 relBid,
         uint256 _refSpot,

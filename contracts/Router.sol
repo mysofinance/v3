@@ -24,6 +24,7 @@ contract Router is Ownable {
 
     mapping(address => bool) public isEscrow;
     mapping(bytes32 => bool) public isQuoteUsed;
+    mapping(address => bool) public quotesPaused;
     address[] public escrows;
 
     event StartAuction(
@@ -77,6 +78,7 @@ contract Router is Ownable {
         uint256 distPartnerFee
     );
     event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
+    event PauseQuotes(address indexed quoter, bool isPaused);
 
     constructor(
         address initOwner,
@@ -400,6 +402,12 @@ contract Router is Ownable {
         // @dev: placeholder
     }
 
+    function togglePauseQuotes() external {
+        bool isPaused = quotesPaused[msg.sender];
+        quotesPaused[msg.sender] = !isPaused;
+        emit PauseQuotes(msg.sender, !isPaused);
+    }
+
     function setFeeHandler(address newFeeHandler) external onlyOwner {
         address oldFeeHandler = feeHandler;
         if (oldFeeHandler == newFeeHandler) {
@@ -477,6 +485,15 @@ contract Router is Ownable {
             return
                 _createTakeQuotePreview(
                     DataTypes.RFQStatus.AlreadyExecuted,
+                    msgHash,
+                    quoter
+                );
+        }
+
+        if (quotesPaused[quoter]) {
+            return
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.QuotesPaused,
                     msgHash,
                     quoter
                 );

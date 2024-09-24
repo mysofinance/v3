@@ -80,6 +80,7 @@ library DataTypes {
         Expired,
         AlreadyExecuted,
         InsufficientFunding,
+        QuotesPaused,
         Success
     }
 
