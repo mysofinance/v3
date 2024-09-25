@@ -70,7 +70,7 @@ contract ChainlinkBase is IOracle, Ownable {
         WETH = _weth;
 
         for (uint256 i; i < tokenAddrsLength; ) {
-            _checkAndStoreOracleInfo(_tokenAddrs[i];, _oracleAddrs[i]);
+            _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
 
             unchecked {
                 ++i;
@@ -115,56 +115,34 @@ contract ChainlinkBase is IOracle, Ownable {
      * @param oracleData Additional data that may be required to fetch the price.
      * The structure and content of this data can vary depending on the implementation
      * and use case. For example, one can pass an optimistic price with signature to verify.
-     * @return The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
+     * @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
      */
     function getPrice(
-        address settlementToken,
-        address underlyingToken,
+        address token,
+        address quoteToken,
         bytes[] memory oracleData
-    ) external view virtual returns (uint256 settlementTokenPriceInUnderlyingToken) {
-        (uint256 priceOfSettlementToken, uint256 priceOfUnderlyingToken) = getRawPrices(
-            settlementToken,
-            underlyingToken
-        );
+    ) external view virtual returns (uint256 tokenPriceInQuoteToken) {
+        uint256 priceOfToken = getPriceOfToken(token);
+        uint256 priceOfQuoteToken = getPriceOfToken(quoteToken);
 
-        uint256 underlyingTokenDecimals = IERC20Metadata(underlyingToken).decimals();
+        uint256 quoteTokenDecimals = IERC20Metadata(quoteToken).decimals();
 
-        settlementTokenPriceInUnderlyingToken = Math.mulDiv(
-            priceOfSettlementToken,
-            10 ** underlyingTokenDecimals,
-            priceOfUnderlyingToken
+        tokenPriceInQuoteToken = Math.mulDiv(
+            priceOfToken,
+            10 ** quoteTokenDecimals,
+            priceOfQuoteToken
         );
     }
 
     /**
-     * @dev Returns the raw prices of two tokens.
-     * @param settlementToken Address of the settlement token.
-     * @param underlyingToken Address of the underlying token.
-     * @return settlementTokenPriceRaw Raw price of settlement token.
-     * @return underlyingTokenPriceRaw Raw price of underlying token.
-     */
-    function getRawPrices(
-        address settlementToken,
-        address underlyingToken
-    )
-        public
-        view
-        virtual
-        returns (uint256 settlementTokenPriceRaw, uint256 underlyingTokenPriceRaw)
-    {
-        settlementTokenPriceRaw = _getPriceOfToken(settlementToken);
-        underlyingTokenPriceRaw = _getPriceOfToken(underlyingToken);
-    }
-
-    /**
-     * @dev Internal function to get the price of a single token.
-     *      Converts USD prices to ETH if necessary.
+     * @dev Public function to get the price of a single token.
+     * @dev Converts USD prices to ETH if necessary.
      * @param token Address of the token.
      * @return tokenPriceRaw Price of the token in ETH.
      */
-    function _getPriceOfToken(
+    function getPriceOfToken(
         address token
-    ) internal view virtual returns (uint256 tokenPriceRaw) {
+    ) public view virtual returns (uint256 tokenPriceRaw) {
         if (token == WETH){
             return 1e18;
         }
