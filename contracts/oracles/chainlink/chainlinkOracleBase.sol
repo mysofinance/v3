@@ -25,8 +25,8 @@ contract ChainlinkBase is IOracle, Ownable {
 
     /**
      * @dev Struct to store oracle address and its decimals.
-     *      Packed to optimize storage.
-     *     decimals are the number of decimals in the oracle's price output,not underlying token.
+     * Packed to optimize storage.
+     * decimals are the number of decimals in the oracle's price output, not underlying token.
      */
     struct OracleInfo {
         address oracleAddr;
@@ -69,13 +69,8 @@ contract ChainlinkBase is IOracle, Ownable {
         ETH_USD_ORACLE = _ethUsdOracle;
         WETH = _weth;
 
-        uint8 oracleDecimals;
-
         for (uint256 i; i < tokenAddrsLength; ) {
-            address token = _tokenAddrs[i];
-            address oracle = _oracleAddrs[i];
-
-            _checkAndStoreOracleInfo(token, oracle);
+            _checkAndStoreOracleInfo(_tokenAddrs[i];, _oracleAddrs[i]);
 
             unchecked {
                 ++i;
@@ -89,7 +84,7 @@ contract ChainlinkBase is IOracle, Ownable {
      * @param _tokenAddrs Array of token addresses.
      * @param _oracleAddrs Array of corresponding new oracle addresses.
      */
-    function setNewOracles(
+    function addOracleMapping(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
     ) external onlyOwner {
@@ -99,16 +94,13 @@ contract ChainlinkBase is IOracle, Ownable {
         }
 
         for (uint256 i; i < length;) {
-            address token = _tokenAddrs[i];
-            address oracle = _oracleAddrs[i];
-
-            OracleInfo storage existingInfo = oracleInfos[token];
+            OracleInfo storage existingInfo = oracleInfos[_tokenAddrs[i]];
 
             if (existingInfo.oracleAddr != address(0)) {
                 revert OracleAlreadySet(existingInfo.oracleAddr);
             }
 
-            _checkAndStoreOracleInfo(token, oracle);
+            _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
 
             unchecked {
                 ++i;
@@ -117,11 +109,13 @@ contract ChainlinkBase is IOracle, Ownable {
     }
 
     /**
-     * @dev Returns the price of the settlement token in terms of the underlying token.
-     * @param settlementToken Address of the settlement token.
-     * @param underlyingToken Address of the underlying token.
-    * @param oracleData Additional data that may be required to fetch the price.
-     * @return settlementTokenPriceInUnderlyingToken Price of settlement in underlying token.
+     * @notice Retrieves the price of a specified token quoted in another token.
+     * @param token The address of the token for which the price is to be retrieved.
+     * @param quoteToken The address of the token in which the price is to be quoted.
+     * @param oracleData Additional data that may be required to fetch the price.
+     * The structure and content of this data can vary depending on the implementation
+     * and use case. For example, one can pass an optimistic price with signature to verify.
+     * @return The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
      */
     function getPrice(
         address settlementToken,
@@ -235,7 +229,7 @@ contract ChainlinkBase is IOracle, Ownable {
         // Fetch decimals from the oracle
         uint8 decimals = AggregatorV3Interface(oracle).decimals();
 
-        // Ensure oracle decimals are either 8 or 18, or handle conversion
+        // Ensure oracle decimals are either 8 or 18
         if (decimals != 8 && decimals != 18) {
             revert InvalidOracleDecimals();
         }
