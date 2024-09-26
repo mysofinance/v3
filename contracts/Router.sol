@@ -81,13 +81,8 @@ contract Router is Ownable {
     event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
     event PauseQuotes(address indexed quoter, bool isPaused);
 
-    constructor(
-        address initOwner,
-        address _escrowImpl,
-        address _feeHandler
-    ) Ownable(initOwner) {
+    constructor(address initOwner, address _escrowImpl) Ownable(initOwner) {
         escrowImpl = _escrowImpl;
-        feeHandler = _feeHandler;
     }
 
     function createAuction(

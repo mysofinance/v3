@@ -43,11 +43,7 @@ describe("Router Contract", function () {
 
     // Deploy Router contract
     const Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(
-      owner.address,
-      escrowImpl.target,
-      ethers.ZeroAddress
-    );
+    router = await Router.deploy(owner.address, escrowImpl.target);
 
     // Deploy mock oracle
     const MockOracle = await ethers.getContractFactory("MockOracle");
