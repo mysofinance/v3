@@ -32,8 +32,8 @@ async function main() {
 
   // Deploy MockERC20 for settlement token
   const MockERC20 = await ethers.getContractFactory("MockERC20");
-  const settlementTokenName = "USDC";
-  const settlementTokenSymbol = "USDC";
+  const settlementTokenName = "USDT";
+  const settlementTokenSymbol = "USDT";
   const settlementTokenDecimals = 6;
   const settlementToken = await MockERC20.deploy(
     settlementTokenName,
@@ -43,8 +43,8 @@ async function main() {
   console.log(`* Settlement Token: ${settlementToken.target}`);
 
   // Deploy MockERC20 for underlying token
-  const underlyingTokenName = "Melon Token";
-  const underlyingTokenSymbol = "MLN";
+  const underlyingTokenName = "MYSO Token";
+  const underlyingTokenSymbol = "MYT";
   const underlyingTokenDecimals = 18;
   const underlyingToken = await MockERC20.deploy(
     underlyingTokenName,
@@ -92,6 +92,22 @@ async function main() {
     `Minted 1000 ${await settlementToken.symbol()} for ${deployer.address}`
   );
 
+  const FeeHandler = await ethers.getContractFactory("FeeHandler");
+  const initOwner = deployer.address;
+  const routerAddr = router.target;
+  const matchFee = ethers.parseEther("0.1");
+  const distPartnerFeeShare = 0;
+  const exerciseFee = 0;
+  const feeHandler = await FeeHandler.deploy(
+    initOwner,
+    routerAddr,
+    matchFee,
+    distPartnerFeeShare,
+    exerciseFee
+  );
+  console.log(`* Fee Handler: ${feeHandler.target}`);
+  await router.connect(deployer).setFeeHandler(feeHandler.target);
+
   console.log("\nContract deployment complete.");
   console.log("Next, verify the contracts using the following commands:");
   console.log(
@@ -108,6 +124,9 @@ async function main() {
   );
   console.log(
     `npx hardhat verify --network ${NETWORK_NAME} "${mockOracle.target}"`
+  );
+  console.log(
+    `npx hardhat verify --network ${NETWORK_NAME} "${feeHandler.target}" "${initOwner}" "${routerAddr}" "${matchFee}" "${distPartnerFeeShare}" "${exerciseFee}"`
   );
 }
 

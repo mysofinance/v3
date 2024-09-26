@@ -36,7 +36,7 @@ contract FeeHandler is Ownable {
         uint256 _distPartnerFeeShare,
         uint256 _exerciseFee
     ) Ownable(initOwner) {
-        _router = router;
+        router = _router;
         setMatchFeeInfo(_matchFee, _distPartnerFeeShare);
         setExerciseFee(_exerciseFee);
     }
@@ -75,13 +75,10 @@ contract FeeHandler is Ownable {
         uint256 _matchFee,
         uint256 _distPartnerFeeShare
     ) public onlyOwner {
-        if (_matchFee > MAX_MATCH_FEE || _matchFee == matchFee) {
+        if (_matchFee > MAX_MATCH_FEE) {
             revert InvalidMatchFee();
         }
-        if (
-            _distPartnerFeeShare > BASE ||
-            _distPartnerFeeShare == matchFeeDistPartnerShare
-        ) {
+        if (_distPartnerFeeShare > BASE) {
             revert InvalidPartnerFeeShare();
         }
         matchFee = _matchFee;
@@ -90,7 +87,7 @@ contract FeeHandler is Ownable {
     }
 
     function setExerciseFee(uint256 _exerciseFee) public onlyOwner {
-        if (_exerciseFee > MAX_EXERCISE_FEE || _exerciseFee == exerciseFee) {
+        if (_exerciseFee > MAX_EXERCISE_FEE) {
             revert InvalidExerciseFee();
         }
         exerciseFee = _exerciseFee;

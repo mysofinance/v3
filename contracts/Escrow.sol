@@ -217,10 +217,11 @@ contract Escrow is InitializableERC20 {
         uint256 strike = optionInfo.strike;
         uint256 underlyingTokenDecimals = IERC20Metadata(underlyingToken)
             .decimals();
+
+        settlementToken = optionInfo.settlementToken;
         uint256 settlementTokenDecimals = IERC20Metadata(settlementToken)
             .decimals();
 
-        settlementToken = optionInfo.settlementToken;
         settlementAmount =
             (strike * underlyingExerciseAmount) /
             (10 ** underlyingTokenDecimals);
@@ -465,8 +466,12 @@ contract Escrow is InitializableERC20 {
         uint256 earliestExerciseTime = block.timestamp +
             auctionParams.earliestExerciseTenor;
 
-        (uint256 protocolFee, uint256 distPartnerFee) = Router(router)
+        (uint256 matchFeeProtocol, uint256 matchFeeDistPartner) = Router(router)
             .getMatchFees(distPartner, premium);
+
+        if (matchFeeProtocol + matchFeeDistPartner >= premium) {
+            return _createBidPreview(DataTypes.BidStatus.InvalidProtocolFees);
+        }
 
         return
             DataTypes.BidPreview({
@@ -482,8 +487,8 @@ contract Escrow is InitializableERC20 {
                     : settlementToken,
                 oracleSpotPrice: oracleSpotPrice,
                 currAsk: _currAsk,
-                protocolFee: protocolFee,
-                distPartnerFee: distPartnerFee
+                matchFeeProtocol: matchFeeProtocol,
+                matchFeeDistPartner: matchFeeDistPartner
             });
     }
 
@@ -536,8 +541,8 @@ contract Escrow is InitializableERC20 {
                 premiumToken: address(0),
                 oracleSpotPrice: 0,
                 currAsk: 0,
-                protocolFee: 0,
-                distPartnerFee: 0
+                matchFeeProtocol: 0,
+                matchFeeDistPartner: 0
             });
     }
 }

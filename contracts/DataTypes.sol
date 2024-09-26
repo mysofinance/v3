@@ -58,7 +58,8 @@ library DataTypes {
         AuctionAlreadySuccessful,
         PremiumTooLow,
         NotAnAuction,
-        InsufficientFunding
+        InsufficientFunding,
+        InvalidProtocolFees
     }
 
     struct BidPreview {
@@ -70,10 +71,10 @@ library DataTypes {
         uint256 earliestExercise;
         uint256 premium;
         address premiumToken;
-        uint256 protocolFee;
-        uint256 distPartnerFee;
         uint256 oracleSpotPrice;
         uint256 currAsk;
+        uint256 matchFeeProtocol;
+        uint256 matchFeeDistPartner;
     }
 
     enum RFQStatus {
@@ -90,8 +91,8 @@ library DataTypes {
         address quoter;
         uint256 premium;
         address premiumToken;
-        uint256 protocolFee;
-        uint256 distPartnerFee;
+        uint256 matchFeeProtocol;
+        uint256 matchFeeDistPartner;
     }
 
     struct SwapQuote {

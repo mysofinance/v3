@@ -58,6 +58,22 @@ describe("Router Contract", function () {
       ethers.parseUnits("1", 6)
     );
 
+    // Deploy fee handler
+    const FeeHandler = await ethers.getContractFactory("FeeHandler");
+    const initOwner = owner.address;
+    const routerAddr = router.target;
+    const matchFee = ethers.parseEther("0.1");
+    const distPartnerFeeShare = 0;
+    const exerciseFee = 0;
+    const feeHandler = await FeeHandler.deploy(
+      initOwner,
+      routerAddr,
+      matchFee,
+      distPartnerFeeShare,
+      exerciseFee
+    );
+    await router.setFeeHandler(feeHandler.target);
+
     // Mint some tokens for the users
     await settlementToken.mint(owner.address, ethers.parseEther("1000"));
     await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -99,8 +115,10 @@ describe("Router Contract", function () {
         .connect(owner)
         .approve(router.target, auctionInitialization.notional);
       await expect(
-        router.connect(owner).startAuction(owner.address, auctionInitialization)
-      ).to.emit(router, "StartAuction");
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.emit(router, "CreateAuction");
     });
   });
 
@@ -130,13 +148,13 @@ describe("Router Contract", function () {
         },
       };
 
-      // Approve and start auction
+      // Approve and create auction
       await underlyingToken
         .connect(owner)
         .approve(router.target, auctionInitialization.notional);
       await router
         .connect(owner)
-        .startAuction(owner.address, auctionInitialization);
+        .createAuction(owner.address, auctionInitialization);
 
       const escrows = await router.getEscrows(0, 1);
       const escrowAddress = escrows[0];
@@ -147,7 +165,6 @@ describe("Router Contract", function () {
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
-      const amount = ethers.parseEther("100");
       const refSpot = ethers.parseUnits("1", 6);
       const data: any = [];
       const preview = await escrow.previewBid(
@@ -158,6 +175,8 @@ describe("Router Contract", function () {
       );
 
       const optionReceiver = user1.address;
+      const expectedProtocolMatchFee = preview[10];
+
       await expect(
         router
           .connect(user1)
@@ -171,7 +190,14 @@ describe("Router Contract", function () {
           )
       )
         .to.emit(router, "BidOnAuction")
-        .withArgs(escrowAddress, relBid, user1.address, refSpot, 0, 0);
+        .withArgs(
+          escrowAddress,
+          relBid,
+          user1.address,
+          refSpot,
+          expectedProtocolMatchFee,
+          0
+        );
     });
   });
 
@@ -239,7 +265,7 @@ describe("Router Contract", function () {
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       await settlementToken
         .connect(owner)
-        .approve(router.target, ethers.parseEther("1000000000000000"));
+        .approve(router.target, ethers.MaxUint256);
       rfqInitialization.rfqQuote.signature = signature;
 
       const preview = await router.previewTakeQuote(
@@ -250,12 +276,134 @@ describe("Router Contract", function () {
 
       await underlyingToken
         .connect(user1)
-        .approve(router.target, ethers.parseEther("100"));
+        .approve(router.target, ethers.MaxUint256);
       await expect(
         router
           .connect(user1)
           .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
       ).to.emit(router, "TakeQuote");
+    });
+  });
+
+  describe("Exercising Option Token", function () {
+    it("should allow exercising option token", async function () {
+      const auctionInitialization: DataTypes.AuctionInitialization = {
+        underlyingToken: underlyingToken.target,
+        settlementToken: settlementToken.target,
+        notional: ethers.parseEther("100"),
+        auctionParams: {
+          relStrike: ethers.parseEther("1"),
+          tenor: 86400 * 30, // 30 days
+          earliestExerciseTenor: 0,
+          relPremiumStart: ethers.parseEther("0.01"),
+          relPremiumFloor: ethers.parseEther("0.005"),
+          decayDuration: 86400 * 7, // 7 days
+          minSpot: ethers.parseUnits("0.1", 6),
+          maxSpot: ethers.parseUnits("1", 6),
+          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+        },
+        advancedSettings: {
+          borrowCap: 0,
+          votingDelegationAllowed: true,
+          allowedDelegateRegistry: ethers.ZeroAddress,
+          premiumTokenIsUnderlying: false,
+          oracle: mockOracle.target,
+        },
+      };
+
+      // Approve and create auction
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+      await router
+        .connect(owner)
+        .createAuction(owner.address, auctionInitialization);
+
+      const escrows = await router.getEscrows(0, 1);
+      const escrowAddress = escrows[0];
+      const escrow: any = await escrowImpl.attach(escrowAddress);
+
+      // Approve and bid on auction
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+      const relBid = ethers.parseEther("0.02");
+      const refSpot = ethers.parseUnits("1", 6);
+      const data: any = [];
+      const preview = await escrow.previewBid(
+        relBid,
+        refSpot,
+        data,
+        ethers.ZeroAddress
+      );
+      const expectedProtocolMatchFee = preview[10];
+
+      const optionReceiver = user1.address;
+      await expect(
+        router
+          .connect(user1)
+          .bidOnAuction(
+            escrowAddress,
+            optionReceiver,
+            relBid,
+            refSpot,
+            data,
+            ethers.ZeroAddress
+          )
+      )
+        .to.emit(router, "BidOnAuction")
+        .withArgs(
+          escrowAddress,
+          relBid,
+          user1.address,
+          refSpot,
+          expectedProtocolMatchFee,
+          0
+        );
+
+      const optionInfo = await escrow.optionInfo();
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const notional = optionInfo[2];
+      const strike = optionInfo[3];
+      const expectedSettlementAmount =
+        (BigInt(strike) * BigInt(notional)) /
+        BigInt(10) ** underlyingTokenDecimals;
+
+      await settlementToken.mint(user1.address, expectedSettlementAmount);
+      const preSettlementTokenBal = await settlementToken.balanceOf(
+        user1.address
+      );
+      const preUnderlyingTokenBal = await underlyingToken.balanceOf(
+        user1.address
+      );
+
+      const underlyingReceiver = user1.address;
+      const underlyingAmount = auctionInitialization.notional;
+      const payInSettlementToken = true;
+      const oracleData: any = [];
+      await router
+        .connect(user1)
+        .exercise(
+          escrowAddress,
+          underlyingReceiver,
+          underlyingAmount,
+          payInSettlementToken,
+          oracleData
+        );
+
+      const postSettlementTokenBal = await settlementToken.balanceOf(
+        user1.address
+      );
+      const postUnderlyingTokenBal = await underlyingToken.balanceOf(
+        user1.address
+      );
+
+      expect(preSettlementTokenBal - postSettlementTokenBal).to.be.equal(
+        expectedSettlementAmount
+      );
+      expect(postUnderlyingTokenBal - preUnderlyingTokenBal).to.be.equal(
+        notional
+      );
     });
   });
 });
