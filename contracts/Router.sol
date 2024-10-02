@@ -443,11 +443,11 @@ contract Router is Ownable {
                 ? BASE
                 : matchFeeDistPartnerShare;
             matchFeeProtocol =
-                (optionPremium * matchFee * (BASE - matchFeeDistPartner)) /
+                (optionPremium * matchFee * (BASE - matchFeeDistPartnerShare)) /
                 BASE /
                 BASE;
             matchFeeDistPartner =
-                (optionPremium * matchFee * matchFeeDistPartner) /
+                (optionPremium * matchFee * matchFeeDistPartnerShare) /
                 BASE /
                 BASE;
         }
