@@ -20,7 +20,7 @@ const config: HardhatUserConfig = {
     sepolia: {
       chainId: 11155111,
       url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_SEPOLIA_API_KEY}`,
-      //accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
+      accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
     },
   },
   etherscan: {
