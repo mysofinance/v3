@@ -39,7 +39,9 @@ describe("Router Contract Ext", function () {
       18
     );
 
-    const MockERC20Votes = await ethers.getContractFactory("MockERC20Votes");
+    const MockERC20Votes = await ethers.getContractFactory(
+      "MockERC20Votes"
+    );
     votingUnderlyingToken = await MockERC20Votes.deploy(
       "Voting Underlying Token",
       "Voting Underlying Token",
@@ -52,7 +54,10 @@ describe("Router Contract Ext", function () {
 
     // Deploy Router contract
     const Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(owner.address, escrowImpl.target);
+    router = await Router.deploy(
+      owner.address,
+      escrowImpl.target
+    );
 
     // Deploy mock oracle
     const MockOracle = await ethers.getContractFactory("MockOracle");
@@ -110,9 +115,7 @@ describe("Router Contract Ext", function () {
         .connect(owner)
         .approve(router.target, auctionInitialization.notional);
       await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+        router.connect(owner).createAuction(owner.address, auctionInitialization)
       ).to.emit(router, "CreateAuction");
     });
   });
@@ -177,7 +180,14 @@ describe("Router Contract Ext", function () {
           )
       )
         .to.emit(router, "BidOnAuction")
-        .withArgs(escrowAddress, relBid, user1.address, refSpot, 0, 0);
+        .withArgs(
+          escrowAddress,
+          relBid,
+          user1.address,
+          refSpot,
+          0,
+          0
+        );
     });
 
     it("should revert if bidding with insufficient premium", async function () {
@@ -300,7 +310,7 @@ describe("Router Contract Ext", function () {
           rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
           rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
         ]
-      );
+      )
 
       const payloadHash = ethers.keccak256(payload);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
@@ -380,7 +390,7 @@ describe("Router Contract Ext", function () {
           rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
           rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
         ]
-      );
+      )
       const payloadHash = ethers.keccak256(payload);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -447,14 +457,7 @@ describe("Router Contract Ext", function () {
 
       // Withdraw funds
       await expect(
-        router
-          .connect(owner)
-          .withdraw(
-            escrowAddress,
-            owner.address,
-            underlyingToken.target,
-            ethers.parseEther("100")
-          )
+        router.connect(owner).withdraw(escrowAddress, owner.address, underlyingToken.target, ethers.parseEther("100"))
       ).to.emit(router, "Withdraw");
     });
 
@@ -502,14 +505,7 @@ describe("Router Contract Ext", function () {
 
       // Attempt to withdraw as non-owner
       await expect(
-        router
-          .connect(user1)
-          .withdraw(
-            escrowAddress,
-            user1.address,
-            underlyingToken.target,
-            ethers.parseEther("100")
-          )
+        router.connect(user1).withdraw(escrowAddress, user1.address, underlyingToken.target, ethers.parseEther("100"))
       ).to.be.reverted;
     });
   });
@@ -583,13 +579,15 @@ describe("Router Contract Ext", function () {
 
       // Exercise the call
       await expect(
-        router.connect(user1).exercise(
-          escrowAddress,
-          user1.address,
-          ethers.parseEther("50"), // Exercising half the notional
-          true, // Pay in settlement token
-          []
-        )
+        router
+          .connect(user1)
+          .exercise(
+            escrowAddress,
+            user1.address,
+            ethers.parseEther("50"), // Exercising half the notional
+            true, // Pay in settlement token
+            []
+          )
       ).to.emit(router, "Exercise");
     });
 
@@ -656,13 +654,15 @@ describe("Router Contract Ext", function () {
         .approve(router.target, ethers.parseEther("10"));
 
       await expect(
-        router.connect(user1).exercise(
-          escrowAddress,
-          user1.address,
-          ethers.parseEther("50"), // Exercising half the notional
-          true, // Pay in settlement token
-          []
-        )
+        router
+          .connect(user1)
+          .exercise(
+            escrowAddress,
+            user1.address,
+            ethers.parseEther("50"), // Exercising half the notional
+            true, // Pay in settlement token
+            []
+          )
       ).to.be.reverted;
     });
   });
@@ -731,9 +731,7 @@ describe("Router Contract Ext", function () {
 
       // Borrow underlying tokens
       await expect(
-        router
-          .connect(user1)
-          .borrow(escrowAddress, user1.address, ethers.parseEther("10"))
+        router.connect(user1).borrow(escrowAddress, user1.address, ethers.parseEther("10"))
       ).to.emit(router, "Borrow");
 
       // Check borrowed amount
@@ -748,9 +746,7 @@ describe("Router Contract Ext", function () {
 
       // Repay borrowed amount
       await expect(
-        router
-          .connect(user1)
-          .repay(escrowAddress, user1.address, ethers.parseEther("10"))
+        router.connect(user1).repay(escrowAddress, user1.address, ethers.parseEther("10"))
       ).to.emit(router, "Repay");
 
       // Check borrowed amount after repayment
@@ -822,10 +818,100 @@ describe("Router Contract Ext", function () {
 
       // Attempt to borrow when borrowing is disallowed
       await expect(
+        router.connect(user1).borrow(escrowAddress, user1.address, ethers.parseEther("10"))
+      ).to.be.reverted;
+    });
+
+    it("should allow withdrawing from expired auction and creating a new one", async function () {
+      const auctionInitialization: DataTypes.AuctionInitialization = {
+        underlyingToken: underlyingToken.target,
+        settlementToken: settlementToken.target,
+        notional: ethers.parseEther("100"),
+        auctionParams: {
+          relStrike: ethers.parseEther("1"),
+          tenor: 86400 * 30, // 30 days
+          earliestExerciseTenor: 86400 * 7, // 7 days
+          relPremiumStart: ethers.parseEther("0.01"),
+          relPremiumFloor: ethers.parseEther("0.005"),
+          decayDuration: 86400 * 7, // 7 days
+          minSpot: ethers.parseUnits("0.1", 6),
+          maxSpot: ethers.parseUnits("1", 6),
+          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+        },
+        advancedSettings: {
+          borrowCap: ethers.parseEther("1"),
+          oracle: mockOracle.target,
+          premiumTokenIsUnderlying: false,
+          votingDelegationAllowed: true,
+          allowedDelegateRegistry: ethers.ZeroAddress,
+        },
+        oracle: mockOracle.target,
+      };
+
+      // Approve and start first auction
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, auctionInitialization.notional * 2n);
+      await router
+        .connect(owner)
+        .createAuction(owner.address, auctionInitialization);
+
+      const escrows = await router.getEscrows(0, 1);
+      const oldEscrowAddress = escrows[0];
+
+      // Fast forward time to after auction expiry (30 days + 1 hour)
+      await ethers.provider.send("evm_increaseTime", [86400 * 30 + 3600]);
+      await ethers.provider.send("evm_mine", []);
+
+      // revert if not an existing escrow
+      await expect(
+        router
+          .connect(owner)
+          .withdrawFromEscrowAndCreateAuction(user2.address, owner.address, auctionInitialization)
+      ).to.be.reverted;
+
+      // Revert if not owner
+      await expect(
         router
           .connect(user1)
-          .borrow(escrowAddress, user1.address, ethers.parseEther("10"))
+          .withdrawFromEscrowAndCreateAuction(oldEscrowAddress, owner.address, auctionInitialization)
       ).to.be.reverted;
+
+      // Withdraw from expired auction and create a new one
+      await expect(
+        router
+          .connect(owner)
+          .withdrawFromEscrowAndCreateAuction(oldEscrowAddress, owner.address, auctionInitialization)
+      ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
+
+      // Get the new escrow address
+      const newEscrows = await router.getEscrows(1, 1);
+      const newEscrowAddress = newEscrows[0];
+      const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
+
+      // Verify that the new escrow is different from the old one
+      expect(newEscrowAddress).to.not.equal(oldEscrowAddress);
+
+      // Approve and bid on the new auction
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+      const relBid = ethers.parseEther("0.02");
+      const refSpot = ethers.parseUnits("1", 6);
+      const data: any[] = [];
+
+      await expect(
+        router
+          .connect(user1)
+          .bidOnAuction(
+            newEscrowAddress,
+            user1.address,
+            relBid,
+            refSpot,
+            data,
+            ethers.ZeroAddress
+          )
+      ).to.emit(router, "BidOnAuction");
     });
   });
 
@@ -887,252 +973,11 @@ describe("Router Contract Ext", function () {
           ethers.ZeroAddress
         );
 
-    describe("Borrow and Repay", function () {
-        it("should allow borrowing and repaying", async function () {
-            const auctionInitialization: DataTypes.AuctionInitialization = {
-                underlyingToken: underlyingToken.target,
-                settlementToken: settlementToken.target,
-                notional: ethers.parseEther("100"),
-                auctionParams: {
-                    relStrike: ethers.parseEther("1"),
-                    tenor: 86400 * 30, // 30 days
-                    earliestExerciseTenor: 86400 * 7, // 7 days
-                    relPremiumStart: ethers.parseEther("0.01"),
-                    relPremiumFloor: ethers.parseEther("0.005"),
-                    decayDuration: 86400 * 7, // 7 days
-                    minSpot: ethers.parseUnits("0.1", 6),
-                    maxSpot: ethers.parseUnits("1", 6),
-                    decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-                },
-                advancedSettings: {
-                    borrowCap: ethers.parseEther("1"),
-                    oracle: mockOracle.target,
-                    premiumTokenIsUnderlying: false,
-                    votingDelegationAllowed: true,
-                    allowedDelegateRegistry: ethers.ZeroAddress,
-                },
-                oracle: mockOracle.target,
-            };
-
-            // Approve and start auction
-            await underlyingToken
-                .connect(owner)
-                .approve(router.target, auctionInitialization.notional);
-            await router
-                .connect(owner)
-                .createAuction(owner.address, auctionInitialization);
-
-            const escrows = await router.getEscrows(0, 1);
-            const escrowAddress = escrows[0];
-            const escrow: any = await escrowImpl.attach(escrowAddress);
-
-            // Approve and bid on auction
-            await settlementToken
-                .connect(user1)
-                .approve(router.target, ethers.parseEther("100"));
-            const relBid = ethers.parseEther("0.02");
-            const refSpot = ethers.parseUnits("1", 6);
-            const data: any[] = [];
-
-            await router
-                .connect(user1)
-                .bidOnAuction(
-                    escrowAddress,
-                    user1.address,
-                    relBid,
-                    refSpot,
-                    data,
-                    ethers.ZeroAddress
-                );
-
-            // Fast forward time to after earliest exercise tenor
-            await ethers.provider.send("evm_increaseTime", [86400 * 7]);
-            await ethers.provider.send("evm_mine", []);
-
-            // Borrow underlying tokens
-            await expect(
-                router.connect(user1).borrow(escrowAddress, user1.address, ethers.parseEther("10"))
-            ).to.emit(router, "Borrow");
-
-            // Check borrowed amount
-            expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
-                ethers.parseEther("10")
-            );
-
-            // Approve underlying token for repayment
-            await underlyingToken
-                .connect(user1)
-                .approve(router.target, ethers.parseEther("100"));
-
-            // Repay borrowed amount
-            await expect(
-                router.connect(user1).repay(escrowAddress, user1.address, ethers.parseEther("10"))
-            ).to.emit(router, "Repay");
-
-            // Check borrowed amount after repayment
-            expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
-                ethers.parseEther("0")
-            );
-        });
-
-        it("should revert if borrowing is not allowed", async function () {
-            const auctionInitialization: DataTypes.AuctionInitialization = {
-                underlyingToken: underlyingToken.target,
-                settlementToken: settlementToken.target,
-                notional: ethers.parseEther("100"),
-                auctionParams: {
-                    relStrike: ethers.parseEther("1"),
-                    tenor: 86400 * 30, // 30 days
-                    earliestExerciseTenor: 86400 * 7, // 7 days
-                    relPremiumStart: ethers.parseEther("0.01"),
-                    relPremiumFloor: ethers.parseEther("0.005"),
-                    decayDuration: 86400 * 7, // 7 days
-                    minSpot: ethers.parseUnits("0.1", 6),
-                    maxSpot: ethers.parseUnits("1", 6),
-                    decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-                },
-                advancedSettings: {
-                    borrowCap: 0n, // Disallow borrowing
-                    oracle: mockOracle.target,
-                    premiumTokenIsUnderlying: false,
-                    votingDelegationAllowed: true,
-                    allowedDelegateRegistry: ethers.ZeroAddress,
-                },
-                oracle: mockOracle.target,
-            };
-
-            // Approve and start auction
-            await underlyingToken
-                .connect(owner)
-                .approve(router.target, auctionInitialization.notional);
-            await router
-                .connect(owner)
-                .createAuction(owner.address, auctionInitialization);
-
-            const escrows = await router.getEscrows(0, 1);
-            const escrowAddress = escrows[0];
-            const escrow: any = await escrowImpl.attach(escrowAddress);
-
-            // Approve and bid on auction
-            await settlementToken
-                .connect(user1)
-                .approve(router.target, ethers.parseEther("100"));
-            const relBid = ethers.parseEther("0.02");
-            const refSpot = ethers.parseUnits("1", 6);
-            const data: any[] = [];
-
-            await router
-                .connect(user1)
-                .bidOnAuction(
-                    escrowAddress,
-                    user1.address,
-                    relBid,
-                    refSpot,
-                    data,
-                    ethers.ZeroAddress
-                );
-
-            // Fast forward time to after earliest exercise tenor
-            await ethers.provider.send("evm_increaseTime", [86400 * 7]);
-            await ethers.provider.send("evm_mine", []);
-
-            // Attempt to borrow when borrowing is disallowed
-            await expect(
-                router.connect(user1).borrow(escrowAddress, user1.address, ethers.parseEther("10"))
-            ).to.be.reverted;
-        });
-
-        it("should allow withdrawing from expired auction and creating a new one", async function () {
-            const auctionInitialization: DataTypes.AuctionInitialization = {
-                underlyingToken: underlyingToken.target,
-                settlementToken: settlementToken.target,
-                notional: ethers.parseEther("100"),
-                auctionParams: {
-                    relStrike: ethers.parseEther("1"),
-                    tenor: 86400 * 30, // 30 days
-                    earliestExerciseTenor: 86400 * 7, // 7 days
-                    relPremiumStart: ethers.parseEther("0.01"),
-                    relPremiumFloor: ethers.parseEther("0.005"),
-                    decayDuration: 86400 * 7, // 7 days
-                    minSpot: ethers.parseUnits("0.1", 6),
-                    maxSpot: ethers.parseUnits("1", 6),
-                    decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-                },
-                advancedSettings: {
-                    borrowCap: ethers.parseEther("1"),
-                    oracle: mockOracle.target,
-                    premiumTokenIsUnderlying: false,
-                    votingDelegationAllowed: true,
-                    allowedDelegateRegistry: ethers.ZeroAddress,
-                },
-                oracle: mockOracle.target,
-            };
-
-            // Approve and start first auction
-            await underlyingToken
-                .connect(owner)
-                .approve(router.target, auctionInitialization.notional * 2n);
-            await router
-                .connect(owner)
-                .createAuction(owner.address, auctionInitialization);
-
-            const escrows = await router.getEscrows(0, 1);
-            const oldEscrowAddress = escrows[0];
-
-            // Fast forward time to after auction expiry (30 days + 1 hour)
-            await ethers.provider.send("evm_increaseTime", [86400 * 30 + 3600]);
-            await ethers.provider.send("evm_mine", []);
-
-            // revert if not an existing escrow
-            await expect(
-                router
-                    .connect(owner)
-                    .withdrawFromEscrowAndCreateAuction(user2.address, owner.address, auctionInitialization)
-            ).to.be.reverted;
-
-            // Revert if not owner
-            await expect(
-                router
-                    .connect(user1)
-                    .withdrawFromEscrowAndCreateAuction(oldEscrowAddress, owner.address, auctionInitialization)
-            ).to.be.reverted;
-
-            // Withdraw from expired auction and create a new one
-            await expect(
-                router
-                    .connect(owner)
-                    .withdrawFromEscrowAndCreateAuction(oldEscrowAddress, owner.address, auctionInitialization)
-            ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
-
-            // Get the new escrow address
-            const newEscrows = await router.getEscrows(1, 1);
-            const newEscrowAddress = newEscrows[0];
-            const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
-
-            // Verify that the new escrow is different from the old one
-            expect(newEscrowAddress).to.not.equal(oldEscrowAddress);
-
-            // Approve and bid on the new auction
-            await settlementToken
-                .connect(user1)
-                .approve(router.target, ethers.parseEther("100"));
-            const relBid = ethers.parseEther("0.02");
-            const refSpot = ethers.parseUnits("1", 6);
-            const data: any[] = [];
-
-            await expect(
-                router
-                    .connect(user1)
-                    .bidOnAuction(
-                        newEscrowAddress,
-                        user1.address,
-                        relBid,
-                        refSpot,
-                        data,
-                        ethers.ZeroAddress
-                    )
-            ).to.emit(router, "BidOnAuction");
-        });
+      // Delegate voting
+      const delegate = user2.address;
+      await expect(
+        escrow.connect(owner).handleOnChainVoting(delegate)
+      ).to.emit(escrow, "OnChainVotingDelegation").withArgs(delegate);
     });
 
     it("should revert if delegation is not allowed", async function () {
@@ -1194,8 +1039,9 @@ describe("Router Contract Ext", function () {
 
       // Attempt to delegate voting when not allowed
       const delegate = user2.address;
-      await expect(escrow.connect(user1).handleOnChainVoting(delegate)).to.be
-        .reverted;
+      await expect(
+        escrow.connect(user1).handleOnChainVoting(delegate)
+      ).to.be.reverted;
     });
   });
 
@@ -1203,7 +1049,9 @@ describe("Router Contract Ext", function () {
     it("should allow owner to set a new fee handler", async function () {
       const newFeeHandler = user1.address;
 
-      await expect(router.connect(owner).setFeeHandler(newFeeHandler))
+      await expect(
+        router.connect(owner).setFeeHandler(newFeeHandler)
+      )
         .to.emit(router, "NewFeeHandler")
         .withArgs(ethers.ZeroAddress, newFeeHandler);
 
@@ -1221,8 +1069,9 @@ describe("Router Contract Ext", function () {
     it("should revert if setting the same fee handler", async function () {
       const currentFeeHandler = await router.feeHandler();
 
-      await expect(router.connect(owner).setFeeHandler(currentFeeHandler)).to.be
-        .reverted;
+      await expect(
+        router.connect(owner).setFeeHandler(currentFeeHandler)
+      ).to.be.reverted;
     });
   });
 
@@ -1263,9 +1112,7 @@ describe("Router Contract Ext", function () {
 
       // Attempt to start another auction with the same nonce (should create a new escrow)
       await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+        router.connect(owner).createAuction(owner.address, auctionInitialization)
       ).to.emit(router, "CreateAuction");
 
       // Fetch both escrows and ensure they are unique
@@ -1273,110 +1120,64 @@ describe("Router Contract Ext", function () {
       expect(escrows[0]).to.not.equal(escrows[1]);
     });
 
-    describe("Edge Cases and Reverts", function () {
-        it("should revert when creating escrow with same nonce", async function () {
-            const auctionInitialization: DataTypes.AuctionInitialization = {
-                underlyingToken: underlyingToken.target,
-                settlementToken: settlementToken.target,
-                notional: ethers.parseEther("100") / 2n,
-                auctionParams: {
-                    relStrike: ethers.parseEther("1"),
-                    tenor: 86400 * 30, // 30 days
-                    earliestExerciseTenor: 86400 * 7, // 7 days
-                    relPremiumStart: ethers.parseEther("0.01"),
-                    relPremiumFloor: ethers.parseEther("0.005"),
-                    decayDuration: 86400 * 7, // 7 days
-                    minSpot: ethers.parseUnits("0.1", 6),
-                    maxSpot: ethers.parseUnits("1", 6),
-                    decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-                },
-                advancedSettings: {
-                    borrowCap: ethers.parseEther("1"),
-                    oracle: mockOracle.target,
-                    premiumTokenIsUnderlying: false,
-                    votingDelegationAllowed: true,
-                    allowedDelegateRegistry: ethers.ZeroAddress,
-                },
-                oracle: mockOracle.target,
-            };
+    it("should revert when non-escrow address tries to interact", async function () {
+      // Attempt to interact with a random address
+      await expect(
+        router.connect(user1).withdraw(user2.address, user1.address, underlyingToken.target, ethers.parseEther("10"))
+      ).to.be.reverted;
+    });
 
-            // Approve and start first auction
-            await underlyingToken
-                .connect(owner)
-                .approve(router.target, auctionInitialization.notional * 2n);
-            await router
-                .connect(owner)
-                .createAuction(owner.address, auctionInitialization);
+    it("should revert when bidding on non-existent escrow", async function () {
+      const nonExistentEscrow = ethers.Wallet.createRandom().address;
 
-            // Attempt to start another auction with the same nonce (should create a new escrow)
-            await expect(
-                router.connect(owner).createAuction(owner.address, auctionInitialization)
-            ).to.emit(router, "CreateAuction");
+      await expect(
+        router.connect(user1).bidOnAuction(
+          nonExistentEscrow,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        )
+      ).to.be.reverted;
+    });
 
-            // Fetch both escrows and ensure they are unique
-            const escrows = await router.getEscrows(0, 2);
-            expect(escrows[0]).to.not.equal(escrows[1]);
-        });
+    it("should revert when exercising on non-existent escrow", async function () {
+      const nonExistentEscrow = ethers.Wallet.createRandom().address;
 
-        it("should revert when non-escrow address tries to interact", async function () {
-            // Attempt to interact with a random address
-            await expect(
-                router.connect(user1).withdraw(user2.address, user1.address, underlyingToken.target, ethers.parseEther("10"))
-            ).to.be.reverted;
-        });
+      await expect(
+        router.connect(user1).exercise(
+          nonExistentEscrow,
+          user1.address,
+          ethers.parseEther("10"),
+          false,
+          []
+        )
+      ).to.be.reverted;
+    });
 
-        it("should revert when bidding on non-existent escrow", async function () {
-            const nonExistentEscrow = ethers.Wallet.createRandom().address;
+    it("should revert when borrowing from non-existent escrow", async function () {
+      const nonExistentEscrow = ethers.Wallet.createRandom().address;
 
-            await expect(
-                router.connect(user1).bidOnAuction(
-                    nonExistentEscrow,
-                    user1.address,
-                    ethers.parseEther("0.1"),
-                    ethers.parseUnits("1", 6),
-                    [],
-                    ethers.ZeroAddress
-                )
-            ).to.be.reverted;
-        });
+      await expect(
+        router.connect(user1).borrow(
+          nonExistentEscrow,
+          user1.address,
+          ethers.parseEther("10")
+        )
+      ).to.be.reverted;
+    });
 
-        it("should revert when exercising on non-existent escrow", async function () {
-            const nonExistentEscrow = ethers.Wallet.createRandom().address;
+    it("should revert when repaying to non-existent escrow", async function () {
+      const nonExistentEscrow = ethers.Wallet.createRandom().address;
 
-            await expect(
-                router.connect(user1).exercise(
-                    nonExistentEscrow,
-                    user1.address,
-                    ethers.parseEther("10"),
-                    false,
-                    []
-                )
-            ).to.be.reverted;
-        });
-
-        it("should revert when borrowing from non-existent escrow", async function () {
-            const nonExistentEscrow = ethers.Wallet.createRandom().address;
-
-            await expect(
-                router.connect(user1).borrow(
-                    nonExistentEscrow,
-                    user1.address,
-                    ethers.parseEther("10")
-                )
-            ).to.be.reverted;
-        });
-
-        it("should revert when repaying to non-existent escrow", async function () {
-            const nonExistentEscrow = ethers.Wallet.createRandom().address;
-
-            await expect(
-                router.connect(user1).repay(
-                    nonExistentEscrow,
-                    user1.address,
-                    ethers.parseEther("10")
-                )
-            ).to.be.reverted;
-        });
+      await expect(
+        router.connect(user1).repay(
+          nonExistentEscrow,
+          user1.address,
+          ethers.parseEther("10")
+        )
+      ).to.be.reverted;
     });
   });
 });
