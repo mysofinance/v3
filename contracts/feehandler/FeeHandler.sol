@@ -8,17 +8,19 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract FeeHandler is Ownable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 public constant BASE = 1 ether;
-    uint256 public constant MAX_MATCH_FEE = 0.2 ether;
-    uint256 public constant MAX_EXERCISE_FEE = 0.005 ether;
+    uint256 internal constant BASE = 1 ether;
+    uint256 internal constant MAX_MATCH_FEE = 0.2 ether;
+    uint256 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
+    address public router;
     uint256 public matchFee;
     uint256 public matchFeeDistPartnerShare;
     uint256 public exerciseFee;
 
     mapping(address => bool) public isDistPartner;
 
-    event PayFee(address indexed token, uint256 amount);
+    event ProvisionFees(address indexed token, uint256 amount);
+    event Withdraw(address indexed to, address indexed token, uint256 amount);
     event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
     event SetExerciseFee(uint256 exerciseFee);
     event SetDistributionPartners(address[] accounts, bool[] isDistPartner);
@@ -29,21 +31,31 @@ contract FeeHandler is Ownable {
 
     constructor(
         address initOwner,
+        address _router,
         uint256 _matchFee,
         uint256 _distPartnerFeeShare,
         uint256 _exerciseFee
     ) Ownable(initOwner) {
+        router = _router;
         setMatchFeeInfo(_matchFee, _distPartnerFeeShare);
         setExerciseFee(_exerciseFee);
     }
 
-    function payFee(address token, uint256 amount) external {
-        IERC20Metadata(token).safeTransferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
-        emit PayFee(token, amount);
+    function provisionFees(address token, uint256 amount) external {
+        if (msg.sender != router) {
+            revert();
+        }
+        // @dev: placeholder for distribution logic
+        emit ProvisionFees(token, amount);
+    }
+
+    function withdraw(
+        address to,
+        address token,
+        uint256 amount
+    ) external onlyOwner {
+        IERC20Metadata(token).safeTransfer(to, amount);
+        emit Withdraw(to, token, amount);
     }
 
     function getMatchFeeInfo(
@@ -63,13 +75,10 @@ contract FeeHandler is Ownable {
         uint256 _matchFee,
         uint256 _distPartnerFeeShare
     ) public onlyOwner {
-        if (_matchFee > MAX_MATCH_FEE || _matchFee == matchFee) {
+        if (_matchFee > MAX_MATCH_FEE) {
             revert InvalidMatchFee();
         }
-        if (
-            _distPartnerFeeShare > BASE ||
-            _distPartnerFeeShare == matchFeeDistPartnerShare
-        ) {
+        if (_distPartnerFeeShare > BASE) {
             revert InvalidPartnerFeeShare();
         }
         matchFee = _matchFee;
@@ -78,7 +87,7 @@ contract FeeHandler is Ownable {
     }
 
     function setExerciseFee(uint256 _exerciseFee) public onlyOwner {
-        if (_exerciseFee > MAX_EXERCISE_FEE || _exerciseFee == exerciseFee) {
+        if (_exerciseFee > MAX_EXERCISE_FEE) {
             revert InvalidExerciseFee();
         }
         exerciseFee = _exerciseFee;
