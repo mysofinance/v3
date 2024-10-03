@@ -409,7 +409,8 @@ describe("Router Contract Fee Tests", function () {
                 .approve(router.target, ethers.parseEther("100"));
 
             // Get initial balances
-            const initialOwnerBalance = await underlyingToken.balanceOf(owner.address);
+            const initialOwnerUnderlyingBalance = await underlyingToken.balanceOf(owner.address);
+            const initialOwnerSettlementBalance = await settlementToken.balanceOf(owner.address);
             const initialUser1Balance = await settlementToken.balanceOf(user1.address);
             const initialFeeHandlerBalance = await settlementToken.balanceOf(feeHandler.target);
 
@@ -425,17 +426,19 @@ describe("Router Contract Fee Tests", function () {
                 );
 
             // Get final balances
-            const finalOwnerBalance = await underlyingToken.balanceOf(owner.address);
+            const finalOwnerUnderlyingBalance = await underlyingToken.balanceOf(owner.address);
             const finalUser1Balance = await settlementToken.balanceOf(user1.address);
+            const finalOwnerSettlementBalance = await settlementToken.balanceOf(owner.address);
             const finalFeeHandlerBalance = await settlementToken.balanceOf(feeHandler.target);
 
             // Calculate expected fees
-            const exerciseAmount = ethers.parseEther("50");
+            const exerciseAmount = ethers.parseEther("50") * refSpot / BASE;
             const expectedExerciseFee = exerciseAmount * ethers.parseEther("0.001") / BASE;
 
             // Check balances
-            expect(finalOwnerBalance).to.be.lt(initialOwnerBalance);
-            expect(finalUser1Balance).to.be.lt(initialUser1Balance);
+            expect(finalOwnerUnderlyingBalance).to.be.equal(initialOwnerUnderlyingBalance);
+            expect(finalOwnerSettlementBalance).to.be.equal(initialOwnerSettlementBalance + exerciseAmount);
+            expect(finalUser1Balance).to.be.equal(initialUser1Balance - exerciseAmount - expectedExerciseFee);
             expect(finalFeeHandlerBalance).to.equal(initialFeeHandlerBalance + expectedExerciseFee);
         });
     });
@@ -629,6 +632,80 @@ describe("Router Contract Fee Tests", function () {
 
             expect(finalFeeHandlerBalance - initialFeeHandlerBalance).to.equal(expectedProtocolFee);
             expect(finalDistPartnerBalance - initialDistPartnerBalance).to.equal(expectedDistPartnerFee);
+        });
+    });
+
+    describe("Revert Scenarios", function () {
+        it("Should revert setMatchFeeInfo when matchFee exceeds MAX_MATCH_FEE", async function () {
+            const excessiveMatchFee = MAX_MATCH_FEE + ethers.parseEther("0.001");
+
+            await expect(
+                feeHandler.connect(owner).setMatchFeeInfo(excessiveMatchFee, ethers.parseEther("0.3"))
+            ).to.be.revertedWithCustomError(feeHandler, "InvalidMatchFee");
+        });
+
+        it("Should revert setMatchFeeInfo when distPartnerFeeShare exceeds BASE", async function () {
+            const excessiveDistPartnerFeeShare = BASE + ethers.parseEther("0.001");
+
+            await expect(
+                feeHandler.connect(owner).setMatchFeeInfo(ethers.parseEther("0.1"), excessiveDistPartnerFeeShare)
+            ).to.be.revertedWithCustomError(feeHandler, "InvalidPartnerFeeShare");
+        });
+
+        it("Should revert setExerciseFee when exerciseFee exceeds MAX_EXERCISE_FEE", async function () {
+            const excessiveExerciseFee = MAX_EXERCISE_FEE + ethers.parseEther("0.001");
+
+            await expect(
+                feeHandler.connect(owner).setExerciseFee(excessiveExerciseFee)
+            ).to.be.revertedWithCustomError(feeHandler, "InvalidExerciseFee");
+        });
+
+        it("Should revert setDistPartners with unequal array lengths", async function () {
+            const accounts = [user1.address, user2.address];
+            const statuses = [true]; // Unequal length
+
+            await expect(
+                feeHandler.connect(owner).setDistPartners(accounts, statuses)
+            ).to.be.reverted;
+        });
+
+        it("Should revert setDistPartners with zero-length arrays", async function () {
+            const accounts: string[] = [];
+            const statuses: boolean[] = [];
+
+            await expect(
+                feeHandler.connect(owner).setDistPartners(accounts, statuses)
+            ).to.be.reverted;
+        });
+
+        it("Should revert setDistPartners when setting a distPartner to the same value", async function () {
+            const accounts = [user1.address];
+            const statuses = [true];
+
+            // First set to true
+            await feeHandler.connect(owner).setDistPartners(accounts, statuses);
+
+            // Attempt to set to true again
+            await expect(
+                feeHandler.connect(owner).setDistPartners(accounts, statuses)
+            ).to.be.reverted;
+        });
+    });
+
+    describe("Extra Cases", function () {
+        it("Should correctly handle getMatchFeeInfo for dist and non-dist partners", async function () {
+            // Initially, user1 is not a distPartner
+            let info = await feeHandler.getMatchFeeInfo(user1.address);
+            expect(info._matchFee).to.equal(ethers.parseEther("0.01"));
+            expect(info._matchFeeDistPartnerShare).to.equal(0);
+
+            // Set user1 as a distPartner
+            await feeHandler.connect(owner).setDistPartners([user1.address], [true]);
+
+            // Now, user1 should have a distPartner share
+            info = await feeHandler.getMatchFeeInfo(user1.address);
+            expect(info._matchFee).to.equal(ethers.parseEther("0.01"));
+            expect(info._matchFeeDistPartnerShare).to.equal(ethers.parseEther("0.05"));
         });
     });
 });
