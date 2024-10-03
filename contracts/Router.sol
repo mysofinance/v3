@@ -8,8 +8,9 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Escrow} from "./Escrow.sol";
-import {FeeHandler} from "./periphery/FeeHandler.sol";
+import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
+import "hardhat/console.sol";
 
 contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
@@ -24,14 +25,15 @@ contract Router is Ownable {
 
     mapping(address => bool) public isEscrow;
     mapping(bytes32 => bool) public isQuoteUsed;
+    mapping(address => bool) public quotesPaused;
     address[] public escrows;
 
-    event StartAuction(
+    event CreateAuction(
         address indexed escrowOwner,
         address indexed escrow,
         DataTypes.AuctionInitialization auctionInitialization
     );
-    event WithdrawFromEscrowAndStartAuction(
+    event WithdrawFromEscrowAndCreateAuction(
         address indexed escrowOwner,
         address indexed oldEscrow,
         address indexed newEscrow,
@@ -49,10 +51,10 @@ contract Router is Ownable {
         uint256 relBid,
         address optionReceiver,
         uint256 refSpot,
-        uint256 protocolFee,
-        uint256 distPartnerFee
+        uint256 matchFeeProtocol,
+        uint256 matchFeeDistPartner
     );
-    event ExerciseCall(
+    event Exercise(
         address indexed escrow,
         address underlyingReceiver,
         uint256 underlyingAmount,
@@ -61,7 +63,8 @@ contract Router is Ownable {
     event Borrow(
         address indexed escrow,
         address underlyingReceiver,
-        uint256 underlyingAmount
+        uint256 underlyingAmount,
+        uint256 collateralFeeAmount
     );
     event Repay(
         address indexed escrow,
@@ -72,21 +75,17 @@ contract Router is Ownable {
         address indexed escrowOwner,
         address indexed escrow,
         DataTypes.RFQInitialization rfqInitialization,
-        uint256 protocolFee,
-        uint256 distPartnerFee
+        uint256 matchFeeProtocol,
+        uint256 matchFeeDistPartner
     );
     event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
+    event PauseQuotes(address indexed quoter, bool isPaused);
 
-    constructor(
-        address initOwner,
-        address _escrowImpl,
-        address _feeHandler
-    ) Ownable(initOwner) {
+    constructor(address initOwner, address _escrowImpl) Ownable(initOwner) {
         escrowImpl = _escrowImpl;
-        feeHandler = _feeHandler;
     }
 
-    function startAuction(
+    function createAuction(
         address escrowOwner,
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
@@ -102,10 +101,10 @@ contract Router is Ownable {
             escrow,
             auctionInitialization.notional
         );
-        emit StartAuction(escrowOwner, escrow, auctionInitialization);
+        emit CreateAuction(escrowOwner, escrow, auctionInitialization);
     }
 
-    function withdrawFromEscrowAndStartAuction(
+    function withdrawFromEscrowAndCreateAuction(
         address oldEscrow,
         address escrowOwner,
         DataTypes.AuctionInitialization calldata auctionInitialization
@@ -135,7 +134,7 @@ contract Router is Ownable {
             newEscrow,
             auctionInitialization.notional
         );
-        emit WithdrawFromEscrowAndStartAuction(
+        emit WithdrawFromEscrowAndCreateAuction(
             escrowOwner,
             oldEscrow,
             newEscrow,
@@ -166,57 +165,41 @@ contract Router is Ownable {
         uint256 _refSpot,
         bytes[] memory _oracleData,
         address distPartner
-    )
-        external
-        returns (
-            address settlementToken,
-            uint256 _strike,
-            uint256 _expiry,
-            uint256 _earliestExercise,
-            uint256 _premium,
-            uint256 _oracleSpotPrice,
-            uint256 _protocolFee,
-            uint256 _distPartnerFee
-        )
-    {
+    ) external returns (DataTypes.BidPreview memory preview) {
         if (!isEscrow[escrow]) {
             revert();
         }
-        (
-            settlementToken,
-            _strike,
-            _expiry,
-            _earliestExercise,
-            _premium,
-            _oracleSpotPrice,
-            _protocolFee,
-            _distPartnerFee
-        ) = Escrow(escrow).handleAuctionBid(
+        preview = Escrow(escrow).handleAuctionBid(
             relBid,
             optionReceiver,
             _refSpot,
             _oracleData,
             distPartner
         );
-        IERC20Metadata(settlementToken).safeTransferFrom(
+        IERC20Metadata(preview.premiumToken).safeTransferFrom(
             msg.sender,
             Escrow(escrow).owner(),
-            _premium - _distPartnerFee - _protocolFee
+            preview.premium -
+                preview.matchFeeDistPartner -
+                preview.matchFeeProtocol
         );
-        if (_distPartnerFee > 0) {
-            IERC20Metadata(settlementToken).safeTransferFrom(
+        if (preview.matchFeeDistPartner > 0) {
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 msg.sender,
                 distPartner,
-                _distPartnerFee
+                preview.matchFeeDistPartner
             );
         }
-        if (_protocolFee > 0) {
-            IERC20Metadata(settlementToken).safeTransferFrom(
+        if (preview.matchFeeProtocol > 0) {
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 msg.sender,
-                address(this),
-                _protocolFee
+                feeHandler,
+                preview.matchFeeProtocol
             );
-            FeeHandler(feeHandler).payFee(settlementToken, _protocolFee);
+            FeeHandler(feeHandler).provisionFees(
+                preview.premiumToken,
+                preview.matchFeeProtocol
+            );
         }
 
         emit BidOnAuction(
@@ -224,12 +207,12 @@ contract Router is Ownable {
             relBid,
             optionReceiver,
             _refSpot,
-            _protocolFee,
-            _distPartnerFee
+            preview.matchFeeProtocol,
+            preview.matchFeeDistPartner
         );
     }
 
-    function exerciseCall(
+    function exercise(
         address escrow,
         address underlyingReceiver,
         uint256 underlyingAmount,
@@ -243,7 +226,7 @@ contract Router is Ownable {
             address settlementToken,
             uint256 settlementAmount,
             uint256 exerciseFeeAmount
-        ) = Escrow(escrow).handleCallExercise(
+        ) = Escrow(escrow).handleExercise(
                 msg.sender,
                 underlyingReceiver,
                 underlyingAmount,
@@ -258,20 +241,18 @@ contract Router is Ownable {
             );
         }
         address _feeHandler = feeHandler;
-        if (_feeHandler != address(0)) {
-            if (exerciseFeeAmount > 0) {
-                IERC20Metadata(settlementToken).safeTransferFrom(
-                    msg.sender,
-                    address(this),
-                    exerciseFeeAmount
-                );
-                FeeHandler(_feeHandler).payFee(
-                    settlementToken,
-                    exerciseFeeAmount
-                );
-            }
+        if (_feeHandler != address(0) && exerciseFeeAmount > 0) {
+            IERC20Metadata(settlementToken).safeTransferFrom(
+                msg.sender,
+                feeHandler,
+                exerciseFeeAmount
+            );
+            FeeHandler(_feeHandler).provisionFees(
+                settlementToken,
+                exerciseFeeAmount
+            );
         }
-        emit ExerciseCall(
+        emit Exercise(
             escrow,
             underlyingReceiver,
             underlyingAmount,
@@ -287,8 +268,11 @@ contract Router is Ownable {
         if (!isEscrow[escrow]) {
             revert();
         }
-        (address settlementToken, uint256 collateralAmount) = Escrow(escrow)
-            .handleBorrow(
+        (
+            address settlementToken,
+            uint256 collateralAmount,
+            uint256 collateralFeeAmount
+        ) = Escrow(escrow).handleBorrow(
                 msg.sender,
                 underlyingReceiver,
                 borrowUnderlyingAmount
@@ -298,7 +282,24 @@ contract Router is Ownable {
             escrow,
             collateralAmount
         );
-        emit Borrow(escrow, underlyingReceiver, borrowUnderlyingAmount);
+        address _feeHandler = feeHandler;
+        if (_feeHandler != address(0) && collateralFeeAmount > 0) {
+            IERC20Metadata(settlementToken).safeTransferFrom(
+                msg.sender,
+                feeHandler,
+                collateralFeeAmount
+            );
+            FeeHandler(_feeHandler).provisionFees(
+                settlementToken,
+                collateralFeeAmount
+            );
+        }
+        emit Borrow(
+            escrow,
+            underlyingReceiver,
+            borrowUnderlyingAmount,
+            collateralFeeAmount
+        );
     }
 
     function repay(
@@ -353,41 +354,56 @@ contract Router is Ownable {
                 escrow,
                 rfqInitialization.optionInfo.notional
             );
-        IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
-            .safeTransferFrom(
+        IERC20Metadata(preview.premiumToken).safeTransferFrom(
+            preview.quoter,
+            msg.sender,
+            rfqInitialization.rfqQuote.premium -
+                preview.matchFeeDistPartner -
+                preview.matchFeeProtocol
+        );
+        if (preview.matchFeeDistPartner > 0) {
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 preview.quoter,
-                msg.sender,
-                rfqInitialization.rfqQuote.premium -
-                    preview.distPartnerFee -
-                    preview.protocolFee
+                distPartner,
+                preview.matchFeeDistPartner
             );
-        if (preview.distPartnerFee > 0) {
-            IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
-                .safeTransferFrom(
-                    msg.sender,
-                    distPartner,
-                    preview.distPartnerFee
-                );
         }
-        if (preview.protocolFee > 0) {
-            IERC20Metadata(rfqInitialization.optionInfo.settlementToken)
-                .safeTransferFrom(
-                    msg.sender,
-                    address(this),
-                    preview.protocolFee
-                );
-            FeeHandler(feeHandler).payFee(
-                rfqInitialization.optionInfo.settlementToken,
-                preview.protocolFee
+        if (preview.matchFeeProtocol > 0) {
+            IERC20Metadata(preview.premiumToken).safeTransferFrom(
+                preview.quoter,
+                feeHandler,
+                preview.matchFeeProtocol
+            );
+            FeeHandler(feeHandler).provisionFees(
+                preview.premiumToken,
+                preview.matchFeeProtocol
             );
         }
         emit TakeQuote(
             escrowOwner,
             escrow,
             rfqInitialization,
-            preview.protocolFee,
-            preview.distPartnerFee
+            preview.matchFeeProtocol,
+            preview.matchFeeDistPartner
         );
+    }
+
+    function takeSwapQuote(DataTypes.SwapQuote calldata swapQuote) external {
+        DataTypes.TakeSwapQuotePreview memory preview = previewTakeSwapQuote(
+            swapQuote
+        );
+
+        if (preview.status != DataTypes.RFQStatus.Success) {
+            revert();
+        }
+
+        // @dev: placeholder
+    }
+
+    function togglePauseQuotes() external {
+        bool isPaused = quotesPaused[msg.sender];
+        quotesPaused[msg.sender] = !isPaused;
+        emit PauseQuotes(msg.sender, !isPaused);
     }
 
     function setFeeHandler(address newFeeHandler) external onlyOwner {
@@ -426,12 +442,13 @@ contract Router is Ownable {
             matchFeeDistPartnerShare = matchFeeDistPartnerShare > BASE
                 ? BASE
                 : matchFeeDistPartnerShare;
-
             matchFeeProtocol =
-                (optionPremium * matchFee * (BASE - matchFeeDistPartner)) /
+                (optionPremium * matchFee * (BASE - matchFeeDistPartnerShare)) /
+                BASE /
                 BASE;
             matchFeeDistPartner =
-                (optionPremium * matchFee * matchFeeDistPartner) /
+                (optionPremium * matchFee * matchFeeDistPartnerShare) /
+                BASE /
                 BASE;
         }
     }
@@ -443,12 +460,7 @@ contract Router is Ownable {
         bytes32 msgHash = keccak256(
             abi.encode(
                 block.chainid,
-                rfqInitialization.optionInfo.underlyingToken,
-                rfqInitialization.optionInfo.settlementToken,
-                rfqInitialization.optionInfo.notional,
-                rfqInitialization.optionInfo.strike,
-                rfqInitialization.optionInfo.expiry,
-                rfqInitialization.optionInfo.earliestExercise,
+                rfqInitialization.optionInfo,
                 rfqInitialization.rfqQuote.premium,
                 rfqInitialization.rfqQuote.validUntil
             )
@@ -461,24 +473,29 @@ contract Router is Ownable {
 
         if (block.timestamp > rfqInitialization.rfqQuote.validUntil) {
             return
-                DataTypes.TakeQuotePreview({
-                    status: DataTypes.RFQStatus.Expired,
-                    msgHash: msgHash,
-                    quoter: quoter,
-                    protocolFee: 0,
-                    distPartnerFee: 0
-                });
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.Expired,
+                    msgHash,
+                    quoter
+                );
         }
 
         if (isQuoteUsed[msgHash]) {
             return
-                DataTypes.TakeQuotePreview({
-                    status: DataTypes.RFQStatus.AlreadyExecuted,
-                    msgHash: msgHash,
-                    quoter: quoter,
-                    protocolFee: 0,
-                    distPartnerFee: 0
-                });
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.AlreadyExecuted,
+                    msgHash,
+                    quoter
+                );
+        }
+
+        if (quotesPaused[quoter]) {
+            return
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.QuotesPaused,
+                    msgHash,
+                    quoter
+                );
         }
 
         uint256 balance = IERC20Metadata(
@@ -487,15 +504,13 @@ contract Router is Ownable {
 
         if (balance < rfqInitialization.rfqQuote.premium) {
             return
-                DataTypes.TakeQuotePreview({
-                    status: DataTypes.RFQStatus.InsufficientFunding,
-                    msgHash: msgHash,
-                    quoter: quoter,
-                    protocolFee: 0,
-                    distPartnerFee: 0
-                });
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.InsufficientFunding,
+                    msgHash,
+                    quoter
+                );
         }
-        (uint256 protocolFee, uint256 distPartnerFee) = getMatchFees(
+        (uint256 matchFeeProtocol, uint256 matchFeeDistPartner) = getMatchFees(
             distPartner,
             rfqInitialization.rfqQuote.premium
         );
@@ -504,10 +519,21 @@ contract Router is Ownable {
                 status: DataTypes.RFQStatus.Success,
                 msgHash: msgHash,
                 quoter: quoter,
-                protocolFee: protocolFee,
-                distPartnerFee: distPartnerFee
+                premium: rfqInitialization.rfqQuote.premium,
+                premiumToken: rfqInitialization
+                    .optionInfo
+                    .advancedSettings
+                    .premiumTokenIsUnderlying
+                    ? rfqInitialization.optionInfo.underlyingToken
+                    : rfqInitialization.optionInfo.settlementToken,
+                matchFeeProtocol: matchFeeProtocol,
+                matchFeeDistPartner: matchFeeDistPartner
             });
     }
+
+    function previewTakeSwapQuote(
+        DataTypes.SwapQuote calldata swapQuote
+    ) public view returns (DataTypes.TakeSwapQuotePreview memory) {}
 
     function getEscrows(
         uint256 from,
@@ -535,5 +561,22 @@ contract Router is Ownable {
         isEscrow[escrow] = true;
         escrows.push(escrow);
         return escrow;
+    }
+
+    function _createTakeQuotePreview(
+        DataTypes.RFQStatus status,
+        bytes32 msgHash,
+        address quoter
+    ) internal pure returns (DataTypes.TakeQuotePreview memory) {
+        return
+            DataTypes.TakeQuotePreview({
+                status: status,
+                msgHash: msgHash,
+                quoter: quoter,
+                premium: 0,
+                premiumToken: address(0),
+                matchFeeProtocol: 0,
+                matchFeeDistPartner: 0
+            });
     }
 }
