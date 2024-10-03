@@ -3,18 +3,18 @@
 pragma solidity 0.8.24;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 
 /**
- * @title ChainlinkBase
+ * @title ChainlinkOracle
  * @dev Abstract contract supporting Chainlink oracles with flexible decimal handling.
  *      Allows oracles with 18 (ETH) or 8 (USD) decimals. If an oracle has 8 decimals,
  *      it uses the ETH/USD oracle to convert the price to ETH.
  */
-contract ChainlinkBase is IOracle, Ownable {
+contract ChainlinkOracle is IOracle, Ownable {
     // Immutable address for the ETH/USD Chainlink oracle
     address public immutable ETH_USD_ORACLE;
 
@@ -93,7 +93,7 @@ contract ChainlinkBase is IOracle, Ownable {
             revert InvalidArrayLength();
         }
 
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ) {
             OracleInfo storage existingInfo = oracleInfos[_tokenAddrs[i]];
 
             if (existingInfo.oracleAddr != address(0)) {
@@ -112,15 +112,12 @@ contract ChainlinkBase is IOracle, Ownable {
      * @notice Retrieves the price of a specified token quoted in another token.
      * @param token The address of the token for which the price is to be retrieved.
      * @param quoteToken The address of the token in which the price is to be quoted.
-     * @param oracleData Additional data that may be required to fetch the price.
-     * The structure and content of this data can vary depending on the implementation
-     * and use case. For example, one can pass an optimistic price with signature to verify.
      * @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
      */
     function getPrice(
         address token,
         address quoteToken,
-        bytes[] memory oracleData
+        bytes[] memory /*oracleData*/
     ) external view virtual returns (uint256 tokenPriceInQuoteToken) {
         uint256 priceOfToken = getPriceOfToken(token);
         uint256 priceOfQuoteToken = getPriceOfToken(quoteToken);
@@ -143,7 +140,7 @@ contract ChainlinkBase is IOracle, Ownable {
     function getPriceOfToken(
         address token
     ) public view virtual returns (uint256 tokenPriceRaw) {
-        if (token == WETH){
+        if (token == WETH) {
             return 1e18;
         }
         OracleInfo memory info = oracleInfos[token];
@@ -159,8 +156,9 @@ contract ChainlinkBase is IOracle, Ownable {
             tokenPriceRaw = rawPrice;
         } else {
             // Price is in USD, convert to ETH using ETH/USD oracle
-            uint256 ethUsdPrice = _checkAndReturnLatestRoundData(ETH_USD_ORACLE);
-
+            uint256 ethUsdPrice = _checkAndReturnLatestRoundData(
+                ETH_USD_ORACLE
+            );
             // Ensure ETH/USD oracle has 8 decimals
             // Convert USD to ETH: (price * 1e18) / ethUsdPrice
             tokenPriceRaw = Math.mulDiv(rawPrice, 1e18, ethUsdPrice);
@@ -196,10 +194,7 @@ contract ChainlinkBase is IOracle, Ownable {
         tokenPriceRaw = uint256(answer);
     }
 
-    function _checkAndStoreOracleInfo(
-        address token,
-        address oracle
-    ) internal {
+    function _checkAndStoreOracleInfo(address token, address oracle) internal {
         if (token == address(0) || oracle == address(0)) {
             revert InvalidAddress();
         }
