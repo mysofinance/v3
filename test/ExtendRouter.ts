@@ -891,6 +891,9 @@ describe("Router Contract Ext", function () {
           )
       ).to.be.reverted;
 
+      const preBalUser = await underlyingToken.balanceOf(owner.address);
+      const preBalOldEscrow = await underlyingToken.balanceOf(oldEscrowAddress);
+
       // Withdraw from expired auction and create a new one
       await expect(
         router
@@ -902,10 +905,23 @@ describe("Router Contract Ext", function () {
           )
       ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
 
+      const postBalUser = await underlyingToken.balanceOf(owner.address);
+      const postBalOldEscrow =
+        await underlyingToken.balanceOf(oldEscrowAddress);
+
+      // Check balance changes
+      expect(preBalUser).to.be.equal(postBalUser);
+      expect(preBalOldEscrow).to.be.gt(0);
+      expect(postBalOldEscrow).to.be.equal(0);
+
       // Get the new escrow address
       const newEscrows = await router.getEscrows(1, 1);
       const newEscrowAddress = newEscrows[0];
       const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
+      const postBalNewEscrow = await underlyingToken.balanceOf(newEscrow);
+
+      // Check balance changes
+      expect(postBalNewEscrow).to.be.equal(preBalOldEscrow);
 
       // Verify that the new escrow is different from the old one
       expect(newEscrowAddress).to.not.equal(oldEscrowAddress);
