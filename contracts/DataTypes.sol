@@ -4,16 +4,16 @@ pragma solidity 0.8.24;
 library DataTypes {
     struct OptionInfo {
         address underlyingToken;
+        uint48 expiry;
         address settlementToken;
-        uint256 notional;
-        uint256 strike;
-        uint256 expiry;
-        uint256 earliestExercise;
+        uint48 earliestExercise;
+        uint128 notional;
+        uint128 strike;
         AdvancedSettings advancedSettings;
     }
 
     struct AdvancedSettings {
-        uint256 borrowCap;
+        uint64 borrowCap;
         address oracle;
         bool premiumTokenIsUnderlying;
         bool votingDelegationAllowed;
@@ -29,15 +29,15 @@ library DataTypes {
     }
 
     struct AuctionParams {
-        uint256 relStrike;
-        uint256 tenor;
-        uint256 earliestExerciseTenor;
-        uint256 relPremiumStart;
-        uint256 relPremiumFloor;
-        uint256 decayDuration;
-        uint256 minSpot;
-        uint256 maxSpot;
-        uint256 decayStartTime;
+        uint128 relStrike;
+        uint48 tenor;
+        uint48 earliestExerciseTenor;
+        uint32 decayStartTime;
+        uint32 decayDuration;
+        uint64 relPremiumStart;
+        uint64 relPremiumFloor;
+        uint128 minSpot;
+        uint128 maxSpot;
     }
 
     struct RFQInitialization {

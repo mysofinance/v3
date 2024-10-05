@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Router} from "./Router.sol";
@@ -15,11 +16,11 @@ contract Escrow is InitializableERC20 {
 
     uint256 internal constant BASE = 1 ether;
 
-    uint256 public premiumPaid;
-    uint256 public exerciseFee;
-    uint256 public totalBorrowed;
+    uint128 public premiumPaid;
+    uint128 public totalBorrowed;
 
     address public router;
+    uint96 public exerciseFee;
     address public owner;
 
     bool public isAuction;
@@ -29,7 +30,6 @@ contract Escrow is InitializableERC20 {
 
     DataTypes.OptionInfo public optionInfo;
     DataTypes.AuctionParams public auctionParams;
-    DataTypes.RFQInitialization public rfqInitialization;
 
     event OnChainVotingDelegation(address delegate);
     event OffChainVotingDelegation(
@@ -99,7 +99,7 @@ contract Escrow is InitializableERC20 {
         }
         optionInfo.underlyingToken = _auctionInitialization.underlyingToken;
         optionInfo.settlementToken = _auctionInitialization.settlementToken;
-        optionInfo.notional = _auctionInitialization.notional;
+        optionInfo.notional = SafeCast.toUint128(_auctionInitialization.notional);
         optionInfo.advancedSettings = _auctionInitialization.advancedSettings;
 
         auctionParams = _auctionInitialization.auctionParams;
@@ -139,21 +139,20 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (optionInfo.advancedSettings.borrowCap > BASE) {
+        if (_rfqInitialization.optionInfo.advancedSettings.borrowCap > BASE) {
             revert();
         }
-        rfqInitialization = _rfqInitialization;
 
-        optionInfo = rfqInitialization.optionInfo;
+        optionInfo = _rfqInitialization.optionInfo;
         optionMinted = true;
-        premiumPaid = rfqInitialization.rfqQuote.premium;
-        _mint(optionReceiver, rfqInitialization.optionInfo.notional);
+        premiumPaid = SafeCast.toUint128(_rfqInitialization.rfqQuote.premium);
+        _mint(optionReceiver, _rfqInitialization.optionInfo.notional);
 
         _initialize(
             _router,
             _owner,
             _exerciseFee,
-            rfqInitialization.optionInfo.underlyingToken
+            _rfqInitialization.optionInfo.underlyingToken
         );
     }
 
@@ -173,12 +172,12 @@ contract Escrow is InitializableERC20 {
             revert();
         }
 
-        optionInfo.strike = preview.strike;
-        optionInfo.expiry = preview.expiry;
-        optionInfo.earliestExercise = preview.earliestExercise;
+        optionInfo.strike = SafeCast.toUint128(preview.strike);
+        optionInfo.expiry = SafeCast.toUint48(preview.expiry);
+        optionInfo.earliestExercise = SafeCast.toUint48(preview.earliestExercise);
 
         optionMinted = true;
-        premiumPaid = preview.premium;
+        premiumPaid = SafeCast.toUint128(preview.premium);
         _mint(optionReceiver, optionInfo.notional);
     }
 
@@ -297,7 +296,7 @@ contract Escrow is InitializableERC20 {
         // @dev: apply exercise fee to ensure equivalence between
         // "borrowing and not repaying" and "regular exercise"
         collateralFeeAmount = (collateralAmount * exerciseFee) / BASE;
-        totalBorrowed += underlyingBorrowAmount;
+        totalBorrowed += SafeCast.toUint128(underlyingBorrowAmount);
         borrowedUnderlyingAmounts[borrower] += underlyingBorrowAmount;
         _burn(borrower, underlyingBorrowAmount);
         IERC20Metadata(optionInfo.underlyingToken).safeTransfer(
@@ -339,7 +338,7 @@ contract Escrow is InitializableERC20 {
         unlockedCollateralAmount =
             (optionInfo.strike * underlyingRepayAmount) /
             optionInfo.notional;
-        totalBorrowed -= underlyingRepayAmount;
+        totalBorrowed -= SafeCast.toUint128(underlyingRepayAmount);
         borrowedUnderlyingAmounts[borrower] -= underlyingRepayAmount;
         _mint(borrower, underlyingRepayAmount);
         IERC20Metadata(optionInfo.settlementToken).safeTransfer(
@@ -518,7 +517,7 @@ contract Escrow is InitializableERC20 {
     ) internal {
         router = _router;
         owner = _owner;
-        exerciseFee = _exerciseFee;
+        exerciseFee = SafeCast.toUint96(_exerciseFee);
         string memory __name = IERC20Metadata(underlyingToken).name();
         string memory __symbol = IERC20Metadata(underlyingToken).symbol();
         _name = string(abi.encodePacked("Call ", __name));
