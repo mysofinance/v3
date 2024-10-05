@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import 'solidity-coverage';
+import 'hardhat-gas-reporter';
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -24,7 +25,7 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-      sepolia: process.env.SEPOLIA_ETHERSCAN_API_KEY,
+      sepolia: process.env.SEPOLIA_ETHERSCAN_API_KEY || "",
     },
   },
 };
