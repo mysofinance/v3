@@ -172,12 +172,12 @@ contract Escrow is InitializableERC20 {
             revert();
         }
 
-        optionInfo.strike = SafeCast.toUint128(preview.strike);
-        optionInfo.expiry = SafeCast.toUint48(preview.expiry);
-        optionInfo.earliestExercise = SafeCast.toUint48(preview.earliestExercise);
+        optionInfo.strike = preview.strike;
+        optionInfo.expiry = preview.expiry;
+        optionInfo.earliestExercise = preview.earliestExercise;
 
         optionMinted = true;
-        premiumPaid = SafeCast.toUint128(preview.premium);
+        premiumPaid = preview.premium;
         _mint(optionReceiver, optionInfo.notional);
     }
 
@@ -454,16 +454,22 @@ contract Escrow is InitializableERC20 {
             .advancedSettings
             .premiumTokenIsUnderlying;
 
-        uint256 premium = premiumTokenIsUnderlying
-            ? (_currAsk * notional) / BASE
-            : (_currAsk * notional * oracleSpotPrice) /
-                BASE /
-                10 ** IERC20Metadata(underlyingToken).decimals();
-        uint256 strikePrice = (oracleSpotPrice * auctionParams.relStrike) /
-            BASE;
-        uint256 expiryTime = block.timestamp + auctionParams.tenor;
-        uint256 earliestExerciseTime = block.timestamp +
-            auctionParams.earliestExerciseTenor;
+        uint128 premium = SafeCast.toUint128(
+            premiumTokenIsUnderlying
+                ? (_currAsk * notional) / BASE
+                : (_currAsk * notional * oracleSpotPrice) /
+                    BASE /
+                    10 ** IERC20Metadata(underlyingToken).decimals()
+        );
+        uint128 strikePrice = SafeCast.toUint128(
+            (oracleSpotPrice * auctionParams.relStrike) / BASE
+        );
+        uint48 expiryTime = SafeCast.toUint48(
+            block.timestamp + auctionParams.tenor
+        );
+        uint48 earliestExerciseTime = SafeCast.toUint48(
+            block.timestamp + auctionParams.earliestExerciseTenor
+        );
 
         (uint256 matchFeeProtocol, uint256 matchFeeDistPartner) = Router(router)
             .getMatchFees(distPartner, premium);
