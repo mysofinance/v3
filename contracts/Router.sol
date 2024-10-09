@@ -15,7 +15,7 @@ import "hardhat/console.sol";
 contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 internal constant BASE = 1 ether;
+    uint96 internal constant BASE = 1 ether;
     uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
     uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
@@ -427,29 +427,29 @@ contract Router is Ownable {
 
     function getMatchFees(
         address distPartner,
-        uint256 optionPremium
+        uint128 optionPremium
     )
         public
         view
-        returns (uint256 matchFeeProtocol, uint256 matchFeeDistPartner)
+        returns (uint128 matchFeeProtocol, uint128 matchFeeDistPartner)
     {
         if (feeHandler != address(0)) {
-            (uint256 matchFee, uint256 matchFeeDistPartnerShare) = FeeHandler(
+            (uint96 matchFee, uint96 matchFeeDistPartnerShare) = FeeHandler(
                 feeHandler
             ).getMatchFeeInfo(distPartner);
 
-            matchFee = matchFee > MAX_MATCH_FEE ? MAX_MATCH_FEE : matchFee;
-            matchFeeDistPartnerShare = matchFeeDistPartnerShare > BASE
+            uint96 cappedMatchFee = matchFee > MAX_MATCH_FEE
+                ? MAX_MATCH_FEE
+                : matchFee;
+            uint96 cappedMatchFeeDistPartnerShare = matchFeeDistPartnerShare >
+                BASE
                 ? BASE
                 : matchFeeDistPartnerShare;
-            matchFeeProtocol =
-                (optionPremium * matchFee * (BASE - matchFeeDistPartnerShare)) /
-                BASE /
-                BASE;
+            uint128 totalMatchFee = (optionPremium * cappedMatchFee) / BASE;
             matchFeeDistPartner =
-                (optionPremium * matchFee * matchFeeDistPartnerShare) /
-                BASE /
+                (totalMatchFee * cappedMatchFeeDistPartnerShare) /
                 BASE;
+            matchFeeProtocol = totalMatchFee - matchFeeDistPartner;
         }
     }
 
@@ -510,7 +510,7 @@ contract Router is Ownable {
                     quoter
                 );
         }
-        (uint256 matchFeeProtocol, uint256 matchFeeDistPartner) = getMatchFees(
+        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = getMatchFees(
             distPartner,
             rfqInitialization.rfqQuote.premium
         );

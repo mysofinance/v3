@@ -63,7 +63,7 @@ contract FeeHandler is Ownable {
     )
         external
         view
-        returns (uint256 _matchFee, uint256 _matchFeeDistPartnerShare)
+        returns (uint96 _matchFee, uint96 _matchFeeDistPartnerShare)
     {
         _matchFee = matchFee;
         _matchFeeDistPartnerShare = isDistPartner[distPartner]

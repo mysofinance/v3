@@ -10,6 +10,7 @@ import {DataTypes} from "./DataTypes.sol";
 import {Router} from "./Router.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
+import "hardhat/console.sol";
 
 contract Escrow is InitializableERC20 {
     using SafeERC20 for IERC20Metadata;
@@ -470,8 +471,7 @@ contract Escrow is InitializableERC20 {
         uint48 earliestExerciseTime = SafeCast.toUint48(
             block.timestamp + auctionParams.earliestExerciseTenor
         );
-
-        (uint256 matchFeeProtocol, uint256 matchFeeDistPartner) = Router(router)
+        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = Router(router)
             .getMatchFees(distPartner, premium);
 
         if (matchFeeProtocol + matchFeeDistPartner >= premium) {
