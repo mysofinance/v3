@@ -89,13 +89,13 @@ contract Router is Ownable {
         address escrowOwner,
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
-        (address escrow, uint256 counter) = _createEscrow();
+        (address escrow, uint256 oTokenIndex) = _createEscrow();
         Escrow(escrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
             auctionInitialization,
-            counter
+            oTokenIndex
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
@@ -123,13 +123,13 @@ contract Router is Ownable {
                 oldEscrow
             )
         );
-        (address newEscrow, uint256 counter) = _createEscrow();
+        (address newEscrow, uint256 oTokenIndex) = _createEscrow();
         Escrow(newEscrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
             auctionInitialization,
-            counter
+            oTokenIndex
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
@@ -341,14 +341,14 @@ contract Router is Ownable {
 
         isQuoteUsed[preview.msgHash] = true;
 
-        (address escrow, uint256 counter) = _createEscrow();
+        (address escrow, uint256 oTokenIndex) = _createEscrow();
         Escrow(escrow).initializeRFQMatch(
             address(this),
             escrowOwner,
             preview.quoter,
             getExerciseFee(),
             rfqInitialization,
-            counter
+            oTokenIndex
         );
 
         IERC20Metadata(rfqInitialization.optionInfo.underlyingToken)
@@ -556,14 +556,14 @@ contract Router is Ownable {
 
     function _createEscrow()
         internal
-        returns (address escrow, uint256 counter)
+        returns (address escrow, uint256 oTokenIndex)
     {
-        counter = numEscrows + 1;
+        oTokenIndex = numEscrows + 1;
         escrow = Clones.cloneDeterministic(
             escrowImpl,
-            keccak256(abi.encode(counter))
+            keccak256(abi.encode(oTokenIndex))
         );
-        numEscrows = counter;
+        numEscrows = oTokenIndex;
         isEscrow[escrow] = true;
         escrows.push(escrow);
     }

@@ -55,7 +55,7 @@ contract Escrow is InitializableERC20 {
         address _owner,
         uint96 _exerciseFee,
         DataTypes.AuctionInitialization calldata _auctionInitialization,
-        uint256 counter
+        uint256 oTokenIndex
     ) external initializer {
         if (
             _auctionInitialization.underlyingToken ==
@@ -112,7 +112,7 @@ contract Escrow is InitializableERC20 {
             _owner,
             _exerciseFee,
             _auctionInitialization.underlyingToken,
-            counter
+            oTokenIndex
         );
     }
 
@@ -122,7 +122,7 @@ contract Escrow is InitializableERC20 {
         address optionReceiver,
         uint96 _exerciseFee,
         DataTypes.RFQInitialization calldata _rfqInitialization,
-        uint256 counter
+        uint256 oTokenIndex
     ) external initializer {
         if (
             _rfqInitialization.optionInfo.underlyingToken ==
@@ -157,7 +157,7 @@ contract Escrow is InitializableERC20 {
             _owner,
             _exerciseFee,
             _rfqInitialization.optionInfo.underlyingToken,
-            counter
+            oTokenIndex
         );
     }
 
@@ -529,7 +529,7 @@ contract Escrow is InitializableERC20 {
         address _owner,
         uint96 _exerciseFee,
         address underlyingToken,
-        uint256 counter
+        uint256 oTokenIndex
     ) internal {
         router = _router;
         owner = _owner;
@@ -537,10 +537,10 @@ contract Escrow is InitializableERC20 {
         string memory __name = IERC20Metadata(underlyingToken).name();
         string memory __symbol = IERC20Metadata(underlyingToken).symbol();
         _name = string(
-            abi.encodePacked(__name, " O", Strings.toString(counter))
+            abi.encodePacked(__name, " O", Strings.toString(oTokenIndex))
         );
         _symbol = string(
-            abi.encodePacked(__symbol, " O", Strings.toString(counter))
+            abi.encodePacked(__symbol, " O", Strings.toString(oTokenIndex))
         );
         _decimals = IERC20Metadata(underlyingToken).decimals();
     }
