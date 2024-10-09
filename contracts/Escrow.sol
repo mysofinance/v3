@@ -10,7 +10,6 @@ import {DataTypes} from "./DataTypes.sol";
 import {Router} from "./Router.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
-import "hardhat/console.sol";
 
 contract Escrow is InitializableERC20 {
     using SafeERC20 for IERC20Metadata;

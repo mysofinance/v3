@@ -10,12 +10,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Escrow} from "./Escrow.sol";
 import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
-import "hardhat/console.sol";
 
 contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
 
-    uint96 internal constant BASE = 1 ether;
+    uint64 internal constant BASE = 1 ether;
     uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
     uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
