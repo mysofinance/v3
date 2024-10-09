@@ -7,6 +7,7 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Escrow} from "./Escrow.sol";
 import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
@@ -444,11 +445,13 @@ contract Router is Ownable {
                 BASE
                 ? BASE
                 : matchFeeDistPartnerShare;
-            uint128 totalMatchFee = (optionPremium * cappedMatchFee) / BASE;
-            matchFeeDistPartner =
-                (totalMatchFee * cappedMatchFeeDistPartnerShare) /
-                BASE;
-            matchFeeProtocol = totalMatchFee - matchFeeDistPartner;
+            uint256 totalMatchFee = (optionPremium * cappedMatchFee) / BASE;
+            matchFeeDistPartner = SafeCast.toUint128(
+                (totalMatchFee * cappedMatchFeeDistPartnerShare) / BASE
+            );
+            matchFeeProtocol = SafeCast.toUint128(
+                totalMatchFee - matchFeeDistPartner
+            );
         }
     }
 
