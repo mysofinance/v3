@@ -69,12 +69,8 @@ contract ChainlinkOracle is IOracle, Ownable {
         ETH_USD_ORACLE = _ethUsdOracle;
         WETH = _weth;
 
-        for (uint256 i; i < tokenAddrsLength; ) {
+        for (uint256 i = 0; i < tokenAddrsLength; ++i) {
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
-
-            unchecked {
-                ++i;
-            }
         }
     }
 
@@ -93,18 +89,12 @@ contract ChainlinkOracle is IOracle, Ownable {
             revert InvalidArrayLength();
         }
 
-        for (uint256 i; i < length; ) {
+        for (uint256 i = 0; i < length; ++i) {
             OracleInfo storage existingInfo = oracleInfos[_tokenAddrs[i]];
-
             if (existingInfo.oracleAddr != address(0)) {
                 revert OracleAlreadySet(existingInfo.oracleAddr);
             }
-
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
-
-            unchecked {
-                ++i;
-            }
         }
     }
 

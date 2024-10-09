@@ -5,6 +5,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Router} from "./Router.sol";
@@ -53,7 +54,8 @@ contract Escrow is InitializableERC20 {
         address _router,
         address _owner,
         uint96 _exerciseFee,
-        DataTypes.AuctionInitialization calldata _auctionInitialization
+        DataTypes.AuctionInitialization calldata _auctionInitialization,
+        uint256 counter
     ) external initializer {
         if (
             _auctionInitialization.underlyingToken ==
@@ -109,7 +111,8 @@ contract Escrow is InitializableERC20 {
             _router,
             _owner,
             _exerciseFee,
-            _auctionInitialization.underlyingToken
+            _auctionInitialization.underlyingToken,
+            counter
         );
     }
 
@@ -118,7 +121,8 @@ contract Escrow is InitializableERC20 {
         address _owner,
         address optionReceiver,
         uint96 _exerciseFee,
-        DataTypes.RFQInitialization calldata _rfqInitialization
+        DataTypes.RFQInitialization calldata _rfqInitialization,
+        uint256 counter
     ) external initializer {
         if (
             _rfqInitialization.optionInfo.underlyingToken ==
@@ -152,7 +156,8 @@ contract Escrow is InitializableERC20 {
             _router,
             _owner,
             _exerciseFee,
-            _rfqInitialization.optionInfo.underlyingToken
+            _rfqInitialization.optionInfo.underlyingToken,
+            counter
         );
     }
 
@@ -207,7 +212,10 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (underlyingExerciseAmount > optionInfo.notional) {
+        if (
+            underlyingExerciseAmount == 0 ||
+            underlyingExerciseAmount > optionInfo.notional
+        ) {
             revert();
         }
 
@@ -520,15 +528,20 @@ contract Escrow is InitializableERC20 {
         address _router,
         address _owner,
         uint96 _exerciseFee,
-        address underlyingToken
+        address underlyingToken,
+        uint256 counter
     ) internal {
         router = _router;
         owner = _owner;
         exerciseFee = _exerciseFee;
         string memory __name = IERC20Metadata(underlyingToken).name();
         string memory __symbol = IERC20Metadata(underlyingToken).symbol();
-        _name = string(abi.encodePacked("Call ", __name));
-        _symbol = string(abi.encodePacked("Call ", __symbol));
+        _name = string(
+            abi.encodePacked(__name, " O", Strings.toString(counter))
+        );
+        _symbol = string(
+            abi.encodePacked(__symbol, " O", Strings.toString(counter))
+        );
         _decimals = IERC20Metadata(underlyingToken).decimals();
     }
 

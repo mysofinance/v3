@@ -89,12 +89,13 @@ contract Router is Ownable {
         address escrowOwner,
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
-        address escrow = _createEscrow();
+        (address escrow, uint256 counter) = _createEscrow();
         Escrow(escrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
-            auctionInitialization
+            auctionInitialization,
+            counter
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
@@ -122,12 +123,13 @@ contract Router is Ownable {
                 oldEscrow
             )
         );
-        address newEscrow = _createEscrow();
+        (address newEscrow, uint256 counter) = _createEscrow();
         Escrow(newEscrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
-            auctionInitialization
+            auctionInitialization,
+            counter
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
@@ -339,13 +341,14 @@ contract Router is Ownable {
 
         isQuoteUsed[preview.msgHash] = true;
 
-        address escrow = _createEscrow();
+        (address escrow, uint256 counter) = _createEscrow();
         Escrow(escrow).initializeRFQMatch(
             address(this),
             escrowOwner,
             preview.quoter,
             getExerciseFee(),
-            rfqInitialization
+            rfqInitialization,
+            counter
         );
 
         IERC20Metadata(rfqInitialization.optionInfo.underlyingToken)
@@ -546,23 +549,23 @@ contract Router is Ownable {
             revert();
         }
         _escrows = new address[](numElements);
-        for (uint256 i; i < numElements; ) {
+        for (uint256 i = 0; i < numElements; ++i) {
             _escrows[i] = escrows[from + i];
-            unchecked {
-                ++i;
-            }
         }
     }
 
-    function _createEscrow() internal returns (address) {
-        address escrow = Clones.cloneDeterministic(
+    function _createEscrow()
+        internal
+        returns (address escrow, uint256 counter)
+    {
+        counter = numEscrows + 1;
+        escrow = Clones.cloneDeterministic(
             escrowImpl,
-            keccak256(abi.encode(numEscrows))
+            keccak256(abi.encode(counter))
         );
-        numEscrows += 1;
+        numEscrows = counter;
         isEscrow[escrow] = true;
         escrows.push(escrow);
-        return escrow;
     }
 
     function _createTakeQuotePreview(

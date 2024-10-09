@@ -101,14 +101,11 @@ contract FeeHandler is Ownable {
         if (accounts.length == 0 || accounts.length != _isDistPartner.length) {
             revert();
         }
-        for (uint256 i; i < accounts.length; ) {
+        for (uint256 i = 0; i < accounts.length; ++i) {
             if (isDistPartner[accounts[i]] == _isDistPartner[i]) {
                 revert();
             }
             isDistPartner[accounts[i]] = _isDistPartner[i];
-            unchecked {
-                ++i;
-            }
         }
 
         emit SetDistributionPartners(accounts, _isDistPartner);
