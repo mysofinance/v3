@@ -9,12 +9,12 @@ import {IOracle} from "../../interfaces/IOracle.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @title ChainlinkBase
+ * @title ChainlinkOracle
  * @dev Abstract contract supporting Chainlink oracles with flexible decimal handling.
  *      Allows oracles with 18 (ETH) or 8 (USD) decimals. If an oracle has 8 decimals,
  *      it uses the ETH/USD oracle to convert the price to ETH.
  */
-contract ChainlinkOracleBase is IOracle, Ownable {
+contract ChainlinkOracle is IOracle, Ownable {
     // Immutable address for the ETH/USD Chainlink oracle
     address public immutable ETH_USD_ORACLE;
 
@@ -112,7 +112,6 @@ contract ChainlinkOracleBase is IOracle, Ownable {
      * @notice Retrieves the price of a specified token quoted in another token.
      * @param token The address of the token for which the price is to be retrieved.
      * @param quoteToken The address of the token in which the price is to be quoted.
-     * @param oracleData Additional data that may be required to fetch the price.
      * The structure and content of this data can vary depending on the implementation
      * and use case. For example, one can pass an optimistic price with signature to verify.
      * @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
@@ -120,7 +119,7 @@ contract ChainlinkOracleBase is IOracle, Ownable {
     function getPrice(
         address token,
         address quoteToken,
-        bytes[] memory oracleData
+        bytes[] memory /*oracleData*/
     ) external view virtual returns (uint256 tokenPriceInQuoteToken) {
         uint256 priceOfToken = getPriceOfToken(token);
         uint256 priceOfQuoteToken = getPriceOfToken(quoteToken);
