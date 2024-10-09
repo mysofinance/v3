@@ -72,7 +72,7 @@ library DataTypes {
         uint128 premium;
         address premiumToken;
         uint256 oracleSpotPrice;
-        uint256 currAsk;
+        uint64 currAsk;
         uint128 matchFeeProtocol;
         uint128 matchFeeDistPartner;
     }
