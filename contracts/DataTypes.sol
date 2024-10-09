@@ -23,7 +23,7 @@ library DataTypes {
     struct AuctionInitialization {
         address underlyingToken;
         address settlementToken;
-        uint256 notional;
+        uint128 notional;
         AuctionParams auctionParams;
         AdvancedSettings advancedSettings;
     }
@@ -46,7 +46,7 @@ library DataTypes {
     }
 
     struct RFQQuote {
-        uint256 premium;
+        uint128 premium;
         uint256 validUntil;
         bytes signature;
     }

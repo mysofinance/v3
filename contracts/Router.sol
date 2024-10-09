@@ -16,8 +16,8 @@ contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
 
     uint256 internal constant BASE = 1 ether;
-    uint256 internal constant MAX_MATCH_FEE = 0.2 ether;
-    uint256 internal constant MAX_EXERCISE_FEE = 0.005 ether;
+    uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
+    uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
     address public immutable escrowImpl;
     address public feeHandler;
@@ -63,13 +63,13 @@ contract Router is Ownable {
     event Borrow(
         address indexed escrow,
         address underlyingReceiver,
-        uint256 underlyingAmount,
+        uint128 underlyingAmount,
         uint256 collateralFeeAmount
     );
     event Repay(
         address indexed escrow,
         address collateralReceiver,
-        uint256 repayUnderlyingAmount
+        uint128 repayUnderlyingAmount
     );
     event TakeQuote(
         address indexed escrowOwner,
@@ -263,7 +263,7 @@ contract Router is Ownable {
     function borrow(
         address escrow,
         address underlyingReceiver,
-        uint256 borrowUnderlyingAmount
+        uint128 borrowUnderlyingAmount
     ) external {
         if (!isEscrow[escrow]) {
             revert();
@@ -305,7 +305,7 @@ contract Router is Ownable {
     function repay(
         address escrow,
         address collateralReceiver,
-        uint256 repayUnderlyingAmount
+        uint128 repayUnderlyingAmount
     ) external {
         if (!isEscrow[escrow]) {
             revert();
@@ -415,7 +415,7 @@ contract Router is Ownable {
         emit NewFeeHandler(oldFeeHandler, newFeeHandler);
     }
 
-    function getExerciseFee() public view returns (uint256 exerciseFee) {
+    function getExerciseFee() public view returns (uint96 exerciseFee) {
         if (feeHandler == address(0)) {
             return 0;
         }

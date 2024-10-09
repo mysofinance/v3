@@ -9,20 +9,20 @@ contract FeeHandler is Ownable {
     using SafeERC20 for IERC20Metadata;
 
     uint256 internal constant BASE = 1 ether;
-    uint256 internal constant MAX_MATCH_FEE = 0.2 ether;
-    uint256 internal constant MAX_EXERCISE_FEE = 0.005 ether;
+    uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
+    uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
     address public router;
-    uint256 public matchFee;
-    uint256 public matchFeeDistPartnerShare;
-    uint256 public exerciseFee;
+    uint96 public matchFee;
+    uint96 public matchFeeDistPartnerShare;
+    uint96 public exerciseFee;
 
     mapping(address => bool) public isDistPartner;
 
     event ProvisionFees(address indexed token, uint256 amount);
     event Withdraw(address indexed to, address indexed token, uint256 amount);
     event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
-    event SetExerciseFee(uint256 exerciseFee);
+    event SetExerciseFee(uint96 exerciseFee);
     event SetDistributionPartners(address[] accounts, bool[] isDistPartner);
 
     error InvalidMatchFee();
@@ -32,9 +32,9 @@ contract FeeHandler is Ownable {
     constructor(
         address initOwner,
         address _router,
-        uint256 _matchFee,
-        uint256 _distPartnerFeeShare,
-        uint256 _exerciseFee
+        uint96 _matchFee,
+        uint96 _distPartnerFeeShare,
+        uint96 _exerciseFee
     ) Ownable(initOwner) {
         router = _router;
         setMatchFeeInfo(_matchFee, _distPartnerFeeShare);
@@ -72,8 +72,8 @@ contract FeeHandler is Ownable {
     }
 
     function setMatchFeeInfo(
-        uint256 _matchFee,
-        uint256 _distPartnerFeeShare
+        uint96 _matchFee,
+        uint96 _distPartnerFeeShare
     ) public onlyOwner {
         if (_matchFee > MAX_MATCH_FEE) {
             revert InvalidMatchFee();
@@ -86,7 +86,7 @@ contract FeeHandler is Ownable {
         emit SetMatchFeeInfo(_matchFee, _distPartnerFeeShare);
     }
 
-    function setExerciseFee(uint256 _exerciseFee) public onlyOwner {
+    function setExerciseFee(uint96 _exerciseFee) public onlyOwner {
         if (_exerciseFee > MAX_EXERCISE_FEE) {
             revert InvalidExerciseFee();
         }
