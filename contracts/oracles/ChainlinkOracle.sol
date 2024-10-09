@@ -5,8 +5,8 @@ pragma solidity 0.8.24;
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IOracle} from "../../interfaces/IOracle.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
 
 /**
  * @title ChainlinkOracle
@@ -112,8 +112,6 @@ contract ChainlinkOracle is IOracle, Ownable {
      * @notice Retrieves the price of a specified token quoted in another token.
      * @param token The address of the token for which the price is to be retrieved.
      * @param quoteToken The address of the token in which the price is to be quoted.
-     * The structure and content of this data can vary depending on the implementation
-     * and use case. For example, one can pass an optimistic price with signature to verify.
      * @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
      */
     function getPrice(
@@ -161,7 +159,6 @@ contract ChainlinkOracle is IOracle, Ownable {
             uint256 ethUsdPrice = _checkAndReturnLatestRoundData(
                 ETH_USD_ORACLE
             );
-
             // Ensure ETH/USD oracle has 8 decimals
             // Convert USD to ETH: (price * 1e18) / ethUsdPrice
             tokenPriceRaw = Math.mulDiv(rawPrice, 1e18, ethUsdPrice);
