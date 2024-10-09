@@ -73,8 +73,8 @@ library DataTypes {
         address premiumToken;
         uint256 oracleSpotPrice;
         uint256 currAsk;
-        uint256 matchFeeProtocol;
-        uint256 matchFeeDistPartner;
+        uint128 matchFeeProtocol;
+        uint128 matchFeeDistPartner;
     }
 
     enum RFQStatus {
@@ -91,8 +91,8 @@ library DataTypes {
         address quoter;
         uint128 premium;
         address premiumToken;
-        uint256 matchFeeProtocol;
-        uint256 matchFeeDistPartner;
+        uint128 matchFeeProtocol;
+        uint128 matchFeeDistPartner;
     }
 
     struct SwapQuote {
