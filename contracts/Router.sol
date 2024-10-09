@@ -7,17 +7,17 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Escrow} from "./Escrow.sol";
 import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
-import "hardhat/console.sol";
 
 contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
 
-    uint256 internal constant BASE = 1 ether;
-    uint256 internal constant MAX_MATCH_FEE = 0.2 ether;
-    uint256 internal constant MAX_EXERCISE_FEE = 0.005 ether;
+    uint64 internal constant BASE = 1 ether;
+    uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
+    uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
     address public immutable escrowImpl;
     address public feeHandler;
@@ -63,13 +63,13 @@ contract Router is Ownable {
     event Borrow(
         address indexed escrow,
         address underlyingReceiver,
-        uint256 underlyingAmount,
+        uint128 underlyingAmount,
         uint256 collateralFeeAmount
     );
     event Repay(
         address indexed escrow,
         address collateralReceiver,
-        uint256 repayUnderlyingAmount
+        uint128 repayUnderlyingAmount
     );
     event TakeQuote(
         address indexed escrowOwner,
@@ -263,7 +263,7 @@ contract Router is Ownable {
     function borrow(
         address escrow,
         address underlyingReceiver,
-        uint256 borrowUnderlyingAmount
+        uint128 borrowUnderlyingAmount
     ) external {
         if (!isEscrow[escrow]) {
             revert();
@@ -305,7 +305,7 @@ contract Router is Ownable {
     function repay(
         address escrow,
         address collateralReceiver,
-        uint256 repayUnderlyingAmount
+        uint128 repayUnderlyingAmount
     ) external {
         if (!isEscrow[escrow]) {
             revert();
@@ -415,7 +415,7 @@ contract Router is Ownable {
         emit NewFeeHandler(oldFeeHandler, newFeeHandler);
     }
 
-    function getExerciseFee() public view returns (uint256 exerciseFee) {
+    function getExerciseFee() public view returns (uint96 exerciseFee) {
         if (feeHandler == address(0)) {
             return 0;
         }
@@ -427,29 +427,31 @@ contract Router is Ownable {
 
     function getMatchFees(
         address distPartner,
-        uint256 optionPremium
+        uint128 optionPremium
     )
         public
         view
-        returns (uint256 matchFeeProtocol, uint256 matchFeeDistPartner)
+        returns (uint128 matchFeeProtocol, uint128 matchFeeDistPartner)
     {
         if (feeHandler != address(0)) {
-            (uint256 matchFee, uint256 matchFeeDistPartnerShare) = FeeHandler(
+            (uint96 matchFee, uint96 matchFeeDistPartnerShare) = FeeHandler(
                 feeHandler
             ).getMatchFeeInfo(distPartner);
 
-            matchFee = matchFee > MAX_MATCH_FEE ? MAX_MATCH_FEE : matchFee;
-            matchFeeDistPartnerShare = matchFeeDistPartnerShare > BASE
+            uint96 cappedMatchFee = matchFee > MAX_MATCH_FEE
+                ? MAX_MATCH_FEE
+                : matchFee;
+            uint96 cappedMatchFeeDistPartnerShare = matchFeeDistPartnerShare >
+                BASE
                 ? BASE
                 : matchFeeDistPartnerShare;
-            matchFeeProtocol =
-                (optionPremium * matchFee * (BASE - matchFeeDistPartnerShare)) /
-                BASE /
-                BASE;
-            matchFeeDistPartner =
-                (optionPremium * matchFee * matchFeeDistPartnerShare) /
-                BASE /
-                BASE;
+            uint256 totalMatchFee = (optionPremium * cappedMatchFee) / BASE;
+            matchFeeDistPartner = SafeCast.toUint128(
+                (totalMatchFee * cappedMatchFeeDistPartnerShare) / BASE
+            );
+            matchFeeProtocol = SafeCast.toUint128(
+                totalMatchFee - matchFeeDistPartner
+            );
         }
     }
 
@@ -510,7 +512,7 @@ contract Router is Ownable {
                     quoter
                 );
         }
-        (uint256 matchFeeProtocol, uint256 matchFeeDistPartner) = getMatchFees(
+        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = getMatchFees(
             distPartner,
             rfqInitialization.rfqQuote.premium
         );

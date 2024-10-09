@@ -4,16 +4,16 @@ pragma solidity 0.8.24;
 library DataTypes {
     struct OptionInfo {
         address underlyingToken;
+        uint48 expiry;
         address settlementToken;
-        uint256 notional;
-        uint256 strike;
-        uint256 expiry;
-        uint256 earliestExercise;
+        uint48 earliestExercise;
+        uint128 notional;
+        uint128 strike;
         AdvancedSettings advancedSettings;
     }
 
     struct AdvancedSettings {
-        uint256 borrowCap;
+        uint64 borrowCap;
         address oracle;
         bool premiumTokenIsUnderlying;
         bool votingDelegationAllowed;
@@ -23,21 +23,21 @@ library DataTypes {
     struct AuctionInitialization {
         address underlyingToken;
         address settlementToken;
-        uint256 notional;
+        uint128 notional;
         AuctionParams auctionParams;
         AdvancedSettings advancedSettings;
     }
 
     struct AuctionParams {
-        uint256 relStrike;
-        uint256 tenor;
-        uint256 earliestExerciseTenor;
-        uint256 relPremiumStart;
-        uint256 relPremiumFloor;
-        uint256 decayDuration;
-        uint256 minSpot;
-        uint256 maxSpot;
-        uint256 decayStartTime;
+        uint128 relStrike;
+        uint48 tenor;
+        uint48 earliestExerciseTenor;
+        uint32 decayStartTime;
+        uint32 decayDuration;
+        uint64 relPremiumStart;
+        uint64 relPremiumFloor;
+        uint128 minSpot;
+        uint128 maxSpot;
     }
 
     struct RFQInitialization {
@@ -46,7 +46,7 @@ library DataTypes {
     }
 
     struct RFQQuote {
-        uint256 premium;
+        uint128 premium;
         uint256 validUntil;
         bytes signature;
     }
@@ -66,15 +66,15 @@ library DataTypes {
         BidStatus status;
         address settlementToken;
         address underlyingToken;
-        uint256 strike;
-        uint256 expiry;
-        uint256 earliestExercise;
-        uint256 premium;
+        uint128 strike;
+        uint48 expiry;
+        uint48 earliestExercise;
+        uint128 premium;
         address premiumToken;
         uint256 oracleSpotPrice;
-        uint256 currAsk;
-        uint256 matchFeeProtocol;
-        uint256 matchFeeDistPartner;
+        uint64 currAsk;
+        uint128 matchFeeProtocol;
+        uint128 matchFeeDistPartner;
     }
 
     enum RFQStatus {
@@ -89,10 +89,10 @@ library DataTypes {
         RFQStatus status;
         bytes32 msgHash;
         address quoter;
-        uint256 premium;
+        uint128 premium;
         address premiumToken;
-        uint256 matchFeeProtocol;
-        uint256 matchFeeDistPartner;
+        uint128 matchFeeProtocol;
+        uint128 matchFeeDistPartner;
     }
 
     struct SwapQuote {

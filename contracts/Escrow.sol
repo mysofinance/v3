@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Router} from "./Router.sol";
@@ -15,11 +16,11 @@ contract Escrow is InitializableERC20 {
 
     uint256 internal constant BASE = 1 ether;
 
-    uint256 public premiumPaid;
-    uint256 public exerciseFee;
-    uint256 public totalBorrowed;
+    uint128 public premiumPaid;
+    uint128 public totalBorrowed;
 
     address public router;
+    uint96 public exerciseFee;
     address public owner;
 
     bool public isAuction;
@@ -29,7 +30,6 @@ contract Escrow is InitializableERC20 {
 
     DataTypes.OptionInfo public optionInfo;
     DataTypes.AuctionParams public auctionParams;
-    DataTypes.RFQInitialization public rfqInitialization;
 
     event OnChainVotingDelegation(address delegate);
     event OffChainVotingDelegation(
@@ -52,7 +52,7 @@ contract Escrow is InitializableERC20 {
     function initializeAuction(
         address _router,
         address _owner,
-        uint256 _exerciseFee,
+        uint96 _exerciseFee,
         DataTypes.AuctionInitialization calldata _auctionInitialization
     ) external initializer {
         if (
@@ -117,7 +117,7 @@ contract Escrow is InitializableERC20 {
         address _router,
         address _owner,
         address optionReceiver,
-        uint256 _exerciseFee,
+        uint96 _exerciseFee,
         DataTypes.RFQInitialization calldata _rfqInitialization
     ) external initializer {
         if (
@@ -139,21 +139,20 @@ contract Escrow is InitializableERC20 {
         ) {
             revert();
         }
-        if (optionInfo.advancedSettings.borrowCap > BASE) {
+        if (_rfqInitialization.optionInfo.advancedSettings.borrowCap > BASE) {
             revert();
         }
-        rfqInitialization = _rfqInitialization;
 
-        optionInfo = rfqInitialization.optionInfo;
+        optionInfo = _rfqInitialization.optionInfo;
         optionMinted = true;
-        premiumPaid = rfqInitialization.rfqQuote.premium;
-        _mint(optionReceiver, rfqInitialization.optionInfo.notional);
+        premiumPaid = _rfqInitialization.rfqQuote.premium;
+        _mint(optionReceiver, _rfqInitialization.optionInfo.notional);
 
         _initialize(
             _router,
             _owner,
             _exerciseFee,
-            rfqInitialization.optionInfo.underlyingToken
+            _rfqInitialization.optionInfo.underlyingToken
         );
     }
 
@@ -260,7 +259,7 @@ contract Escrow is InitializableERC20 {
     function handleBorrow(
         address borrower,
         address underlyingReceiver,
-        uint256 underlyingBorrowAmount
+        uint128 underlyingBorrowAmount
     )
         external
         returns (
@@ -309,7 +308,7 @@ contract Escrow is InitializableERC20 {
     function handleRepay(
         address borrower,
         address collateralReceiver,
-        uint256 underlyingRepayAmount
+        uint128 underlyingRepayAmount
     )
         external
         returns (address underlyingToken, uint256 unlockedCollateralAmount)
@@ -412,7 +411,7 @@ contract Escrow is InitializableERC20 {
         bytes[] memory _oracleData,
         address distPartner
     ) public view returns (DataTypes.BidPreview memory preview) {
-        uint256 _currAsk = currAsk();
+        uint64 _currAsk = currAsk();
 
         if (!isAuction) {
             return _createBidPreview(DataTypes.BidStatus.NotAnAuction);
@@ -455,18 +454,23 @@ contract Escrow is InitializableERC20 {
             .advancedSettings
             .premiumTokenIsUnderlying;
 
-        uint256 premium = premiumTokenIsUnderlying
-            ? (_currAsk * notional) / BASE
-            : (_currAsk * notional * oracleSpotPrice) /
-                BASE /
-                10 ** IERC20Metadata(underlyingToken).decimals();
-        uint256 strikePrice = (oracleSpotPrice * auctionParams.relStrike) /
-            BASE;
-        uint256 expiryTime = block.timestamp + auctionParams.tenor;
-        uint256 earliestExerciseTime = block.timestamp +
-            auctionParams.earliestExerciseTenor;
-
-        (uint256 matchFeeProtocol, uint256 matchFeeDistPartner) = Router(router)
+        uint128 premium = SafeCast.toUint128(
+            premiumTokenIsUnderlying
+                ? (_currAsk * notional) / BASE
+                : (_currAsk * notional * oracleSpotPrice) /
+                    BASE /
+                    10 ** IERC20Metadata(underlyingToken).decimals()
+        );
+        uint128 strikePrice = SafeCast.toUint128(
+            (oracleSpotPrice * auctionParams.relStrike) / BASE
+        );
+        uint48 expiryTime = SafeCast.toUint48(
+            block.timestamp + auctionParams.tenor
+        );
+        uint48 earliestExerciseTime = SafeCast.toUint48(
+            block.timestamp + auctionParams.earliestExerciseTenor
+        );
+        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = Router(router)
             .getMatchFees(distPartner, premium);
 
         if (matchFeeProtocol + matchFeeDistPartner >= premium) {
@@ -492,28 +496,30 @@ contract Escrow is InitializableERC20 {
             });
     }
 
-    function currAsk() public view returns (uint256) {
+    function currAsk() public view returns (uint64) {
         uint256 _decayStartTime = auctionParams.decayStartTime;
         uint256 _decayDuration = auctionParams.decayDuration;
+        uint256 currentAsk;
         if (block.timestamp < _decayStartTime) {
-            return auctionParams.relPremiumStart;
+            currentAsk = auctionParams.relPremiumStart;
         } else if (block.timestamp < _decayStartTime + _decayDuration) {
             uint256 _timePassed = block.timestamp - _decayStartTime;
             uint256 _relPremiumFloor = auctionParams.relPremiumFloor;
             uint256 _relPremiumStart = auctionParams.relPremiumStart;
-            return
+            currentAsk =
                 _relPremiumStart -
                 ((_relPremiumStart - _relPremiumFloor) * _timePassed) /
                 _decayDuration;
         } else {
-            return auctionParams.relPremiumFloor;
+            currentAsk = auctionParams.relPremiumFloor;
         }
+        return SafeCast.toUint64(currentAsk);
     }
 
     function _initialize(
         address _router,
         address _owner,
-        uint256 _exerciseFee,
+        uint96 _exerciseFee,
         address underlyingToken
     ) internal {
         router = _router;

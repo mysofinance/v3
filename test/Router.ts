@@ -227,7 +227,7 @@ describe("Router Contract", function () {
         [
           "uint256", // CHAIN_ID
           // OptionInfo
-          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(uint256,address,bool,bool,address))",
+          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))",
           // RFQQuote (only includes premium and validUntil)
           "uint256",
           "uint256",
@@ -236,11 +236,11 @@ describe("Router Contract", function () {
           CHAIN_ID,
           [
             rfqInitialization.optionInfo.underlyingToken,
+            rfqInitialization.optionInfo.expiry,
             rfqInitialization.optionInfo.settlementToken,
+            rfqInitialization.optionInfo.earliestExercise,
             rfqInitialization.optionInfo.notional,
             rfqInitialization.optionInfo.strike,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.earliestExercise,
             [
               rfqInitialization.optionInfo.advancedSettings.borrowCap,
               rfqInitialization.optionInfo.advancedSettings.oracle,
@@ -359,8 +359,8 @@ describe("Router Contract", function () {
 
       const optionInfo = await escrow.optionInfo();
       const underlyingTokenDecimals = await underlyingToken.decimals();
-      const notional = optionInfo[2];
-      const strike = optionInfo[3];
+      const notional = optionInfo[4];
+      const strike = optionInfo[5];
       const expectedSettlementAmount =
         (BigInt(strike) * BigInt(notional)) /
         BigInt(10) ** underlyingTokenDecimals;

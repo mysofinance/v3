@@ -272,7 +272,7 @@ describe("Router Contract Ext", function () {
         [
           "uint256", // CHAIN_ID
           // OptionInfo
-          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(uint256,address,bool,bool,address))",
+          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))",
           // RFQQuote (only includes premium and validUntil)
           "uint256",
           "uint256",
@@ -281,11 +281,11 @@ describe("Router Contract Ext", function () {
           CHAIN_ID,
           [
             rfqInitialization.optionInfo.underlyingToken,
+            rfqInitialization.optionInfo.expiry,
             rfqInitialization.optionInfo.settlementToken,
+            rfqInitialization.optionInfo.earliestExercise,
             rfqInitialization.optionInfo.notional,
             rfqInitialization.optionInfo.strike,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.earliestExercise,
             [
               rfqInitialization.optionInfo.advancedSettings.borrowCap,
               rfqInitialization.optionInfo.advancedSettings.oracle,
