@@ -411,7 +411,7 @@ contract Escrow is InitializableERC20 {
         bytes[] memory _oracleData,
         address distPartner
     ) public view returns (DataTypes.BidPreview memory preview) {
-        uint256 _currAsk = currAsk();
+        uint64 _currAsk = currAsk();
 
         if (!isAuction) {
             return _createBidPreview(DataTypes.BidStatus.NotAnAuction);
@@ -496,22 +496,24 @@ contract Escrow is InitializableERC20 {
             });
     }
 
-    function currAsk() public view returns (uint256) {
+    function currAsk() public view returns (uint64) {
         uint256 _decayStartTime = auctionParams.decayStartTime;
         uint256 _decayDuration = auctionParams.decayDuration;
+        uint256 currentAsk;
         if (block.timestamp < _decayStartTime) {
-            return auctionParams.relPremiumStart;
+            currentAsk = auctionParams.relPremiumStart;
         } else if (block.timestamp < _decayStartTime + _decayDuration) {
             uint256 _timePassed = block.timestamp - _decayStartTime;
             uint256 _relPremiumFloor = auctionParams.relPremiumFloor;
             uint256 _relPremiumStart = auctionParams.relPremiumStart;
-            return
+            currentAsk =
                 _relPremiumStart -
                 ((_relPremiumStart - _relPremiumFloor) * _timePassed) /
                 _decayDuration;
         } else {
-            return auctionParams.relPremiumFloor;
+            currentAsk = auctionParams.relPremiumFloor;
         }
+        return SafeCast.toUint64(currentAsk);
     }
 
     function _initialize(
