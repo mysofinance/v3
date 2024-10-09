@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -93,7 +93,7 @@ contract ChainlinkOracle is IOracle, Ownable {
             revert InvalidArrayLength();
         }
 
-        for (uint256 i; i < length;) {
+        for (uint256 i; i < length; ) {
             OracleInfo storage existingInfo = oracleInfos[_tokenAddrs[i]];
 
             if (existingInfo.oracleAddr != address(0)) {
@@ -142,7 +142,7 @@ contract ChainlinkOracle is IOracle, Ownable {
     function getPriceOfToken(
         address token
     ) public view virtual returns (uint256 tokenPriceRaw) {
-        if (token == WETH){
+        if (token == WETH) {
             return 1e18;
         }
         OracleInfo memory info = oracleInfos[token];
@@ -158,7 +158,9 @@ contract ChainlinkOracle is IOracle, Ownable {
             tokenPriceRaw = rawPrice;
         } else {
             // Price is in USD, convert to ETH using ETH/USD oracle
-            uint256 ethUsdPrice = _checkAndReturnLatestRoundData(ETH_USD_ORACLE);
+            uint256 ethUsdPrice = _checkAndReturnLatestRoundData(
+                ETH_USD_ORACLE
+            );
 
             // Ensure ETH/USD oracle has 8 decimals
             // Convert USD to ETH: (price * 1e18) / ethUsdPrice
@@ -195,10 +197,7 @@ contract ChainlinkOracle is IOracle, Ownable {
         tokenPriceRaw = uint256(answer);
     }
 
-    function _checkAndStoreOracleInfo(
-        address token,
-        address oracle
-    ) internal {
+    function _checkAndStoreOracleInfo(address token, address oracle) internal {
         if (token == address(0) || oracle == address(0)) {
             revert InvalidAddress();
         }

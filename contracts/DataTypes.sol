@@ -66,10 +66,10 @@ library DataTypes {
         BidStatus status;
         address settlementToken;
         address underlyingToken;
-        uint256 strike;
-        uint256 expiry;
-        uint256 earliestExercise;
-        uint256 premium;
+        uint128 strike;
+        uint48 expiry;
+        uint48 earliestExercise;
+        uint128 premium;
         address premiumToken;
         uint256 oracleSpotPrice;
         uint256 currAsk;
@@ -89,7 +89,7 @@ library DataTypes {
         RFQStatus status;
         bytes32 msgHash;
         address quoter;
-        uint256 premium;
+        uint128 premium;
         address premiumToken;
         uint256 matchFeeProtocol;
         uint256 matchFeeDistPartner;
