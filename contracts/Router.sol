@@ -11,6 +11,7 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Escrow} from "./Escrow.sol";
 import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
+import {Errors} from "./errors/Errors.sol";
 
 contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
@@ -89,12 +90,13 @@ contract Router is Ownable {
         address escrowOwner,
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
-        address escrow = _createEscrow();
+        (address escrow, uint256 oTokenIndex) = _createEscrow();
         Escrow(escrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
-            auctionInitialization
+            auctionInitialization,
+            oTokenIndex
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
@@ -110,10 +112,10 @@ contract Router is Ownable {
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
         if (!isEscrow[oldEscrow]) {
-            revert();
+            revert Errors.NotAnEscrow();
         }
         if (msg.sender != Escrow(oldEscrow).owner()) {
-            revert();
+            revert Errors.InvalidSender();
         }
         Escrow(oldEscrow).handleWithdraw(
             msg.sender,
@@ -122,12 +124,13 @@ contract Router is Ownable {
                 oldEscrow
             )
         );
-        address newEscrow = _createEscrow();
+        (address newEscrow, uint256 oTokenIndex) = _createEscrow();
         Escrow(newEscrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
-            auctionInitialization
+            auctionInitialization,
+            oTokenIndex
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
@@ -149,10 +152,10 @@ contract Router is Ownable {
         uint256 amount
     ) external {
         if (!isEscrow[escrow]) {
-            revert();
+            revert Errors.NotAnEscrow();
         }
         if (msg.sender != Escrow(escrow).owner()) {
-            revert();
+            revert Errors.InvalidSender();
         }
         Escrow(escrow).handleWithdraw(to, token, amount);
         emit Withdraw(msg.sender, escrow, to, token, amount);
@@ -167,7 +170,7 @@ contract Router is Ownable {
         address distPartner
     ) external returns (DataTypes.BidPreview memory preview) {
         if (!isEscrow[escrow]) {
-            revert();
+            revert Errors.NotAnEscrow();
         }
         preview = Escrow(escrow).handleAuctionBid(
             relBid,
@@ -220,7 +223,7 @@ contract Router is Ownable {
         bytes[] memory oracleData
     ) external {
         if (!isEscrow[escrow]) {
-            revert();
+            revert Errors.NotAnEscrow();
         }
         (
             address settlementToken,
@@ -266,7 +269,7 @@ contract Router is Ownable {
         uint128 borrowUnderlyingAmount
     ) external {
         if (!isEscrow[escrow]) {
-            revert();
+            revert Errors.NotAnEscrow();
         }
         (
             address settlementToken,
@@ -308,7 +311,7 @@ contract Router is Ownable {
         uint128 repayUnderlyingAmount
     ) external {
         if (!isEscrow[escrow]) {
-            revert();
+            revert Errors.NotAnEscrow();
         }
         (address underlyingToken, ) = Escrow(escrow).handleRepay(
             msg.sender,
@@ -334,18 +337,19 @@ contract Router is Ownable {
         );
 
         if (preview.status != DataTypes.RFQStatus.Success) {
-            revert();
+            revert Errors.InvalidTakeQuote();
         }
 
         isQuoteUsed[preview.msgHash] = true;
 
-        address escrow = _createEscrow();
+        (address escrow, uint256 oTokenIndex) = _createEscrow();
         Escrow(escrow).initializeRFQMatch(
             address(this),
             escrowOwner,
             preview.quoter,
             getExerciseFee(),
-            rfqInitialization
+            rfqInitialization,
+            oTokenIndex
         );
 
         IERC20Metadata(rfqInitialization.optionInfo.underlyingToken)
@@ -394,7 +398,7 @@ contract Router is Ownable {
         );
 
         if (preview.status != DataTypes.RFQStatus.Success) {
-            revert();
+            revert Errors.InvalidTakeQuote();
         }
 
         // @dev: placeholder
@@ -409,7 +413,7 @@ contract Router is Ownable {
     function setFeeHandler(address newFeeHandler) external onlyOwner {
         address oldFeeHandler = feeHandler;
         if (oldFeeHandler == newFeeHandler) {
-            revert();
+            revert Errors.FeeHandlerAlreadySet();
         }
         feeHandler = newFeeHandler;
         emit NewFeeHandler(oldFeeHandler, newFeeHandler);
@@ -543,26 +547,26 @@ contract Router is Ownable {
     ) external view returns (address[] memory _escrows) {
         uint256 length = escrows.length;
         if (numElements == 0 || from + numElements > length) {
-            revert();
+            revert Errors.InvalidGetEscrowsQuery();
         }
         _escrows = new address[](numElements);
-        for (uint256 i; i < numElements; ) {
+        for (uint256 i = 0; i < numElements; ++i) {
             _escrows[i] = escrows[from + i];
-            unchecked {
-                ++i;
-            }
         }
     }
 
-    function _createEscrow() internal returns (address) {
-        address escrow = Clones.cloneDeterministic(
+    function _createEscrow()
+        internal
+        returns (address escrow, uint256 oTokenIndex)
+    {
+        oTokenIndex = numEscrows + 1;
+        escrow = Clones.cloneDeterministic(
             escrowImpl,
-            keccak256(abi.encode(numEscrows))
+            keccak256(abi.encode(oTokenIndex))
         );
-        numEscrows += 1;
+        numEscrows = oTokenIndex;
         isEscrow[escrow] = true;
         escrows.push(escrow);
-        return escrow;
     }
 
     function _createTakeQuotePreview(

@@ -5,9 +5,11 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Router} from "./Router.sol";
+import {Errors} from "./errors/Errors.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
 
@@ -53,28 +55,29 @@ contract Escrow is InitializableERC20 {
         address _router,
         address _owner,
         uint96 _exerciseFee,
-        DataTypes.AuctionInitialization calldata _auctionInitialization
+        DataTypes.AuctionInitialization calldata _auctionInitialization,
+        uint256 oTokenIndex
     ) external initializer {
         if (
             _auctionInitialization.underlyingToken ==
             _auctionInitialization.settlementToken
         ) {
-            revert();
+            revert Errors.InvalidTokenPair();
         }
         if (_auctionInitialization.notional == 0) {
-            revert();
+            revert Errors.InvalidNotional();
         }
         if (_auctionInitialization.auctionParams.relStrike == 0) {
-            revert();
+            revert Errors.InvalidStrike();
         }
         if (_auctionInitialization.auctionParams.tenor == 0) {
-            revert();
+            revert Errors.InvalidTenor();
         }
         if (
             _auctionInitialization.auctionParams.tenor <
             _auctionInitialization.auctionParams.earliestExerciseTenor + 1 days
         ) {
-            revert();
+            revert Errors.InvalidEarliestExerciseTenor();
         }
         if (
             _auctionInitialization.auctionParams.relPremiumStart == 0 ||
@@ -82,20 +85,20 @@ contract Escrow is InitializableERC20 {
             _auctionInitialization.auctionParams.relPremiumStart <
             _auctionInitialization.auctionParams.relPremiumFloor
         ) {
-            revert();
+            revert Errors.InvalidRelPremiums();
         }
         if (
             _auctionInitialization.auctionParams.maxSpot == 0 ||
             _auctionInitialization.auctionParams.maxSpot <
             _auctionInitialization.auctionParams.minSpot
         ) {
-            revert();
+            revert Errors.InvalidMinMaxSpot();
         }
         if (_auctionInitialization.advancedSettings.oracle == address(0)) {
-            revert();
+            revert Errors.InvalidOracle();
         }
         if (_auctionInitialization.advancedSettings.borrowCap > BASE) {
-            revert();
+            revert Errors.InvalidBorrowCap();
         }
         optionInfo.underlyingToken = _auctionInitialization.underlyingToken;
         optionInfo.settlementToken = _auctionInitialization.settlementToken;
@@ -109,7 +112,8 @@ contract Escrow is InitializableERC20 {
             _router,
             _owner,
             _exerciseFee,
-            _auctionInitialization.underlyingToken
+            _auctionInitialization.underlyingToken,
+            oTokenIndex
         );
     }
 
@@ -118,29 +122,30 @@ contract Escrow is InitializableERC20 {
         address _owner,
         address optionReceiver,
         uint96 _exerciseFee,
-        DataTypes.RFQInitialization calldata _rfqInitialization
+        DataTypes.RFQInitialization calldata _rfqInitialization,
+        uint256 oTokenIndex
     ) external initializer {
         if (
             _rfqInitialization.optionInfo.underlyingToken ==
             _rfqInitialization.optionInfo.settlementToken
         ) {
-            revert();
+            revert Errors.InvalidTokenPair();
         }
         if (_rfqInitialization.optionInfo.notional == 0) {
-            revert();
+            revert Errors.InvalidNotional();
         }
         if (_rfqInitialization.optionInfo.strike == 0) {
-            revert();
+            revert Errors.InvalidStrike();
         }
         if (
             block.timestamp > _rfqInitialization.optionInfo.expiry ||
             _rfqInitialization.optionInfo.expiry <
             _rfqInitialization.optionInfo.earliestExercise + 1 days
         ) {
-            revert();
+            revert Errors.InvalidEarliestExerciseTenor();
         }
         if (_rfqInitialization.optionInfo.advancedSettings.borrowCap > BASE) {
-            revert();
+            revert Errors.InvalidBorrowCap();
         }
 
         optionInfo = _rfqInitialization.optionInfo;
@@ -152,7 +157,8 @@ contract Escrow is InitializableERC20 {
             _router,
             _owner,
             _exerciseFee,
-            _rfqInitialization.optionInfo.underlyingToken
+            _rfqInitialization.optionInfo.underlyingToken,
+            oTokenIndex
         );
     }
 
@@ -164,12 +170,12 @@ contract Escrow is InitializableERC20 {
         address distPartner
     ) external returns (DataTypes.BidPreview memory preview) {
         if (msg.sender != router) {
-            revert();
+            revert Errors.InvalidSender();
         }
         preview = previewBid(relBid, _refSpot, _oracleData, distPartner);
 
         if (preview.status != DataTypes.BidStatus.Success) {
-            revert();
+            revert Errors.InvalidBid();
         }
 
         optionInfo.strike = preview.strike;
@@ -196,19 +202,22 @@ contract Escrow is InitializableERC20 {
         )
     {
         if (msg.sender != router) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (!optionMinted) {
-            revert();
+            revert Errors.NoOptionMinted();
         }
         if (
             block.timestamp > optionInfo.expiry ||
             block.timestamp < optionInfo.earliestExercise
         ) {
-            revert();
+            revert Errors.InvalidExerciseTime();
         }
-        if (underlyingExerciseAmount > optionInfo.notional) {
-            revert();
+        if (
+            underlyingExerciseAmount == 0 ||
+            underlyingExerciseAmount > optionInfo.notional
+        ) {
+            revert Errors.InvalidExerciseAmount();
         }
 
         // @dev: caching
@@ -242,7 +251,7 @@ contract Escrow is InitializableERC20 {
                 exerciseCostInUnderlying == 0
             ) {
                 // @dev: revert if OTM or exercise cost is null
-                revert();
+                revert Errors.InvalidExercise();
             }
             IERC20Metadata(underlyingToken).safeTransfer(
                 owner,
@@ -269,25 +278,23 @@ contract Escrow is InitializableERC20 {
         )
     {
         if (msg.sender != router) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (!optionMinted) {
-            revert();
+            revert Errors.NoOptionMinted();
         }
         if (
             block.timestamp > optionInfo.expiry ||
             block.timestamp < optionInfo.earliestExercise
         ) {
-            revert();
-        }
-        if (underlyingBorrowAmount == 0) {
-            revert();
+            revert Errors.InvalidBorrowTime();
         }
         if (
+            underlyingBorrowAmount == 0 ||
             (totalBorrowed + underlyingBorrowAmount) * BASE >
             optionInfo.notional * optionInfo.advancedSettings.borrowCap
         ) {
-            revert();
+            revert Errors.InvalidBorrowAmount();
         }
         settlementToken = optionInfo.settlementToken;
         collateralAmount =
@@ -314,25 +321,25 @@ contract Escrow is InitializableERC20 {
         returns (address underlyingToken, uint256 unlockedCollateralAmount)
     {
         if (msg.sender != router) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (!optionMinted) {
-            revert();
+            revert Errors.NoOptionMinted();
         }
         if (
             block.timestamp > optionInfo.expiry ||
             block.timestamp < optionInfo.earliestExercise
         ) {
-            revert();
-        }
-        if (underlyingRepayAmount == 0) {
-            revert();
+            revert Errors.InvalidRepayTime();
         }
         if (totalBorrowed == 0 || optionInfo.advancedSettings.borrowCap == 0) {
-            revert();
+            revert Errors.NothingToRepay();
         }
-        if (underlyingRepayAmount > borrowedUnderlyingAmounts[borrower]) {
-            revert();
+        if (
+            underlyingRepayAmount == 0 ||
+            underlyingRepayAmount > borrowedUnderlyingAmounts[borrower]
+        ) {
+            revert Errors.InvalidRepayAmount();
         }
         underlyingToken = optionInfo.underlyingToken;
         unlockedCollateralAmount =
@@ -349,10 +356,10 @@ contract Escrow is InitializableERC20 {
 
     function handleOnChainVoting(address delegate) external {
         if (msg.sender != owner) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (!optionInfo.advancedSettings.votingDelegationAllowed) {
-            revert();
+            revert Errors.VotingDelegationNotAllowed();
         }
         ERC20Votes(optionInfo.underlyingToken).delegate(delegate);
         emit OnChainVotingDelegation(delegate);
@@ -360,13 +367,13 @@ contract Escrow is InitializableERC20 {
 
     function handleOffChainVoting(bytes32 spaceId, address delegate) external {
         if (msg.sender != owner) {
-            revert();
+            revert Errors.InvalidSender();
         }
         address allowedDelegateRegistry = optionInfo
             .advancedSettings
             .allowedDelegateRegistry;
-        if (allowedDelegateRegistry != address(0)) {
-            revert();
+        if (allowedDelegateRegistry == address(0)) {
+            revert Errors.NoAllowedDelegateRegistry();
         }
         // @dev: for off-chain voting via Gnosis Delegate Registry
         // see: https://docs.snapshot.org/user-guides/delegation#delegation-contract
@@ -384,10 +391,10 @@ contract Escrow is InitializableERC20 {
         uint256 amount
     ) external {
         if (msg.sender != router && msg.sender != owner) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (optionMinted && block.timestamp <= optionInfo.expiry) {
-            revert();
+            revert Errors.InvalidWithdraw();
         }
         IERC20Metadata(token).safeTransfer(to, amount);
         emit Withdraw(msg.sender, to, token, amount);
@@ -396,10 +403,10 @@ contract Escrow is InitializableERC20 {
     function transferOwnership(address newOwner) external {
         address _owner = owner;
         if (msg.sender != _owner) {
-            revert();
+            revert Errors.InvalidSender();
         }
         if (_owner == newOwner) {
-            revert();
+            revert Errors.OwnerAlreadySet();
         }
         owner = newOwner;
         emit TransferOwnership(msg.sender, _owner, newOwner);
@@ -520,15 +527,20 @@ contract Escrow is InitializableERC20 {
         address _router,
         address _owner,
         uint96 _exerciseFee,
-        address underlyingToken
+        address underlyingToken,
+        uint256 oTokenIndex
     ) internal {
         router = _router;
         owner = _owner;
         exerciseFee = _exerciseFee;
         string memory __name = IERC20Metadata(underlyingToken).name();
         string memory __symbol = IERC20Metadata(underlyingToken).symbol();
-        _name = string(abi.encodePacked("Call ", __name));
-        _symbol = string(abi.encodePacked("Call ", __symbol));
+        _name = string(
+            abi.encodePacked(__name, " O", Strings.toString(oTokenIndex))
+        );
+        _symbol = string(
+            abi.encodePacked(__symbol, " O", Strings.toString(oTokenIndex))
+        );
         _decimals = IERC20Metadata(underlyingToken).decimals();
     }
 

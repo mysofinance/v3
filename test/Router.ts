@@ -155,6 +155,23 @@ describe("Router Contract", function () {
       const escrows = await router.getEscrows(0, 1);
       const escrowAddress = escrows[0];
       const escrow: any = await escrowImpl.attach(escrowAddress);
+      const numEscrows = await router.numEscrows();
+
+      const underlyingTokenName = await underlyingToken.name();
+      const underlyingTokenSymbol = await underlyingToken.symbol();
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const optionTokenName = await escrow.name();
+      const optionTokenSymbol = await escrow.symbol();
+      const optionTokenDecimals = await escrow.decimals();
+      const optionTokenSupply = await escrow.totalSupply();
+      expect(optionTokenName).to.be.equal(
+        `${underlyingTokenName} O${numEscrows}`
+      );
+      expect(optionTokenSymbol).to.be.equal(
+        `${underlyingTokenSymbol} O${numEscrows}`
+      );
+      expect(optionTokenDecimals).to.be.equal(underlyingTokenDecimals);
+      expect(optionTokenSupply).to.be.equal(0);
 
       // Approve and bid on auction
       await settlementToken
@@ -372,6 +389,8 @@ describe("Router Contract", function () {
       const preUnderlyingTokenBal = await underlyingToken.balanceOf(
         user1.address
       );
+      const preOptionTokenBalance = await escrow.balanceOf(user1.address);
+      const preOptionTokenSupply = await escrow.totalSupply();
 
       const underlyingReceiver = user1.address;
       const underlyingAmount = auctionInitialization.notional;
@@ -393,12 +412,20 @@ describe("Router Contract", function () {
       const postUnderlyingTokenBal = await underlyingToken.balanceOf(
         user1.address
       );
+      const postOptionTokenBalance = await escrow.balanceOf(user1.address);
+      const postOptionTokenSupply = await escrow.totalSupply();
 
       expect(preSettlementTokenBal - postSettlementTokenBal).to.be.equal(
         expectedSettlementAmount
       );
       expect(postUnderlyingTokenBal - preUnderlyingTokenBal).to.be.equal(
         notional
+      );
+      expect(preOptionTokenBalance - postOptionTokenBalance).to.be.equal(
+        postUnderlyingTokenBal - preUnderlyingTokenBal
+      );
+      expect(preOptionTokenBalance - postOptionTokenBalance).to.be.equal(
+        preOptionTokenSupply - postOptionTokenSupply
       );
     });
   });
