@@ -51,44 +51,44 @@ export const setupTestContracts = async () => {
 };
 
 interface AuctionParams {
-  underlyingTokenAddress: string; // Required parameter
-  settlementTokenAddress: string; // Required parameter
-  notionalAmount?: bigint; // Optional with a default
-  relStrike?: bigint; // Optional with a default
-  tenor?: number; // Optional with a default
-  earliestExerciseTenor?: number; // Optional with a default
-  relPremiumStart?: bigint; // Optional with a default
-  relPremiumFloor?: bigint; // Optional with a default
-  decayDuration?: number; // Optional with a default
-  minSpot?: bigint; // Optional with a default
-  maxSpot?: bigint; // Optional with a default
-  decayStartTime?: number; // Optional
-  borrowCap?: number; // Optional with a default
-  votingDelegationAllowed?: boolean; // Optional with a default
-  allowedDelegateRegistry?: string; // Optional with a default
-  premiumTokenIsUnderlying?: boolean; // Optional with a default
-  oracleAddress: string; // Required
-  router: any; // Required
-  owner: any; // Required
+  underlyingTokenAddress: string;
+  settlementTokenAddress: string;
+  notionalAmount?: bigint;
+  relStrike?: bigint;
+  tenor?: number;
+  earliestExerciseTenor?: number;
+  relPremiumStart?: bigint;
+  relPremiumFloor?: bigint;
+  decayDuration?: number;
+  minSpot?: bigint;
+  maxSpot?: bigint;
+  decayStartTime?: number;
+  borrowCap?: number;
+  votingDelegationAllowed?: boolean;
+  allowedDelegateRegistry?: string;
+  premiumTokenIsUnderlying?: boolean;
+  oracleAddress: string;
+  router: any;
+  owner: any;
 }
 
 export const setupAuction = async ({
   underlyingTokenAddress,
   settlementTokenAddress,
-  notionalAmount = ethers.parseEther("100"), // Default value if not provided
-  relStrike = ethers.parseEther("1"), // Default value if not provided
-  tenor = 86400 * 30, // 30 days default
-  earliestExerciseTenor = 86400 * 7, // 7 days default
-  relPremiumStart = ethers.parseEther("0.01"), // Default premium start
-  relPremiumFloor = ethers.parseEther("0.005"), // Default premium floor
-  decayDuration = 86400 * 7, // 7 days default decay duration
-  minSpot = ethers.parseUnits("0.1", 6), // Default minimum spot price
-  maxSpot = ethers.parseUnits("1", 6), // Default maximum spot price
-  decayStartTime, // Optional decay start time
-  borrowCap = 0, // Default borrow cap
-  votingDelegationAllowed = true, // Default delegation allowed
-  allowedDelegateRegistry = ethers.ZeroAddress, // Default registry
-  premiumTokenIsUnderlying = false, // Default premium token setting
+  notionalAmount = ethers.parseEther("100"), // Default 100 ETH
+  relStrike = ethers.parseEther("1.2"), // Default 120%
+  tenor = 86400 * 30, // Default 30 days
+  earliestExerciseTenor = 86400 * 7, // Default 7 days
+  relPremiumStart = ethers.parseEther("0.1"), // Default 10%
+  relPremiumFloor = ethers.parseEther("0.01"), // Default 1%
+  decayDuration = 86400 * 7, // Default 7 days
+  minSpot = BigInt(1), // Default 1
+  maxSpot = BigInt(2) ** BigInt(128) - BigInt(1), // Default maxuint128
+  decayStartTime, // Can be undefined, default set below
+  borrowCap = 0, // Default 0%
+  votingDelegationAllowed = false, // Default false
+  allowedDelegateRegistry = ethers.ZeroAddress, // Default 0x
+  premiumTokenIsUnderlying = false, // Default false
   oracleAddress,
   router,
   owner,

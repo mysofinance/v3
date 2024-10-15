@@ -1,12 +1,6 @@
 const { expect } = require("chai");
 import { ethers } from "hardhat";
-import {
-  Router,
-  Escrow,
-  MockERC20,
-  MockOracle,
-  DataTypes,
-} from "../typechain-types";
+import { Router, Escrow, MockERC20, MockOracle } from "../typechain-types";
 import {
   setupTestContracts,
   setupAuction,
@@ -133,10 +127,11 @@ describe("Router Contract", function () {
       });
 
       // Approve and bid on auction
+      let currentAsk = await escrow.currAsk();
       await settlementToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
-      const relBid = ethers.parseEther("0.02");
+      const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
       const data: any = [];
       const preview = await escrow.previewBid(
@@ -267,10 +262,11 @@ describe("Router Contract", function () {
       });
 
       // Approve and bid on auction
+      let currentAsk = await escrow.currAsk();
       await settlementToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
-      const relBid = ethers.parseEther("0.02");
+      const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
       const data: any = [];
       const preview = await escrow.previewBid(
