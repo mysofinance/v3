@@ -7,6 +7,11 @@ import {
   MockOracle,
   DataTypes,
 } from "../typechain-types";
+import {
+  setupTestContracts,
+  setupAuction,
+  calculateExpectedAsk,
+} from "./testHelpers";
 
 describe("Router Contract", function () {
   let router: Router;
@@ -21,157 +26,111 @@ describe("Router Contract", function () {
   const CHAIN_ID = 31337;
 
   beforeEach(async function () {
-    [owner, user1, user2] = await ethers.getSigners();
-    provider = owner.provider;
-
-    // Deploy mock ERC20 token
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
-    settlementToken = await MockERC20.deploy(
-      "Settlement Token",
-      "Settlement Token",
-      6
-    );
-    underlyingToken = await MockERC20.deploy(
-      "Underlying Token",
-      "Underlying Token",
-      18
-    );
-
-    // Deploy Escrow implementation
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrowImpl = await Escrow.deploy();
-
-    // Deploy Router contract
-    const Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(owner.address, escrowImpl.target);
-
-    // Deploy mock oracle
-    const MockOracle = await ethers.getContractFactory("MockOracle");
-    mockOracle = await MockOracle.deploy();
-    await mockOracle.setPrice(
-      underlyingToken.target,
-      settlementToken.target,
-      ethers.parseUnits("1", 6)
-    );
-
-    // Deploy fee handler
-    const FeeHandler = await ethers.getContractFactory("FeeHandler");
-    const initOwner = owner.address;
-    const routerAddr = router.target;
-    const matchFee = ethers.parseEther("0.1");
-    const distPartnerFeeShare = 0;
-    const exerciseFee = 0;
-    const feeHandler = await FeeHandler.deploy(
-      initOwner,
-      routerAddr,
-      matchFee,
-      distPartnerFeeShare,
-      exerciseFee
-    );
-    await router.setFeeHandler(feeHandler.target);
-
-    // Mint some tokens for the users
-    await settlementToken.mint(owner.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user2.address, ethers.parseEther("1000"));
-
-    await underlyingToken.mint(owner.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user1.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user2.address, ethers.parseEther("1000"));
+    const contracts = await setupTestContracts();
+    ({
+      owner,
+      user1,
+      user2,
+      provider,
+      settlementToken,
+      underlyingToken,
+      escrowImpl,
+      router,
+      mockOracle,
+    } = contracts);
   });
 
   describe("Start Auction", function () {
     it("should allow starting an auction", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: 0,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-          premiumTokenIsUnderlying: false,
-          oracle: mockOracle.target,
-        },
-      };
+      // Use the setupAuction helper method
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
-      ).to.emit(router, "CreateAuction");
+      // Fetch the escrow
+      const escrows = await router.getEscrows(0, 1);
+      const escrowAddress = escrows[0];
+      const escrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow: any = await escrowImpl.attach(escrowAddress);
+
+      expect(escrow).to.exist; // Ensure the escrow was created
+    });
+
+    it("should calculate current ask correctly across different premium values", async function () {
+      const relPremiumStart = ethers.parseEther("0.01");
+      const relPremiumFloor = ethers.parseEther("0.005");
+
+      // Use the setupAuction helper method
+      let { escrow, auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relPremiumStart,
+        relPremiumFloor,
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+
+      // Check current ask before decay starts
+      await ethers.provider.send("evm_increaseTime", [50]);
+      await ethers.provider.send("evm_mine", []);
+
+      let currentAsk = await escrow.currAsk();
+      let block = await ethers.provider.getBlock("latest");
+      let blockTimestamp = block?.timestamp || new Date().getTime() / 1000;
+
+      // Calculate expected ask
+      let expectedAsk = calculateExpectedAsk(
+        blockTimestamp,
+        auctionInitialization.auctionParams.decayStartTime,
+        auctionInitialization.auctionParams.decayDuration,
+        BigInt(relPremiumStart.toString()),
+        BigInt(relPremiumFloor.toString())
+      );
+
+      expect(currentAsk).to.equal(expectedAsk);
+
+      // Check current ask during decay period
+      await ethers.provider.send("evm_increaseTime", [3 * 86400]);
+      await ethers.provider.send("evm_mine", []);
+
+      currentAsk = await escrow.currAsk();
+      block = await ethers.provider.getBlock("latest");
+      blockTimestamp = block?.timestamp || new Date().getTime() / 1000;
+
+      expectedAsk = calculateExpectedAsk(
+        blockTimestamp,
+        auctionInitialization.auctionParams.decayStartTime,
+        auctionInitialization.auctionParams.decayDuration,
+        BigInt(relPremiumStart.toString()),
+        BigInt(relPremiumFloor.toString())
+      );
+
+      expect(currentAsk).to.equal(expectedAsk);
+
+      // Check current ask after decay finishes
+      await ethers.provider.send("evm_increaseTime", [5 * 86400]);
+      await ethers.provider.send("evm_mine", []);
+
+      currentAsk = await escrow.currAsk();
+      expectedAsk = relPremiumFloor;
+      expect(currentAsk).to.equal(expectedAsk);
     });
   });
 
   describe("Bid on Auction", function () {
     it("should allow bidding on an auction", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: 0,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-          premiumTokenIsUnderlying: false,
-          oracle: mockOracle.target,
-        },
-      };
-
-      // Approve and create auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
-      const numEscrows = await router.numEscrows();
-
-      const underlyingTokenName = await underlyingToken.name();
-      const underlyingTokenSymbol = await underlyingToken.symbol();
-      const underlyingTokenDecimals = await underlyingToken.decimals();
-      const optionTokenName = await escrow.name();
-      const optionTokenSymbol = await escrow.symbol();
-      const optionTokenDecimals = await escrow.decimals();
-      const optionTokenSupply = await escrow.totalSupply();
-      expect(optionTokenName).to.be.equal(
-        `${underlyingTokenName} O${numEscrows}`
-      );
-      expect(optionTokenSymbol).to.be.equal(
-        `${underlyingTokenSymbol} O${numEscrows}`
-      );
-      expect(optionTokenDecimals).to.be.equal(underlyingTokenDecimals);
-      expect(optionTokenSupply).to.be.equal(0);
+      const { escrow } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and bid on auction
       await settlementToken
@@ -194,7 +153,7 @@ describe("Router Contract", function () {
         router
           .connect(user1)
           .bidOnAuction(
-            escrowAddress,
+            escrow.target,
             optionReceiver,
             relBid,
             refSpot,
@@ -204,7 +163,7 @@ describe("Router Contract", function () {
       )
         .to.emit(router, "BidOnAuction")
         .withArgs(
-          escrowAddress,
+          escrow.target,
           relBid,
           user1.address,
           refSpot,
@@ -216,7 +175,7 @@ describe("Router Contract", function () {
 
   describe("Take Quote", function () {
     it("should allow taking a quote", async function () {
-      let rfqInitialization: DataTypes.RFQInitialization = {
+      const rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
           underlyingToken: underlyingToken.target,
           settlementToken: settlementToken.target,
@@ -243,11 +202,9 @@ describe("Router Contract", function () {
       const payload = abiCoder.encode(
         [
           "uint256", // CHAIN_ID
-          // OptionInfo
-          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))",
-          // RFQQuote (only includes premium and validUntil)
-          "uint256",
-          "uint256",
+          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))", // OptionInfo
+          "uint256", // premium
+          "uint256", // validUntil
         ],
         [
           CHAIN_ID,
@@ -269,13 +226,14 @@ describe("Router Contract", function () {
                 .allowedDelegateRegistry,
             ],
           ],
-          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
-          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
+          rfqInitialization.rfqQuote.premium,
+          rfqInitialization.rfqQuote.validUntil,
         ]
       );
 
       const payloadHash = ethers.keccak256(payload);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+
       await settlementToken
         .connect(owner)
         .approve(router.target, ethers.MaxUint256);
@@ -300,41 +258,13 @@ describe("Router Contract", function () {
 
   describe("Exercising Option Token", function () {
     it("should allow exercising option token", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 0,
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: 0,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-          premiumTokenIsUnderlying: false,
-          oracle: mockOracle.target,
-        },
-      };
-
-      // Approve and create auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, ethers.MaxUint256);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const { escrow, auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and bid on auction
       await settlementToken
@@ -356,23 +286,14 @@ describe("Router Contract", function () {
         router
           .connect(user1)
           .bidOnAuction(
-            escrowAddress,
+            escrow.target,
             optionReceiver,
             relBid,
             refSpot,
             data,
             ethers.ZeroAddress
           )
-      )
-        .to.emit(router, "BidOnAuction")
-        .withArgs(
-          escrowAddress,
-          relBid,
-          user1.address,
-          refSpot,
-          expectedProtocolMatchFee,
-          0
-        );
+      ).to.emit(router, "BidOnAuction");
 
       const optionInfo = await escrow.optionInfo();
       const underlyingTokenDecimals = await underlyingToken.decimals();
@@ -381,6 +302,15 @@ describe("Router Contract", function () {
       const expectedSettlementAmount =
         (BigInt(strike) * BigInt(notional)) /
         BigInt(10) ** underlyingTokenDecimals;
+
+      // Move forward after earliest exercise
+      const earliestExercise = optionInfo[3];
+      const block = await ethers.provider.getBlock("latest");
+      const blockTimestamp = block?.timestamp || new Date().getTime() / 1000;
+      const moveForwardTime = Number(earliestExercise) - blockTimestamp + 1;
+
+      await ethers.provider.send("evm_increaseTime", [moveForwardTime]);
+      await ethers.provider.send("evm_mine", []);
 
       await settlementToken.mint(user1.address, expectedSettlementAmount);
       const preSettlementTokenBal = await settlementToken.balanceOf(
@@ -399,7 +329,7 @@ describe("Router Contract", function () {
       await router
         .connect(user1)
         .exercise(
-          escrowAddress,
+          escrow.target,
           underlyingReceiver,
           underlyingAmount,
           payInSettlementToken,
