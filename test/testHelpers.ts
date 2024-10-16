@@ -82,8 +82,6 @@ interface AuctionInitializationParams {
   allowedDelegateRegistry?: string;
   premiumTokenIsUnderlying?: boolean;
   oracleAddress: string;
-  router: any;
-  owner: any;
 }
 
 export const getAuctionInitialization = async ({
