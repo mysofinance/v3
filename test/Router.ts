@@ -6,8 +6,9 @@ import {
   getAuctionInitialization,
   createAuction,
   calculateExpectedAsk,
+  getRFQInitialization,
+  rfqSignaturePayload,
 } from "./testHelpers";
-import { DataTypes } from "./DataTypes";
 
 describe("Router Contract", function () {
   let router: Router;
@@ -155,70 +156,20 @@ describe("Router Contract", function () {
           user1.address,
           refSpot,
           expectedProtocolMatchFee,
-          0
+          0,
+          ethers.ZeroAddress
         );
     });
   });
 
   describe("Take Quote", function () {
     it("should allow taking a quote", async function () {
-      const rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: 0n,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-            premiumTokenIsUnderlying: false,
-            oracle: ethers.ZeroAddress,
-          },
-        },
-        rfqQuote: {
-          premium: ethers.parseEther("10"),
-          validUntil: (await provider.getBlock("latest")).timestamp + 86400, // 1 day
-          signature: ethers.hexlify(ethers.randomBytes(65)), // Mock signature
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+      });
 
-      const abiCoder = new ethers.AbiCoder();
-      const payload = abiCoder.encode(
-        [
-          "uint256", // CHAIN_ID
-          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))", // OptionInfo
-          "uint256", // premium
-          "uint256", // validUntil
-        ],
-        [
-          CHAIN_ID,
-          [
-            rfqInitialization.optionInfo.underlyingToken,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.settlementToken,
-            rfqInitialization.optionInfo.earliestExercise,
-            rfqInitialization.optionInfo.notional,
-            rfqInitialization.optionInfo.strike,
-            [
-              rfqInitialization.optionInfo.advancedSettings.borrowCap,
-              rfqInitialization.optionInfo.advancedSettings.oracle,
-              rfqInitialization.optionInfo.advancedSettings
-                .premiumTokenIsUnderlying,
-              rfqInitialization.optionInfo.advancedSettings
-                .votingDelegationAllowed,
-              rfqInitialization.optionInfo.advancedSettings
-                .allowedDelegateRegistry,
-            ],
-          ],
-          rfqInitialization.rfqQuote.premium,
-          rfqInitialization.rfqQuote.validUntil,
-        ]
-      );
-
-      const payloadHash = ethers.keccak256(payload);
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
 
       await settlementToken
