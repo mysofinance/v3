@@ -104,8 +104,9 @@ export const setupAuction = async ({
   premiumTokenIsUnderlying = false, // Default false
   oracleAddress,
   router,
-  owner,
-}: AuctionParams) => {
+  owner
+}: AuctionParams,
+  setupFullAuction = true) => {
   // Fetch the latest block to ensure we have the correct block timestamp
   const latestBlock = await ethers.provider.getBlock("latest");
   if (!latestBlock) {
@@ -145,20 +146,23 @@ export const setupAuction = async ({
   // Attach the underlying token and settlement token to their contract instances
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   const underlyingToken = await MockERC20Factory.attach(underlyingTokenAddress);
+  let escrow: any
 
-  // Approve tokens and start the auction
-  await underlyingToken
-    .connect(owner)
-    .approve(router.target, auctionInitialization.notional);
-  await expect(
-    router.connect(owner).createAuction(owner.address, auctionInitialization)
-  ).to.emit(router, "CreateAuction");
+  if (setupFullAuction) {
+    // Approve tokens and start the auction
+    await underlyingToken
+      .connect(owner)
+      .approve(router.target, auctionInitialization.notional);
+    await expect(
+      router.connect(owner).createAuction(owner.address, auctionInitialization)
+    ).to.emit(router, "CreateAuction");
 
-  // Attach the escrow instance
-  const escrows = await router.getEscrows(0, 1);
-  const escrowAddress = escrows[0];
-  const escrowImpl = await ethers.getContractFactory("Escrow");
-  const escrow: any = await escrowImpl.attach(escrowAddress);
+    // Attach the escrow instance
+    const escrows = await router.getEscrows(0, 1);
+    const escrowAddress = escrows[0];
+    const escrowImpl = await ethers.getContractFactory("Escrow");
+    escrow = await escrowImpl.attach(escrowAddress);
+  }
 
   return { escrow, auctionInitialization };
 };
@@ -219,4 +223,11 @@ export const rfqSignaturePayload = (rfqInitialization: DataTypes.RFQInitializati
   );
   return ethers.keccak256(payload);
 };
+
+export const getFirstEscrow = async (router: any, escrowImpl: any): any => {
+  const escrows = await router.getEscrows(0, 1);
+  const escrowAddress = escrows[0];
+  const escrow: any = await escrowImpl.attach(escrowAddress);
+  return escrow;
+}
 
