@@ -10,7 +10,7 @@ import {
 } from "../typechain-types";
 import { setupTestContracts, setupAuction, rfqSignaturePayload } from "./testHelpers";
 
-describe("Router Contract Ext", function () {
+describe("Router And Escrow Interaction", function () {
   let router: Router;
   let escrowImpl: Escrow;
   let settlementToken: MockERC20;
