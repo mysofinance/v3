@@ -1,6 +1,7 @@
 const { expect } = require("chai");
 import { ethers } from "hardhat";
 import { DataTypes } from "../typechain-types";
+import { MockERC20, Escrow } from "../typechain-types";
 
 export const setupTestContracts = async () => {
   const [owner, user1, user2] = await ethers.getSigners();
@@ -63,7 +64,7 @@ export const setupTestContracts = async () => {
   };
 };
 
-interface AuctionParams {
+interface AuctionInitializationParams {
   underlyingTokenAddress: string;
   settlementTokenAddress: string;
   notionalAmount?: bigint;
@@ -81,34 +82,27 @@ interface AuctionParams {
   allowedDelegateRegistry?: string;
   premiumTokenIsUnderlying?: boolean;
   oracleAddress: string;
-  router: any;
-  owner: any;
 }
 
-export const setupAuction = async (
-  {
-    underlyingTokenAddress,
-    settlementTokenAddress,
-    notionalAmount = ethers.parseEther("100"), // Default 100 ETH
-    relStrike = ethers.parseEther("1.2"), // Default 120%
-    tenor = 86400 * 30, // Default 30 days
-    earliestExerciseTenor = 86400 * 7, // Default 7 days
-    relPremiumStart = ethers.parseEther("0.1"), // Default 10%
-    relPremiumFloor = ethers.parseEther("0.01"), // Default 1%
-    decayDuration = 86400 * 7, // Default 7 days
-    minSpot = BigInt(1), // Default 1
-    maxSpot = BigInt(2) ** BigInt(128) - BigInt(1), // Default maxuint128
-    decayStartTime, // Can be undefined, default set below
-    borrowCap = 0n, // Default 0%
-    votingDelegationAllowed = false, // Default false
-    allowedDelegateRegistry = ethers.ZeroAddress, // Default 0x
-    premiumTokenIsUnderlying = false, // Default false
-    oracleAddress,
-    router,
-    owner,
-  }: AuctionParams,
-  setupFullAuction = true
-) => {
+export const getAuctionInitialization = async ({
+  underlyingTokenAddress,
+  settlementTokenAddress,
+  notionalAmount = ethers.parseEther("100"), // Default 100 ETH
+  relStrike = ethers.parseEther("1.2"), // Default 120%
+  tenor = 86400 * 30, // Default 30 days
+  earliestExerciseTenor = 86400 * 7, // Default 7 days
+  relPremiumStart = ethers.parseEther("0.1"), // Default 10%
+  relPremiumFloor = ethers.parseEther("0.01"), // Default 1%
+  decayDuration = 86400 * 7, // Default 7 days
+  minSpot = BigInt(1), // Default 1
+  maxSpot = BigInt(2) ** BigInt(128) - BigInt(1), // Default maxuint128
+  decayStartTime, // Can be undefined, default set below
+  borrowCap = 0n, // Default 0%
+  votingDelegationAllowed = false, // Default false
+  allowedDelegateRegistry = ethers.ZeroAddress, // Default 0x
+  premiumTokenIsUnderlying = false, // Default false
+  oracleAddress,
+}: AuctionInitializationParams): Promise<DataTypes.AuctionInitialization> => {
   // Fetch the latest block to ensure we have the correct block timestamp
   const latestBlock = await ethers.provider.getBlock("latest");
   if (!latestBlock) {
@@ -116,58 +110,63 @@ export const setupAuction = async (
   }
 
   // Handle optional decayStartTime, defaulting to block timestamp + 100 seconds
-  if (!decayStartTime) {
-    decayStartTime = latestBlock.timestamp + 100;
-  }
+  decayStartTime = decayStartTime || latestBlock.timestamp + 100;
 
-  // Auction initialization parameters
-  const auctionInitialization: DataTypes.AuctionInitialization = {
+  // Return the auction initialization struct with defaults and custom values
+  return {
     underlyingToken: underlyingTokenAddress,
     settlementToken: settlementTokenAddress,
     notional: notionalAmount,
     auctionParams: {
-      relStrike: relStrike,
-      tenor: tenor,
-      earliestExerciseTenor: earliestExerciseTenor,
-      relPremiumStart: relPremiumStart,
-      relPremiumFloor: relPremiumFloor,
-      decayDuration: decayDuration,
-      minSpot: minSpot,
-      maxSpot: maxSpot,
-      decayStartTime: decayStartTime,
+      relStrike,
+      tenor,
+      earliestExerciseTenor,
+      relPremiumStart,
+      relPremiumFloor,
+      decayDuration,
+      minSpot,
+      maxSpot,
+      decayStartTime,
     },
     advancedSettings: {
-      borrowCap: borrowCap,
-      votingDelegationAllowed: votingDelegationAllowed,
-      allowedDelegateRegistry: allowedDelegateRegistry,
-      premiumTokenIsUnderlying: premiumTokenIsUnderlying,
+      borrowCap,
       oracle: oracleAddress,
+      premiumTokenIsUnderlying,
+      votingDelegationAllowed,
+      allowedDelegateRegistry,
     },
   };
+};
 
-  // Attach the underlying token and settlement token to their contract instances
+export const createAuction = async (
+  auctionInitialization: DataTypes.AuctionInitialization,
+  router: any,
+  owner: any
+): Promise<Escrow> => {
+  // Attach the underlying token to its contract instance
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-  const underlyingToken = await MockERC20Factory.attach(underlyingTokenAddress);
-  let escrow: any;
+  const underlyingToken = (await MockERC20Factory.attach(
+    auctionInitialization.underlyingToken
+  )) as MockERC20;
 
-  if (setupFullAuction) {
-    // Approve tokens and start the auction
-    await underlyingToken
-      .connect(owner)
-      .approve(router.target, auctionInitialization.notional);
-    await expect(
-      router.connect(owner).createAuction(owner.address, auctionInitialization)
-    ).to.emit(router, "CreateAuction");
+  // Approve tokens and create the auction
+  await underlyingToken
+    .connect(owner)
+    .approve(router.target, auctionInitialization.notional);
 
-    // Attach the escrow instance
-    const numEscrows = await router.numEscrows();
-    const escrows = await router.getEscrows(numEscrows - 1n, 1);
-    const escrowAddress = escrows[0];
-    const escrowImpl = await ethers.getContractFactory("Escrow");
-    escrow = await escrowImpl.attach(escrowAddress);
-  }
+  // Create the auction via the Router contract
+  await expect(
+    router.connect(owner).createAuction(owner.address, auctionInitialization)
+  ).to.emit(router, "CreateAuction");
 
-  return { escrow, auctionInitialization };
+  // Retrieve and return the created escrow instance
+  const numEscrows = await router.numEscrows();
+  const escrows = await router.getEscrows(numEscrows - 1n, 1);
+  const escrowAddress = escrows[0];
+  const EscrowImpl = await ethers.getContractFactory("Escrow");
+  const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+
+  return escrow;
 };
 
 export const calculateExpectedAsk = (
@@ -229,4 +228,121 @@ export const rfqSignaturePayload = (
     ]
   );
   return ethers.keccak256(payload);
+};
+
+interface AuctionParams {
+  underlyingTokenAddress: string;
+  settlementTokenAddress: string;
+  notionalAmount?: bigint;
+  relStrike?: bigint;
+  tenor?: number;
+  earliestExerciseTenor?: number;
+  relPremiumStart?: bigint;
+  relPremiumFloor?: bigint;
+  decayDuration?: number;
+  minSpot?: bigint;
+  maxSpot?: bigint;
+  decayStartTime?: number;
+  borrowCap?: bigint;
+  votingDelegationAllowed?: boolean;
+  allowedDelegateRegistry?: string;
+  premiumTokenIsUnderlying?: boolean;
+  oracleAddress: string;
+  router: any;
+  owner: any;
+}
+
+export const setupAuction = async (
+  {
+    underlyingTokenAddress,
+    settlementTokenAddress,
+    notionalAmount = ethers.parseEther("100"), // Default 100 ETH
+    relStrike = ethers.parseEther("1.2"), // Default 120%
+    tenor = 86400 * 30, // Default 30 days
+    earliestExerciseTenor = 86400 * 7, // Default 7 days
+    relPremiumStart = ethers.parseEther("0.1"), // Default 10%
+    relPremiumFloor = ethers.parseEther("0.01"), // Default 1%
+    decayDuration = 86400 * 7, // Default 7 days
+    minSpot = BigInt(1), // Default 1
+    maxSpot = BigInt(2) ** BigInt(128) - BigInt(1), // Default maxuint128
+    decayStartTime, // Can be undefined, default set below
+    borrowCap = 0n, // Default 0%
+    votingDelegationAllowed = false, // Default false
+    allowedDelegateRegistry = ethers.ZeroAddress, // Default 0x
+    premiumTokenIsUnderlying = false, // Default false
+    oracleAddress,
+    router,
+    owner,
+  }: AuctionParams,
+  setupFullAuction = true
+) => {
+  // Fetch the latest block to ensure we have the correct block timestamp
+  const latestBlock = await ethers.provider.getBlock("latest");
+  if (!latestBlock) {
+    throw new Error("Failed to retrieve the latest block.");
+  }
+
+  // Handle optional decayStartTime, defaulting to block timestamp + 100 seconds
+  if (!decayStartTime) {
+    decayStartTime = latestBlock.timestamp + 100;
+  }
+
+  if (setupFullAuction) {
+    console.log(
+      "Can use getAuctionInitialization() and createAuction() helper"
+    );
+  } else {
+    console.log(
+      "Can use getAuctionInitialization() and create auction separately to catch reverts"
+    );
+  }
+
+  // Auction initialization parameters
+  const auctionInitialization: DataTypes.AuctionInitialization = {
+    underlyingToken: underlyingTokenAddress,
+    settlementToken: settlementTokenAddress,
+    notional: notionalAmount,
+    auctionParams: {
+      relStrike: relStrike,
+      tenor: tenor,
+      earliestExerciseTenor: earliestExerciseTenor,
+      relPremiumStart: relPremiumStart,
+      relPremiumFloor: relPremiumFloor,
+      decayDuration: decayDuration,
+      minSpot: minSpot,
+      maxSpot: maxSpot,
+      decayStartTime: decayStartTime,
+    },
+    advancedSettings: {
+      borrowCap: borrowCap,
+      votingDelegationAllowed: votingDelegationAllowed,
+      allowedDelegateRegistry: allowedDelegateRegistry,
+      premiumTokenIsUnderlying: premiumTokenIsUnderlying,
+      oracle: oracleAddress,
+    },
+  };
+
+  // Attach the underlying token and settlement token to their contract instances
+  const MockERC20Factory = await ethers.getContractFactory("MockERC20");
+  const underlyingToken = await MockERC20Factory.attach(underlyingTokenAddress);
+  let escrow: any;
+
+  if (setupFullAuction) {
+    // Approve tokens and start the auction
+    await underlyingToken
+      .connect(owner)
+      .approve(router.target, auctionInitialization.notional);
+    await expect(
+      router.connect(owner).createAuction(owner.address, auctionInitialization)
+    ).to.emit(router, "CreateAuction");
+
+    // Attach the escrow instance
+    const numEscrows = await router.numEscrows();
+    const escrows = await router.getEscrows(numEscrows - 1n, 1);
+    const escrowAddress = escrows[0];
+    const escrowImpl = await ethers.getContractFactory("Escrow");
+    escrow = await escrowImpl.attach(escrowAddress);
+  }
+
+  return { escrow, auctionInitialization };
 };

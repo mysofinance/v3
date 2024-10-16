@@ -3,9 +3,11 @@ import { ethers } from "hardhat";
 import { Router, Escrow, MockERC20, MockOracle } from "../typechain-types";
 import {
   setupTestContracts,
-  setupAuction,
+  getAuctionInitialization,
+  createAuction,
   calculateExpectedAsk,
 } from "./testHelpers";
+import { DataTypes } from "./DataTypes";
 
 describe("Router Contract", function () {
   let router: Router;
@@ -36,20 +38,13 @@ describe("Router Contract", function () {
 
   describe("Start Auction", function () {
     it("should allow starting an auction", async function () {
-      // Use the setupAuction helper method
-      const { auctionInitialization } = await setupAuction({
+      // Use the createAuction helper method
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-
-      // Fetch the escrow
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrowImpl = await ethers.getContractFactory("Escrow");
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
 
       expect(escrow).to.exist; // Ensure the escrow was created
     });
@@ -58,16 +53,14 @@ describe("Router Contract", function () {
       const relPremiumStart = ethers.parseEther("0.01");
       const relPremiumFloor = ethers.parseEther("0.005");
 
-      // Use the setupAuction helper method
-      let { escrow, auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relPremiumStart,
         relPremiumFloor,
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      const escrow = await createAuction(auctionInitialization, router, owner);
 
       // Check current ask before decay starts
       await ethers.provider.send("evm_increaseTime", [50]);
@@ -118,13 +111,12 @@ describe("Router Contract", function () {
 
   describe("Bid on Auction", function () {
     it("should allow bidding on an auction", async function () {
-      const { escrow } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      const escrow = await createAuction(auctionInitialization, router, owner);
 
       // Approve and bid on auction
       let currentAsk = await escrow.currAsk();
@@ -172,14 +164,14 @@ describe("Router Contract", function () {
     it("should allow taking a quote", async function () {
       const rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
-            borrowCap: 0,
+            borrowCap: 0n,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
             premiumTokenIsUnderlying: false,
@@ -253,13 +245,12 @@ describe("Router Contract", function () {
 
   describe("Exercising Option Token", function () {
     it("should allow exercising option token", async function () {
-      const { escrow, auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      const escrow = await createAuction(auctionInitialization, router, owner);
 
       // Approve and bid on auction
       let currentAsk = await escrow.currAsk();
