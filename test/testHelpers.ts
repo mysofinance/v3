@@ -85,28 +85,30 @@ interface AuctionParams {
   owner: any;
 }
 
-export const setupAuction = async ({
-  underlyingTokenAddress,
-  settlementTokenAddress,
-  notionalAmount = ethers.parseEther("100"), // Default 100 ETH
-  relStrike = ethers.parseEther("1.2"), // Default 120%
-  tenor = 86400 * 30, // Default 30 days
-  earliestExerciseTenor = 86400 * 7, // Default 7 days
-  relPremiumStart = ethers.parseEther("0.1"), // Default 10%
-  relPremiumFloor = ethers.parseEther("0.01"), // Default 1%
-  decayDuration = 86400 * 7, // Default 7 days
-  minSpot = BigInt(1), // Default 1
-  maxSpot = BigInt(2) ** BigInt(128) - BigInt(1), // Default maxuint128
-  decayStartTime, // Can be undefined, default set below
-  borrowCap = 0n, // Default 0%
-  votingDelegationAllowed = false, // Default false
-  allowedDelegateRegistry = ethers.ZeroAddress, // Default 0x
-  premiumTokenIsUnderlying = false, // Default false
-  oracleAddress,
-  router,
-  owner
-}: AuctionParams,
-  setupFullAuction = true) => {
+export const setupAuction = async (
+  {
+    underlyingTokenAddress,
+    settlementTokenAddress,
+    notionalAmount = ethers.parseEther("100"), // Default 100 ETH
+    relStrike = ethers.parseEther("1.2"), // Default 120%
+    tenor = 86400 * 30, // Default 30 days
+    earliestExerciseTenor = 86400 * 7, // Default 7 days
+    relPremiumStart = ethers.parseEther("0.1"), // Default 10%
+    relPremiumFloor = ethers.parseEther("0.01"), // Default 1%
+    decayDuration = 86400 * 7, // Default 7 days
+    minSpot = BigInt(1), // Default 1
+    maxSpot = BigInt(2) ** BigInt(128) - BigInt(1), // Default maxuint128
+    decayStartTime, // Can be undefined, default set below
+    borrowCap = 0n, // Default 0%
+    votingDelegationAllowed = false, // Default false
+    allowedDelegateRegistry = ethers.ZeroAddress, // Default 0x
+    premiumTokenIsUnderlying = false, // Default false
+    oracleAddress,
+    router,
+    owner,
+  }: AuctionParams,
+  setupFullAuction = true
+) => {
   // Fetch the latest block to ensure we have the correct block timestamp
   const latestBlock = await ethers.provider.getBlock("latest");
   if (!latestBlock) {
@@ -146,7 +148,7 @@ export const setupAuction = async ({
   // Attach the underlying token and settlement token to their contract instances
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   const underlyingToken = await MockERC20Factory.attach(underlyingTokenAddress);
-  let escrow: any
+  let escrow: any;
 
   if (setupFullAuction) {
     // Approve tokens and start the auction
@@ -158,7 +160,8 @@ export const setupAuction = async ({
     ).to.emit(router, "CreateAuction");
 
     // Attach the escrow instance
-    const escrows = await router.getEscrows(0, 1);
+    const numEscrows = await router.numEscrows();
+    const escrows = await router.getEscrows(numEscrows - 1n, 1);
     const escrowAddress = escrows[0];
     const escrowImpl = await ethers.getContractFactory("Escrow");
     escrow = await escrowImpl.attach(escrowAddress);
@@ -182,14 +185,17 @@ export const calculateExpectedAsk = (
     expectedAsk =
       relPremiumStart -
       ((relPremiumStart - relPremiumFloor) * timePassed) /
-      BigInt(decayDuration);
+        BigInt(decayDuration);
   } else {
     expectedAsk = relPremiumFloor; // After decay ends
   }
   return expectedAsk;
 };
 
-export const rfqSignaturePayload = (rfqInitialization: DataTypes.RFQInitialization, chainId: number): string => {
+export const rfqSignaturePayload = (
+  rfqInitialization: DataTypes.RFQInitialization,
+  chainId: number
+): string => {
   const abiCoder = new ethers.AbiCoder();
   const payload = abiCoder.encode(
     [
@@ -212,7 +218,8 @@ export const rfqSignaturePayload = (rfqInitialization: DataTypes.RFQInitializati
         [
           rfqInitialization.optionInfo.advancedSettings.borrowCap,
           rfqInitialization.optionInfo.advancedSettings.oracle,
-          rfqInitialization.optionInfo.advancedSettings.premiumTokenIsUnderlying,
+          rfqInitialization.optionInfo.advancedSettings
+            .premiumTokenIsUnderlying,
           rfqInitialization.optionInfo.advancedSettings.votingDelegationAllowed,
           rfqInitialization.optionInfo.advancedSettings.allowedDelegateRegistry,
         ],
@@ -223,11 +230,3 @@ export const rfqSignaturePayload = (rfqInitialization: DataTypes.RFQInitializati
   );
   return ethers.keccak256(payload);
 };
-
-export const getFirstEscrow = async (router: any, escrowImpl: any): any => {
-  const escrows = await router.getEscrows(0, 1);
-  const escrowAddress = escrows[0];
-  const escrow: any = await escrowImpl.attach(escrowAddress);
-  return escrow;
-}
-
