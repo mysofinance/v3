@@ -8,6 +8,7 @@ import {
   MockOracle,
   DataTypes,
 } from "../typechain-types";
+import { setupTestContracts, setupAuction, rfqSignaturePayload } from "./testHelpers";
 
 describe("Router Contract Ext", function () {
   let router: Router;
@@ -23,87 +24,30 @@ describe("Router Contract Ext", function () {
   const CHAIN_ID = 31337;
 
   beforeEach(async function () {
-    [owner, user1, user2] = await ethers.getSigners();
-    provider = owner.provider;
-
-    // Deploy mock ERC20 token
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
-    settlementToken = await MockERC20.deploy(
-      "Settlement Token",
-      "Settlement Token",
-      6
-    );
-    underlyingToken = await MockERC20.deploy(
-      "Underlying Token",
-      "Underlying Token",
-      18
-    );
-
-    const MockERC20Votes = await ethers.getContractFactory("MockERC20Votes");
-    votingUnderlyingToken = await MockERC20Votes.deploy(
-      "Voting Underlying Token",
-      "Voting Underlying Token",
-      18
-    );
-
-    // Deploy Escrow implementation
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrowImpl = await Escrow.deploy();
-
-    // Deploy Router contract
-    const Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(owner.address, escrowImpl.target);
-
-    // Deploy mock oracle
-    const MockOracle = await ethers.getContractFactory("MockOracle");
-    mockOracle = await MockOracle.deploy();
-    await mockOracle.setPrice(
-      underlyingToken.target,
-      settlementToken.target,
-      ethers.parseUnits("1", 6)
-    );
-    await mockOracle.setPrice(
-      votingUnderlyingToken.target,
-      settlementToken.target,
-      ethers.parseUnits("1", 6)
-    );
-
-    // Mint some tokens for the users
-    await settlementToken.mint(owner.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user2.address, ethers.parseEther("1000"));
-
-    await underlyingToken.mint(owner.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user1.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user2.address, ethers.parseEther("1000"));
+    const contracts = await setupTestContracts();
+    ({
+      owner,
+      user1,
+      user2,
+      provider,
+      settlementToken,
+      underlyingToken,
+      votingUnderlyingToken,
+      escrowImpl,
+      router,
+      mockOracle,
+    } = contracts);
   });
 
   describe("Start Auction", function () {
     it("should allow starting an auction", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and start auction
       await underlyingToken
@@ -267,42 +211,7 @@ describe("Router Contract Ext", function () {
         },
       };
 
-      const abiCoder = new ethers.AbiCoder();
-      const payload = abiCoder.encode(
-        [
-          "uint256", // CHAIN_ID
-          // OptionInfo
-          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))",
-          // RFQQuote (only includes premium and validUntil)
-          "uint256",
-          "uint256",
-        ],
-        [
-          CHAIN_ID,
-          [
-            rfqInitialization.optionInfo.underlyingToken,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.settlementToken,
-            rfqInitialization.optionInfo.earliestExercise,
-            rfqInitialization.optionInfo.notional,
-            rfqInitialization.optionInfo.strike,
-            [
-              rfqInitialization.optionInfo.advancedSettings.borrowCap,
-              rfqInitialization.optionInfo.advancedSettings.oracle,
-              rfqInitialization.optionInfo.advancedSettings
-                .premiumTokenIsUnderlying,
-              rfqInitialization.optionInfo.advancedSettings
-                .votingDelegationAllowed,
-              rfqInitialization.optionInfo.advancedSettings
-                .allowedDelegateRegistry,
-            ],
-          ],
-          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
-          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
-        ]
-      );
-
-      const payloadHash = ethers.keccak256(payload);
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
@@ -347,41 +256,7 @@ describe("Router Contract Ext", function () {
         },
       };
 
-      const abiCoder = new ethers.AbiCoder();
-      const payload = abiCoder.encode(
-        [
-          "uint256", // CHAIN_ID
-          // OptionInfo
-          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(uint256,address,bool,bool,address))",
-          // RFQQuote (only includes premium and validUntil)
-          "uint256",
-          "uint256",
-        ],
-        [
-          CHAIN_ID,
-          [
-            rfqInitialization.optionInfo.underlyingToken,
-            rfqInitialization.optionInfo.settlementToken,
-            rfqInitialization.optionInfo.notional,
-            rfqInitialization.optionInfo.strike,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.earliestExercise,
-            [
-              rfqInitialization.optionInfo.advancedSettings.borrowCap,
-              rfqInitialization.optionInfo.advancedSettings.oracle,
-              rfqInitialization.optionInfo.advancedSettings
-                .premiumTokenIsUnderlying,
-              rfqInitialization.optionInfo.advancedSettings
-                .votingDelegationAllowed,
-              rfqInitialization.optionInfo.advancedSettings
-                .allowedDelegateRegistry,
-            ],
-          ],
-          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
-          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
-        ]
-      );
-      const payloadHash = ethers.keccak256(payload);
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
@@ -1217,6 +1092,57 @@ describe("Router Contract Ext", function () {
           .connect(user1)
           .repay(nonExistentEscrow, user1.address, ethers.parseEther("10"))
       ).to.be.reverted;
+    });
+
+    it("should revert with InvalidGetEscrowsQuery for invalid queries", async function () {
+      const auctionInitialization: DataTypes.AuctionInitialization = {
+        underlyingToken: underlyingToken.target,
+        settlementToken: settlementToken.target,
+        notional: ethers.parseEther("100"),
+        auctionParams: {
+          relStrike: ethers.parseEther("1"),
+          tenor: 86400 * 30,
+          earliestExerciseTenor: 86400 * 7,
+          relPremiumStart: ethers.parseEther("0.01"),
+          relPremiumFloor: ethers.parseEther("0.005"),
+          decayDuration: 86400 * 7,
+          minSpot: ethers.parseUnits("0.1", 6),
+          maxSpot: ethers.parseUnits("1", 6),
+          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+        },
+        advancedSettings: {
+          borrowCap: ethers.parseEther("1"),
+          oracle: mockOracle.target,
+          premiumTokenIsUnderlying: false,
+          votingDelegationAllowed: true,
+          allowedDelegateRegistry: ethers.ZeroAddress,
+        },
+        oracle: mockOracle.target,
+      };
+
+      // Create a few escrows
+      for (let i = 0; i < 3; i++) {
+        await underlyingToken
+          .connect(owner)
+          .approve(router.target, auctionInitialization.notional);
+        await router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization);
+      }
+
+      // Case 1: numElements is 0
+      await expect(
+        router.getEscrows(0, 0)
+      ).to.be.revertedWithCustomError(router, "InvalidGetEscrowsQuery");
+
+      // Case 2: from + numElements > length
+      await expect(
+        router.getEscrows(2, 2)
+      ).to.be.revertedWithCustomError(router, "InvalidGetEscrowsQuery");
+
+      // Verify that a valid query still works
+      const validEscrows = await router.getEscrows(0, 3);
+      expect(validEscrows.length).to.equal(3);
     });
   });
 });
