@@ -6,6 +6,7 @@ import {
   setupAuction,
   calculateExpectedAsk,
 } from "./testHelpers";
+import { DataTypes } from "./DataTypes";
 
 describe("Router Contract", function () {
   let router: Router;
@@ -172,14 +173,14 @@ describe("Router Contract", function () {
     it("should allow taking a quote", async function () {
       const rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
-            borrowCap: 0,
+            borrowCap: 0n,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
             premiumTokenIsUnderlying: false,

@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 import { ethers } from "hardhat";
-import { DataTypes } from "../typechain-types";
+import { DataTypes } from "./DataTypes";
 
 export const setupTestContracts = async () => {
   const [owner, user1, user2] = await ethers.getSigners();
@@ -155,7 +155,8 @@ export const setupAuction = async ({
   ).to.emit(router, "CreateAuction");
 
   // Attach the escrow instance
-  const escrows = await router.getEscrows(0, 1);
+  const numEscrows = await router.numEscrows();
+  const escrows = await router.getEscrows(numEscrows - 1n, 1);
   const escrowAddress = escrows[0];
   const escrowImpl = await ethers.getContractFactory("Escrow");
   const escrow: any = await escrowImpl.attach(escrowAddress);
@@ -178,14 +179,17 @@ export const calculateExpectedAsk = (
     expectedAsk =
       relPremiumStart -
       ((relPremiumStart - relPremiumFloor) * timePassed) /
-      BigInt(decayDuration);
+        BigInt(decayDuration);
   } else {
     expectedAsk = relPremiumFloor; // After decay ends
   }
   return expectedAsk;
 };
 
-export const rfqSignaturePayload = (rfqInitialization: DataTypes.RFQInitialization, chainId: number): string => {
+export const rfqSignaturePayload = (
+  rfqInitialization: DataTypes.RFQInitialization,
+  chainId: number
+): string => {
   const abiCoder = new ethers.AbiCoder();
   const payload = abiCoder.encode(
     [
@@ -208,7 +212,8 @@ export const rfqSignaturePayload = (rfqInitialization: DataTypes.RFQInitializati
         [
           rfqInitialization.optionInfo.advancedSettings.borrowCap,
           rfqInitialization.optionInfo.advancedSettings.oracle,
-          rfqInitialization.optionInfo.advancedSettings.premiumTokenIsUnderlying,
+          rfqInitialization.optionInfo.advancedSettings
+            .premiumTokenIsUnderlying,
           rfqInitialization.optionInfo.advancedSettings.votingDelegationAllowed,
           rfqInitialization.optionInfo.advancedSettings.allowedDelegateRegistry,
         ],
@@ -220,3 +225,48 @@ export const rfqSignaturePayload = (rfqInitialization: DataTypes.RFQInitializati
   return ethers.keccak256(payload);
 };
 
+export const getRFQInitialization = async ({
+  optionInfo = {},
+  rfqQuote = {},
+  oracle = ethers.ZeroAddress,
+  underlyingToken = ethers.ZeroAddress,
+  settlementToken = ethers.ZeroAddress,
+}: {
+  optionInfo?: Partial<DataTypes.OptionInfo>;
+  rfqQuote?: Partial<DataTypes.RFQQuote>;
+  oracle?: string;
+  underlyingToken?: string;
+  settlementToken?: string;
+} = {}) => {
+  const latestBlock = await ethers.provider.getBlock("latest");
+  if (!latestBlock) {
+    throw new Error("Failed to retrieve the latest block.");
+  }
+  const blockTimestamp = latestBlock.timestamp;
+  return {
+    optionInfo: {
+      underlyingToken,
+      settlementToken,
+      notional: ethers.parseEther("100"),
+      strike: ethers.parseEther("1"),
+      earliestExercise: 0,
+      expiry: blockTimestamp + 86400 * 30, // 30 days
+      advancedSettings: {
+        borrowCap: ethers.parseEther("1"),
+        oracle,
+        premiumTokenIsUnderlying: false,
+        votingDelegationAllowed: true,
+        allowedDelegateRegistry: ethers.ZeroAddress,
+        ...optionInfo.advancedSettings,
+      },
+      oracle,
+      ...optionInfo,
+    },
+    rfqQuote: {
+      premium: ethers.parseEther("10"),
+      validUntil: blockTimestamp + 86400, // 1 day
+      signature: ethers.ZeroHash, // Placeholder, will set later
+      ...rfqQuote,
+    },
+  };
+};

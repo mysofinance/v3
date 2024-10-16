@@ -41,7 +41,7 @@ contract FeeHandler is Ownable {
         setExerciseFee(_exerciseFee);
     }
 
-    function provisionFees(address token, uint256 amount) external {
+    function provisionFees(address token, uint256 amount) external virtual {
         if (msg.sender != router) {
             revert();
         }
@@ -53,7 +53,7 @@ contract FeeHandler is Ownable {
         address to,
         address token,
         uint256 amount
-    ) external onlyOwner {
+    ) external virtual onlyOwner {
         IERC20Metadata(token).safeTransfer(to, amount);
         emit Withdraw(to, token, amount);
     }
@@ -63,6 +63,7 @@ contract FeeHandler is Ownable {
     )
         external
         view
+        virtual
         returns (uint96 _matchFee, uint96 _matchFeeDistPartnerShare)
     {
         _matchFee = matchFee;
@@ -71,33 +72,10 @@ contract FeeHandler is Ownable {
             : 0;
     }
 
-    function setMatchFeeInfo(
-        uint96 _matchFee,
-        uint96 _distPartnerFeeShare
-    ) public onlyOwner {
-        if (_matchFee > MAX_MATCH_FEE) {
-            revert InvalidMatchFee();
-        }
-        if (_distPartnerFeeShare > BASE) {
-            revert InvalidPartnerFeeShare();
-        }
-        matchFee = _matchFee;
-        matchFeeDistPartnerShare = _distPartnerFeeShare;
-        emit SetMatchFeeInfo(_matchFee, _distPartnerFeeShare);
-    }
-
-    function setExerciseFee(uint96 _exerciseFee) public onlyOwner {
-        if (_exerciseFee > MAX_EXERCISE_FEE) {
-            revert InvalidExerciseFee();
-        }
-        exerciseFee = _exerciseFee;
-        emit SetExerciseFee(_exerciseFee);
-    }
-
     function setDistPartners(
         address[] calldata accounts,
         bool[] calldata _isDistPartner
-    ) public onlyOwner {
+    ) external virtual onlyOwner {
         if (accounts.length == 0 || accounts.length != _isDistPartner.length) {
             revert();
         }
@@ -109,5 +87,28 @@ contract FeeHandler is Ownable {
         }
 
         emit SetDistributionPartners(accounts, _isDistPartner);
+    }
+
+    function setMatchFeeInfo(
+        uint96 _matchFee,
+        uint96 _distPartnerFeeShare
+    ) public virtual onlyOwner {
+        if (_matchFee > MAX_MATCH_FEE) {
+            revert InvalidMatchFee();
+        }
+        if (_distPartnerFeeShare > BASE) {
+            revert InvalidPartnerFeeShare();
+        }
+        matchFee = _matchFee;
+        matchFeeDistPartnerShare = _distPartnerFeeShare;
+        emit SetMatchFeeInfo(_matchFee, _distPartnerFeeShare);
+    }
+
+    function setExerciseFee(uint96 _exerciseFee) public virtual onlyOwner {
+        if (_exerciseFee > MAX_EXERCISE_FEE) {
+            revert InvalidExerciseFee();
+        }
+        exerciseFee = _exerciseFee;
+        emit SetExerciseFee(_exerciseFee);
     }
 }
