@@ -8,7 +8,11 @@ import {
   MockOracle,
   DataTypes,
 } from "../typechain-types";
-import { setupTestContracts, setupAuction, rfqSignaturePayload, getFirstEscrow } from "./testHelpers";
+import {
+  setupTestContracts,
+  setupAuction,
+  rfqSignaturePayload,
+} from "./testHelpers";
 
 describe("Router And Escrow Interaction", function () {
   let router: Router;
@@ -953,151 +957,197 @@ describe("Router And Escrow Interaction", function () {
 
   describe("Escrow initializeAuction", function () {
     it("should revert with InvalidTokenPair", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(underlyingToken.target), // Same as underlying
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(underlyingToken.target), // Same as underlying
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidTokenPair");
     });
 
     it("should revert with InvalidNotional", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-        notionalAmount: 0n,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          notionalAmount: 0n,
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidNotional");
     });
 
     it("should revert with InvalidStrike", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-        relStrike: 0n,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          relStrike: 0n,
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidStrike");
     });
 
     it("should revert with InvalidTenor", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-        tenor: 0,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          tenor: 0,
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidTenor");
     });
 
     it("should revert with InvalidEarliestExerciseTenor", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-        tenor: 86400, // 1 day
-        earliestExerciseTenor: 86400, // 1 day (should be less than tenor - 1 day)
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          tenor: 86400, // 1 day
+          earliestExerciseTenor: 86400, // 1 day (should be less than tenor - 1 day)
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidEarliestExerciseTenor");
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(
+        escrowImpl,
+        "InvalidEarliestExerciseTenor"
+      );
     });
 
     it("should revert with InvalidRelPremiums", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-        relPremiumStart: 0n,
-        relPremiumFloor: 0n,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          relPremiumStart: 0n,
+          relPremiumFloor: 0n,
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
     });
 
     it("should revert with InvalidMinMaxSpot", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-        minSpot: 2n,
-        maxSpot: 1n,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          minSpot: 2n,
+          maxSpot: 1n,
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
     });
 
     it("should revert with InvalidOracle", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: ethers.ZeroAddress,
-        router,
-        owner,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: ethers.ZeroAddress,
+          router,
+          owner,
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidOracle");
     });
 
     it("should revert with InvalidBorrowCap", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-        borrowCap: ethers.parseEther("1.1"), // 110%, which is > BASE (100%)
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          borrowCap: ethers.parseEther("1.1"), // 110%, which is > BASE (100%)
+        },
+        false
+      );
 
       await expect(
-        router.connect(owner).createAuction(owner.address, auctionInitialization)
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidBorrowCap");
     });
 
     it("should revert when bidding with invalid parameters", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const { escrow, auctionInitialization } = await setupAuction({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
         router,
         owner,
       });
-
-      const escrow = getFirstEscrow(router, escrowImpl);
 
       // Attempt to bid with invalid parameters (e.g., zero relBid)
       await expect(
@@ -1238,14 +1288,16 @@ describe("Router And Escrow Interaction", function () {
       expect(numEscrows).to.equal(4);
 
       // Case 1: numElements is 0
-      await expect(
-        router.getEscrows(0, 0)
-      ).to.be.revertedWithCustomError(router, "InvalidGetEscrowsQuery");
+      await expect(router.getEscrows(0, 0)).to.be.revertedWithCustomError(
+        router,
+        "InvalidGetEscrowsQuery"
+      );
 
       // Case 2: from + numElements > length
-      await expect(
-        router.getEscrows(2, 3)
-      ).to.be.revertedWithCustomError(router, "InvalidGetEscrowsQuery");
+      await expect(router.getEscrows(2, 3)).to.be.revertedWithCustomError(
+        router,
+        "InvalidGetEscrowsQuery"
+      );
 
       // Verify that a valid query still works
       const validEscrows = await router.getEscrows(0, 3);
