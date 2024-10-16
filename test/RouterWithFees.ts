@@ -9,6 +9,8 @@ import {
   DataTypes,
 } from "../typechain-types";
 
+import { setupTestContracts, setupAuction, rfqSignaturePayload } from "./testHelpers";
+
 describe("Router Contract Fee Tests", function () {
   let router: Router;
   let escrowImpl: Escrow;
@@ -26,30 +28,18 @@ describe("Router Contract Fee Tests", function () {
   const MAX_EXERCISE_FEE = ethers.parseEther("0.005");
 
   beforeEach(async function () {
-    [owner, user1, user2] = await ethers.getSigners();
-    provider = owner.provider;
-
-    // Deploy mock ERC20 tokens
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
-    settlementToken = await MockERC20.deploy(
-      "Settlement Token",
-      "Settlement Token",
-      6
-    );
-    underlyingToken = await MockERC20.deploy(
-      "Underlying Token",
-      "Underlying Token",
-      18
-    );
-
-    // Deploy Escrow implementation
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrowImpl = await Escrow.deploy();
-
-    // Deploy Router contract
-    const Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(owner.address, escrowImpl.target);
-
+    const contracts = await setupTestContracts();
+    ({
+      owner,
+      user1,
+      user2,
+      provider,
+      settlementToken,
+      underlyingToken,
+      escrowImpl,
+      router,
+      mockOracle,
+    } = contracts);
     // Deploy FeeHandler
     const FeeHandler = await ethers.getContractFactory("FeeHandler");
     feeHandler = await FeeHandler.deploy(
@@ -62,23 +52,11 @@ describe("Router Contract Fee Tests", function () {
 
     await router.connect(owner).setFeeHandler(feeHandler.target);
 
-    // Deploy mock oracle
-    const MockOracle = await ethers.getContractFactory("MockOracle");
-    mockOracle = await MockOracle.deploy();
     await mockOracle.setPrice(
-      underlyingToken.target,
       settlementToken.target,
-      ethers.parseUnits("1", 6)
+      underlyingToken.target,
+      ethers.parseUnits("1", 18)
     );
-
-    // Mint some tokens for the users
-    await settlementToken.mint(owner.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user2.address, ethers.parseEther("1000"));
-
-    await underlyingToken.mint(owner.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user1.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user2.address, ethers.parseEther("1000"));
   });
 
   describe("Access Control", function () {
@@ -201,30 +179,15 @@ describe("Router Contract Fee Tests", function () {
 
   describe("Fees in Auction", function () {
     it("should apply correct fees when bidding on an auction", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and start auction
       await underlyingToken
@@ -290,6 +253,87 @@ describe("Router Contract Fee Tests", function () {
         initialFeeHandlerBalance + expectedMatchFee
       );
     });
+    it("should apply correct fees when borrowing", async function () {
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        borrowCap: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+
+      // Approve and start auction
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, auctionInitialization.notional);
+      await router
+        .connect(owner)
+        .createAuction(owner.address, auctionInitialization);
+
+      const escrows = await router.getEscrows(0, 1);
+      const escrowAddress = escrows[0];
+
+      // Approve and bid on auction
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+      const relBid = ethers.parseEther("0.02");
+      const refSpot = ethers.parseUnits("1", 6);
+      const data: any[] = [];
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrowAddress,
+          user1.address,
+          relBid,
+          refSpot,
+          data,
+          ethers.ZeroAddress
+        );
+
+      // Fast forward time to after earliest exercise tenor
+      await ethers.provider.send("evm_increaseTime", [86400 * 7]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Set borrow fee (same as exercise fee for this test)
+      await feeHandler.connect(owner).setExerciseFee(ethers.parseEther("0.001"));
+
+      // Approve settlement token for borrowing and fees
+      const borrowAmount = ethers.parseEther("10");
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+
+      // Get initial balances
+      const initialUser1Balance = await settlementToken.balanceOf(user1.address);
+      const initialFeeHandlerBalance = await settlementToken.balanceOf(
+        feeHandler.target
+      );
+
+      // Borrow
+      await router
+        .connect(user1)
+        .borrow(escrowAddress, user1.address, borrowAmount);
+
+      // Get final balances
+      const finalUser1Balance = await settlementToken.balanceOf(user1.address);
+      const finalFeeHandlerBalance = await settlementToken.balanceOf(
+        feeHandler.target
+      );
+
+      // Calculate expected fees
+      const expectedBorrowFee = (borrowAmount * refSpot * ethers.parseEther("0.001")) / (BASE * auctionInitialization.notional);
+
+      // Check balances
+      expect(finalUser1Balance).to.be.lt(initialUser1Balance);
+      expect(finalFeeHandlerBalance).to.equal(
+        initialFeeHandlerBalance + expectedBorrowFee
+      );
+    });
   });
 
   describe("Fees in RFQ", function () {
@@ -318,41 +362,7 @@ describe("Router Contract Fee Tests", function () {
         },
       };
 
-      const abiCoder = new ethers.AbiCoder();
-      const payload = abiCoder.encode(
-        [
-          "uint256", // CHAIN_ID
-          // OptionInfo
-          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))",
-          // RFQQuote (only includes premium and validUntil)
-          "uint256",
-          "uint256",
-        ],
-        [
-          CHAIN_ID,
-          [
-            rfqInitialization.optionInfo.underlyingToken,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.settlementToken,
-            rfqInitialization.optionInfo.earliestExercise,
-            rfqInitialization.optionInfo.notional,
-            rfqInitialization.optionInfo.strike,
-            [
-              rfqInitialization.optionInfo.advancedSettings.borrowCap,
-              rfqInitialization.optionInfo.advancedSettings.oracle,
-              rfqInitialization.optionInfo.advancedSettings
-                .premiumTokenIsUnderlying,
-              rfqInitialization.optionInfo.advancedSettings
-                .votingDelegationAllowed,
-              rfqInitialization.optionInfo.advancedSettings
-                .allowedDelegateRegistry,
-            ],
-          ],
-          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
-          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
-        ]
-      );
-      const payloadHash = ethers.keccak256(payload);
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
@@ -398,6 +408,185 @@ describe("Router Contract Fee Tests", function () {
         initialFeeHandlerBalance + expectedMatchFee
       );
     });
+
+    it("should apply correct fees when taking a quote with a distribution partner", async function () {
+      // Set up a distribution partner
+      await feeHandler.connect(owner).setDistPartners([user2.address], [true]);
+
+      let rfqInitialization: DataTypes.RFQInitialization = {
+        optionInfo: {
+          underlyingToken: underlyingToken.target,
+          settlementToken: settlementToken.target,
+          notional: ethers.parseEther("100"),
+          strike: ethers.parseEther("1"),
+          earliestExercise: 0,
+          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
+          advancedSettings: {
+            borrowCap: ethers.parseEther("1"),
+            oracle: mockOracle.target,
+            premiumTokenIsUnderlying: false,
+            votingDelegationAllowed: true,
+            allowedDelegateRegistry: ethers.ZeroAddress,
+          },
+          oracle: mockOracle.target,
+        },
+        rfqQuote: {
+          premium: ethers.parseUnits("2", 6), // 2% premium
+          validUntil: (await provider.getBlock("latest")).timestamp + 86400,
+          signature: ethers.ZeroHash,
+        },
+      };
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Approve tokens
+      await settlementToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+
+      // Get initial balances
+      const initialOwnerBalance = await settlementToken.balanceOf(owner.address);
+      const initialUser1Balance = await underlyingToken.balanceOf(user1.address);
+      const initialFeeHandlerBalance = await settlementToken.balanceOf(
+        feeHandler.target
+      );
+      const initialDistPartnerBalance = await settlementToken.balanceOf(
+        user2.address
+      );
+
+      // Take the quote
+      await router
+        .connect(user1)
+        .takeQuote(user1.address, rfqInitialization, user2.address);
+
+      // Get final balances
+      const finalOwnerBalance = await settlementToken.balanceOf(owner.address);
+      const finalUser1Balance = await underlyingToken.balanceOf(user1.address);
+      const finalFeeHandlerBalance = await settlementToken.balanceOf(
+        feeHandler.target
+      );
+      const finalDistPartnerBalance = await settlementToken.balanceOf(
+        user2.address
+      );
+
+      // Calculate expected fees
+      const refSpot = ethers.parseUnits("1", 6);
+      const expectedMatchFee =
+        (rfqInitialization.rfqQuote.premium *
+          ethers.parseEther("0.01")) /
+        (BASE);
+      const expectedDistPartnerFee = (expectedMatchFee * ethers.parseEther("0.05")) / BASE;
+      const expectedProtocolFee = expectedMatchFee - expectedDistPartnerFee;
+
+      // Check balances
+      expect(finalOwnerBalance).to.be.lt(initialOwnerBalance);
+      expect(finalUser1Balance).to.be.lt(initialUser1Balance);
+      expect(finalFeeHandlerBalance).to.equal(
+        initialFeeHandlerBalance + expectedProtocolFee
+      );
+      expect(finalDistPartnerBalance).to.equal(
+        initialDistPartnerBalance + expectedDistPartnerFee
+      );
+    });
+
+    it("should revert when attempting to reuse the same quote hash", async function () {
+      let rfqInitialization: DataTypes.RFQInitialization = {
+        optionInfo: {
+          underlyingToken: underlyingToken.target,
+          settlementToken: settlementToken.target,
+          notional: ethers.parseEther("100"),
+          strike: ethers.parseEther("1"),
+          earliestExercise: 0,
+          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
+          advancedSettings: {
+            borrowCap: ethers.parseEther("1"),
+            oracle: mockOracle.target,
+            premiumTokenIsUnderlying: false,
+            votingDelegationAllowed: true,
+            allowedDelegateRegistry: ethers.ZeroAddress,
+          },
+          oracle: mockOracle.target,
+        },
+        rfqQuote: {
+          premium: ethers.parseUnits("2", 6), // 2% premium
+          validUntil: (await provider.getBlock("latest")).timestamp + 86400,
+          signature: ethers.ZeroHash,
+        },
+      };
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Approve tokens
+      await settlementToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+
+      // Take the quote for the first time
+      await router
+        .connect(user1)
+        .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress);
+
+      // Attempt to take the same quote again
+      await expect(
+        router
+          .connect(user1)
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
+    });
+
+    it("should revert when the quoter has insufficient balance", async function () {
+      const [, , , poorQuoter] = await ethers.getSigners(); // New signer with no balance
+
+      let rfqInitialization: DataTypes.RFQInitialization = {
+        optionInfo: {
+          underlyingToken: underlyingToken.target,
+          settlementToken: settlementToken.target,
+          notional: ethers.parseEther("100"),
+          strike: ethers.parseEther("1"),
+          earliestExercise: 0,
+          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
+          advancedSettings: {
+            borrowCap: ethers.parseEther("1"),
+            oracle: mockOracle.target,
+            premiumTokenIsUnderlying: false,
+            votingDelegationAllowed: true,
+            allowedDelegateRegistry: ethers.ZeroAddress,
+          },
+          oracle: mockOracle.target,
+        },
+        rfqQuote: {
+          premium: ethers.parseUnits("2", 6), // 2% premium
+          validUntil: (await provider.getBlock("latest")).timestamp + 86400,
+          signature: ethers.ZeroHash,
+        },
+      };
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await poorQuoter.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Approve tokens for user1
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+
+      // Attempt to take the quote
+      await expect(
+        router
+          .connect(user1)
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
+    });
   });
 
   describe("Exercise Fees", function () {
@@ -405,30 +594,16 @@ describe("Router Contract Fee Tests", function () {
       await feeHandler
         .connect(owner)
         .setExerciseFee(ethers.parseEther("0.001"));
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        borrowCap: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and start auction
       await underlyingToken
@@ -523,6 +698,103 @@ describe("Router Contract Fee Tests", function () {
         initialFeeHandlerBalance + expectedExerciseFee
       );
     });
+    it("should apply correct fees when exercising with underlying token", async function () {
+      await feeHandler
+        .connect(owner)
+        .setExerciseFee(ethers.parseEther("0.001"));
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        borrowCap: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+
+      // Approve and start auction
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, auctionInitialization.notional);
+      await router
+        .connect(owner)
+        .createAuction(owner.address, auctionInitialization);
+
+      const escrows = await router.getEscrows(0, 1);
+      const escrowAddress = escrows[0];
+
+      // Approve and bid on auction
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+      const relBid = ethers.parseEther("0.02");
+      const refSpot = ethers.parseUnits("1", 6);
+      const data: any[] = [];
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrowAddress,
+          user1.address,
+          relBid,
+          refSpot,
+          data,
+          ethers.ZeroAddress
+        );
+
+      // Fast forward time to after earliest exercise tenor
+      await ethers.provider.send("evm_increaseTime", [86400 * 7]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Approve underlying token for exercise and fees
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+
+      // Get initial balances
+      const initialOwnerUnderlyingBalance = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const initialUser1Balance = await underlyingToken.balanceOf(user1.address);
+      const initialFeeHandlerBalance = await settlementToken.balanceOf(
+        feeHandler.target
+      );
+
+      // Exercise the call
+      await router.connect(user1).exercise(
+        escrowAddress,
+        user1.address,
+        ethers.parseEther("50"), // Exercising half the notional
+        false, // Pay in underlying token
+        []
+      );
+
+      // Get final balances
+      const finalOwnerUnderlyingBalance = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const finalUser1Balance = await underlyingToken.balanceOf(user1.address);
+      const finalFeeHandlerBalance = await settlementToken.balanceOf(
+        feeHandler.target
+      );
+
+      // Calculate expected fees
+      const oraclePrice = await mockOracle.getPrice(
+        underlyingToken.target,
+        settlementToken.target,
+        []
+      );
+      const exerciseAmount = ethers.parseEther("50");
+      const expectedExerciseFee = (exerciseAmount * ethers.parseEther("0.001") * oraclePrice) / (BASE * BASE);
+
+      // Check balances
+      expect(finalOwnerUnderlyingBalance).to.be.gt(initialOwnerUnderlyingBalance);
+      expect(finalUser1Balance).to.be.equal(initialUser1Balance);
+      expect(finalFeeHandlerBalance).to.be.equal(
+        initialFeeHandlerBalance + expectedExerciseFee
+      );
+    });
   });
 
   describe("Fee Limits", function () {
@@ -531,30 +803,15 @@ describe("Router Contract Fee Tests", function () {
       await feeHandler.connect(owner).setMatchFeeInfo(MAX_MATCH_FEE, BASE);
       await feeHandler.connect(owner).setExerciseFee(MAX_EXERCISE_FEE);
 
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Start auction
       await underlyingToken
@@ -653,30 +910,15 @@ describe("Router Contract Fee Tests", function () {
         .connect(owner)
         .setMatchFeeInfo(matchFee, distPartnerShare);
 
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30,
-          earliestExerciseTenor: 86400 * 7,
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7,
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Start auction
       await underlyingToken
@@ -739,6 +981,111 @@ describe("Router Contract Fee Tests", function () {
       );
     });
   });
+
+  describe("Fee Capping", function () {
+    it("should cap fees at maximum allowed values when using a high fee handler", async function () {
+      const HighFeeHandler = await ethers.getContractFactory("MockHighFeeHandler");
+      const highFeeHandler = await HighFeeHandler.deploy(
+        owner.address,
+        router.target,
+        ethers.parseEther("0.5"), // 50% match fee
+        ethers.parseEther("0.05"), // 5% distribution partner share
+        ethers.parseEther("0.5") // 50% exercise fee
+      );
+
+      // Set the high fee handler
+      await router.connect(owner).setFeeHandler(highFeeHandler.target);
+
+      // Check exercise fee
+      const exerciseFee = await router.getExerciseFee();
+      expect(exerciseFee).to.equal(ethers.parseEther("0.005")); // Max exercise fee is 0.5%
+
+      await highFeeHandler.setDistPartners([user1.address], [true]);
+
+      // Check match fees
+      const optionPremium = ethers.parseEther("100"); // Example premium
+      const [matchFeeProtocol, matchFeeDistPartner] = await router.getMatchFees(user1.address, optionPremium);
+
+      // Max match fee is 20%
+      const expectedMaxMatchFee = optionPremium * BigInt(20) / BigInt(100);
+      expect(matchFeeProtocol + matchFeeDistPartner).to.equal(expectedMaxMatchFee);
+
+      // Verify distribution partner share
+      const expectedDistPartnerFee = (expectedMaxMatchFee * BigInt(5)) / BigInt(100); // 5% of max match fee
+      expect(matchFeeDistPartner).to.equal(expectedDistPartnerFee);
+      expect(matchFeeProtocol).to.equal(expectedMaxMatchFee - expectedDistPartnerFee);
+
+      // set dist partner fee over Base 
+      await highFeeHandler.setMatchFeeInfo(ethers.parseEther("0.5"), ethers.parseEther("1.5"));
+      const [secondMatchFeeProtocol, secondMatchFeeDistPartner] = await router.getMatchFees(user1.address, optionPremium);
+      expect(secondMatchFeeDistPartner).to.equal(expectedMaxMatchFee);
+      expect(secondMatchFeeProtocol).to.equal(0n);
+    });
+  });
+
+  describe("Quote Pausing", function () {
+    it("should allow toggling pause on/off and revert when taking a quote while paused", async function () {
+      let rfqInitialization: DataTypes.RFQInitialization = {
+        optionInfo: {
+          underlyingToken: underlyingToken.target,
+          settlementToken: settlementToken.target,
+          notional: ethers.parseEther("100"),
+          strike: ethers.parseEther("1"),
+          earliestExercise: 0,
+          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
+          advancedSettings: {
+            borrowCap: ethers.parseEther("1"),
+            oracle: mockOracle.target,
+            premiumTokenIsUnderlying: false,
+            votingDelegationAllowed: true,
+            allowedDelegateRegistry: ethers.ZeroAddress,
+          },
+          oracle: mockOracle.target,
+        },
+        rfqQuote: {
+          premium: ethers.parseEther("2"), // 2% premium
+          validUntil: (await provider.getBlock("latest")).timestamp + 86400, // 1 day
+          signature: ethers.ZeroHash, // Placeholder, will set later
+        },
+      };
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Approve tokens
+      await settlementToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+
+      // Toggle pause on
+      await expect(router.connect(owner).togglePauseQuotes())
+        .to.emit(router, "PauseQuotes")
+        .withArgs(owner.address, true);
+
+      // Attempt to take quote while paused
+      await expect(
+        router
+          .connect(user1)
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
+
+      // Toggle pause off
+      await expect(router.connect(owner).togglePauseQuotes())
+        .to.emit(router, "PauseQuotes")
+        .withArgs(owner.address, false);
+
+      // Take quote should now succeed
+      await expect(
+        router
+          .connect(user1)
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+    });
+  })
 
   describe("Revert Scenarios", function () {
     it("Should revert setMatchFeeInfo when matchFee exceeds MAX_MATCH_FEE", async function () {

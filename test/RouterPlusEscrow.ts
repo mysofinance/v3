@@ -8,8 +8,13 @@ import {
   MockOracle,
   DataTypes,
 } from "../typechain-types";
+import {
+  setupTestContracts,
+  setupAuction,
+  rfqSignaturePayload,
+} from "./testHelpers";
 
-describe("Router Contract Ext", function () {
+describe("Router And Escrow Interaction", function () {
   let router: Router;
   let escrowImpl: Escrow;
   let settlementToken: MockERC20;
@@ -23,87 +28,30 @@ describe("Router Contract Ext", function () {
   const CHAIN_ID = 31337;
 
   beforeEach(async function () {
-    [owner, user1, user2] = await ethers.getSigners();
-    provider = owner.provider;
-
-    // Deploy mock ERC20 token
-    const MockERC20 = await ethers.getContractFactory("MockERC20");
-    settlementToken = await MockERC20.deploy(
-      "Settlement Token",
-      "Settlement Token",
-      6
-    );
-    underlyingToken = await MockERC20.deploy(
-      "Underlying Token",
-      "Underlying Token",
-      18
-    );
-
-    const MockERC20Votes = await ethers.getContractFactory("MockERC20Votes");
-    votingUnderlyingToken = await MockERC20Votes.deploy(
-      "Voting Underlying Token",
-      "Voting Underlying Token",
-      18
-    );
-
-    // Deploy Escrow implementation
-    const Escrow = await ethers.getContractFactory("Escrow");
-    escrowImpl = await Escrow.deploy();
-
-    // Deploy Router contract
-    const Router = await ethers.getContractFactory("Router");
-    router = await Router.deploy(owner.address, escrowImpl.target);
-
-    // Deploy mock oracle
-    const MockOracle = await ethers.getContractFactory("MockOracle");
-    mockOracle = await MockOracle.deploy();
-    await mockOracle.setPrice(
-      underlyingToken.target,
-      settlementToken.target,
-      ethers.parseUnits("1", 6)
-    );
-    await mockOracle.setPrice(
-      votingUnderlyingToken.target,
-      settlementToken.target,
-      ethers.parseUnits("1", 6)
-    );
-
-    // Mint some tokens for the users
-    await settlementToken.mint(owner.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-    await settlementToken.mint(user2.address, ethers.parseEther("1000"));
-
-    await underlyingToken.mint(owner.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user1.address, ethers.parseEther("1000"));
-    await underlyingToken.mint(user2.address, ethers.parseEther("1000"));
+    const contracts = await setupTestContracts();
+    ({
+      owner,
+      user1,
+      user2,
+      provider,
+      settlementToken,
+      underlyingToken,
+      votingUnderlyingToken,
+      escrowImpl,
+      router,
+      mockOracle,
+    } = contracts);
   });
 
   describe("Start Auction", function () {
     it("should allow starting an auction", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and start auction
       await underlyingToken
@@ -267,42 +215,7 @@ describe("Router Contract Ext", function () {
         },
       };
 
-      const abiCoder = new ethers.AbiCoder();
-      const payload = abiCoder.encode(
-        [
-          "uint256", // CHAIN_ID
-          // OptionInfo
-          "tuple(address,uint48,address,uint48,uint128,uint128,tuple(uint64,address,bool,bool,address))",
-          // RFQQuote (only includes premium and validUntil)
-          "uint256",
-          "uint256",
-        ],
-        [
-          CHAIN_ID,
-          [
-            rfqInitialization.optionInfo.underlyingToken,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.settlementToken,
-            rfqInitialization.optionInfo.earliestExercise,
-            rfqInitialization.optionInfo.notional,
-            rfqInitialization.optionInfo.strike,
-            [
-              rfqInitialization.optionInfo.advancedSettings.borrowCap,
-              rfqInitialization.optionInfo.advancedSettings.oracle,
-              rfqInitialization.optionInfo.advancedSettings
-                .premiumTokenIsUnderlying,
-              rfqInitialization.optionInfo.advancedSettings
-                .votingDelegationAllowed,
-              rfqInitialization.optionInfo.advancedSettings
-                .allowedDelegateRegistry,
-            ],
-          ],
-          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
-          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
-        ]
-      );
-
-      const payloadHash = ethers.keccak256(payload);
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
@@ -347,41 +260,7 @@ describe("Router Contract Ext", function () {
         },
       };
 
-      const abiCoder = new ethers.AbiCoder();
-      const payload = abiCoder.encode(
-        [
-          "uint256", // CHAIN_ID
-          // OptionInfo
-          "tuple(address,address,uint256,uint256,uint256,uint256,tuple(uint256,address,bool,bool,address))",
-          // RFQQuote (only includes premium and validUntil)
-          "uint256",
-          "uint256",
-        ],
-        [
-          CHAIN_ID,
-          [
-            rfqInitialization.optionInfo.underlyingToken,
-            rfqInitialization.optionInfo.settlementToken,
-            rfqInitialization.optionInfo.notional,
-            rfqInitialization.optionInfo.strike,
-            rfqInitialization.optionInfo.expiry,
-            rfqInitialization.optionInfo.earliestExercise,
-            [
-              rfqInitialization.optionInfo.advancedSettings.borrowCap,
-              rfqInitialization.optionInfo.advancedSettings.oracle,
-              rfqInitialization.optionInfo.advancedSettings
-                .premiumTokenIsUnderlying,
-              rfqInitialization.optionInfo.advancedSettings
-                .votingDelegationAllowed,
-              rfqInitialization.optionInfo.advancedSettings
-                .allowedDelegateRegistry,
-            ],
-          ],
-          rfqInitialization.rfqQuote.premium, // Include premium from rfqQuote
-          rfqInitialization.rfqQuote.validUntil, // Include validUntil from rfqQuote
-        ]
-      );
-      const payloadHash = ethers.keccak256(payload);
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
@@ -951,30 +830,16 @@ describe("Router Contract Ext", function () {
 
   describe("Delegation", function () {
     it("should allow on-chain voting delegation", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: votingUnderlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(votingUnderlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        votingDelegationAllowed: true,
+        router,
+        owner,
+      });
 
       // Approve and start auction
       await votingUnderlyingToken
@@ -1015,33 +880,18 @@ describe("Router Contract Ext", function () {
     });
 
     it("should revert if delegation is not allowed", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: false, // Disallow delegation
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(votingUnderlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and start auction
-      await underlyingToken
+      await votingUnderlyingToken
         .connect(owner)
         .approve(router.target, auctionInitialization.notional);
       await router
@@ -1105,32 +955,226 @@ describe("Router Contract Ext", function () {
     });
   });
 
+  describe("Escrow initializeAuction", function () {
+    it("should revert with InvalidTokenPair", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(underlyingToken.target), // Same as underlying
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidTokenPair");
+    });
+
+    it("should revert with InvalidNotional", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          notionalAmount: 0n,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidNotional");
+    });
+
+    it("should revert with InvalidStrike", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          relStrike: 0n,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidStrike");
+    });
+
+    it("should revert with InvalidTenor", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          tenor: 0,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidTenor");
+    });
+
+    it("should revert with InvalidEarliestExerciseTenor", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          tenor: 86400, // 1 day
+          earliestExerciseTenor: 86400, // 1 day (should be less than tenor - 1 day)
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(
+        escrowImpl,
+        "InvalidEarliestExerciseTenor"
+      );
+    });
+
+    it("should revert with InvalidRelPremiums", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          relPremiumStart: 0n,
+          relPremiumFloor: 0n,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
+    });
+
+    it("should revert with InvalidMinMaxSpot", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          minSpot: 2n,
+          maxSpot: 1n,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
+    });
+
+    it("should revert with InvalidOracle", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: ethers.ZeroAddress,
+          router,
+          owner,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidOracle");
+    });
+
+    it("should revert with InvalidBorrowCap", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          borrowCap: ethers.parseEther("1.1"), // 110%, which is > BASE (100%)
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidBorrowCap");
+    });
+
+    it("should revert when bidding with invalid parameters", async function () {
+      const { escrow, auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+
+      // Attempt to bid with invalid parameters (e.g., zero relBid)
+      await expect(
+        router.connect(user1).bidOnAuction(
+          escrow.target,
+          user1.address,
+          0, // Invalid relBid
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidBid");
+    });
+  });
+
   describe("Edge Cases and Reverts", function () {
-    it("should revert when creating escrow with same nonce", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
-        notional: ethers.parseEther("100") / 2n,
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
-      };
+    it("should push new escrow to array when creating second identical auction", async function () {
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        notionalAmount: ethers.parseEther("100") / 2n,
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
 
       // Approve and start first auction
       await underlyingToken
@@ -1218,5 +1262,57 @@ describe("Router Contract Ext", function () {
           .repay(nonExistentEscrow, user1.address, ethers.parseEther("10"))
       ).to.be.reverted;
     });
+
+    it("should revert with InvalidGetEscrowsQuery for invalid queries", async function () {
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+
+      // Create a few more escrows
+      for (let i = 0; i < 3; i++) {
+        await underlyingToken
+          .connect(owner)
+          .approve(router.target, auctionInitialization.notional);
+        await router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization);
+      }
+
+      const numEscrows = await router.numEscrows();
+      expect(numEscrows).to.equal(4);
+
+      // Case 1: numElements is 0
+      await expect(router.getEscrows(0, 0)).to.be.revertedWithCustomError(
+        router,
+        "InvalidGetEscrowsQuery"
+      );
+
+      // Case 2: from + numElements > length
+      await expect(router.getEscrows(2, 3)).to.be.revertedWithCustomError(
+        router,
+        "InvalidGetEscrowsQuery"
+      );
+
+      // Verify that a valid query still works
+      const validEscrows = await router.getEscrows(0, 3);
+      expect(validEscrows.length).to.equal(3);
+    });
   });
 });
+
+/*
+async function deployEscrow(auctionInitialization: DataTypes.AuctionInitialization) {
+      const tx = await router.connect(owner).createAuction(owner.address, auctionInitialization);
+      const receipt = await tx.wait();
+      const event = receipt?.logs.find(
+        (e: any) => e.fragment.name === "CreateAuction"
+      );
+      return Escrow.attach(event?.args.escrow);
+    }
+      */
