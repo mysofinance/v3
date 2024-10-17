@@ -125,7 +125,15 @@ describe("Router And Escrow Interaction", function () {
           )
       )
         .to.emit(router, "BidOnAuction")
-        .withArgs(escrowAddress, relBid, user1.address, refSpot, 0, 0);
+        .withArgs(
+          escrowAddress,
+          relBid,
+          user1.address,
+          refSpot,
+          0,
+          0,
+          ethers.ZeroAddress
+        );
     });
 
     it("should revert if bidding with insufficient premium", async function () {
