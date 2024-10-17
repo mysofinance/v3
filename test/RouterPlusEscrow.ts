@@ -953,6 +953,26 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Escrow initializeAuction", function () {
+    it("should revert when re-initializing", async function () {
+      const { escrow, auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+  
+      await expect(
+        escrow.initializeAuction(
+          router.target,
+          owner.address,
+          0,
+          auctionInitialization,
+          1
+        )
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidInitialization");
+    });
+
     it("should revert with InvalidTokenPair", async function () {
       const { auctionInitialization } = await setupAuction(
         {
@@ -1077,6 +1097,48 @@ describe("Router And Escrow Interaction", function () {
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
     });
 
+    it("should revert when floor premium is zero", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          relPremiumStart: 1n,
+          relPremiumFloor: 0n,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
+    });
+
+    it("should revert when floor premium > start premium", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          relPremiumStart: 1n,
+          relPremiumFloor: 2n,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
+    });
+
     it("should revert with InvalidMinMaxSpot", async function () {
       const { auctionInitialization } = await setupAuction(
         {
@@ -1087,6 +1149,27 @@ describe("Router And Escrow Interaction", function () {
           owner,
           minSpot: 2n,
           maxSpot: 1n,
+        },
+        false
+      );
+
+      await expect(
+        router
+          .connect(owner)
+          .createAuction(owner.address, auctionInitialization)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
+    });
+
+    it("should revert when max spot is 0", async function () {
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+          minSpot: 0n,
+          maxSpot: 0n,
         },
         false
       );
@@ -1156,7 +1239,7 @@ describe("Router And Escrow Interaction", function () {
           [],
           ethers.ZeroAddress
         )
-      ).to.be.revertedWithCustomError(escrow, "InvalidBid");
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidBid");
     });
   });
 
