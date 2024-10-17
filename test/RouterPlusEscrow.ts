@@ -1363,6 +1363,175 @@ describe("Router And Escrow Interaction", function () {
     });
   })
 
+  describe("Escrow handleAuctionBid and handleExercise", function () {
+    let escrow: any
+    let auctionInitialization: DataTypes.AuctionInitialization
+    beforeEach(async function(){
+      const { escrow : escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+      escrow = escrowSetup
+      auctionInitialization = auctionInitializationSetup
+    })  
+    describe("handleAuctionBid", function () {
+      it("should revert with InvalidSender if not called by router", async function () {
+        await expect(
+          escrow.connect(user1).handleAuctionBid(
+            ethers.parseEther("0.1"),
+            user1.address,
+            ethers.parseUnits("1", 6),
+            [],
+            ethers.ZeroAddress
+          )
+        ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+      });
+  
+      it("should revert with InvalidBid if bid preview is not successful", async function () {
+        // Assuming a very low bid will result in an unsuccessful preview
+        await expect(
+          router.connect(user1).bidOnAuction(
+            escrow.target,
+            user1.address,
+            ethers.parseEther("0.000001"), // Very low bid
+            ethers.parseUnits("1", 6),
+            [],
+            ethers.ZeroAddress
+          )
+        ).to.be.revertedWithCustomError(escrow, "InvalidBid");
+      });
+  
+      it("should successfully handle a valid bid", async function () {
+        await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+        await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+  
+        await expect(
+          router.connect(user1).bidOnAuction(
+            escrow.target,
+            user1.address,
+            ethers.parseEther("0.1"), // Valid bid
+            ethers.parseUnits("1", 6),
+            [],
+            ethers.ZeroAddress
+          )
+        ).to.emit(router, "BidOnAuction");
+  
+        expect(await escrow.optionMinted()).to.be.true;
+      });
+    });
+  
+    describe("handleExercise", function () {
+      beforeEach(async function () {
+        // Setup a successful bid first
+        await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+        await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+  
+        await router.connect(user1).bidOnAuction(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+      });
+  
+      it("should revert with InvalidSender if not called by router", async function () {
+        await expect(
+          escrow.connect(user1).handleExercise(
+            user1.address,
+            user1.address,
+            ethers.parseEther("1"),
+            true,
+            []
+          )
+        ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+      });
+  
+      it("should revert with InvalidExerciseTime if exercised too early", async function () {
+        await expect(
+          router.connect(user1).exercise(
+            escrow.target,
+            user1.address,
+            ethers.parseEther("1"),
+            true,
+            []
+          )
+        ).to.be.revertedWithCustomError(escrow, "InvalidExerciseTime");
+      });
+  
+      it("should revert with InvalidExerciseTime if exercised after expiry", async function () {
+        const optionInfo = await escrow.optionInfo();
+        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.expiry) + 1]);
+        await ethers.provider.send("evm_mine", []);
+  
+        await expect(
+          router.connect(user1).exercise(
+            escrow.target,
+            user1.address,
+            ethers.parseEther("1"),
+            true,
+            []
+          )
+        ).to.be.revertedWithCustomError(escrow, "InvalidExerciseTime");
+      });
+  
+      it("should revert with InvalidExerciseAmount if amount is zero", async function () {
+        const optionInfo = await escrow.optionInfo();
+        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+        await ethers.provider.send("evm_mine", []);
+  
+        await expect(
+          router.connect(user1).exercise(
+            escrow.target,
+            user1.address,
+            0,
+            true,
+            []
+          )
+        ).to.be.revertedWithCustomError(escrow, "InvalidExerciseAmount");
+      });
+  
+      it("should revert with InvalidExerciseAmount if amount exceeds notional", async function () {
+        const optionInfo = await escrow.optionInfo();
+        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+        await ethers.provider.send("evm_mine", []);
+  
+        await expect(
+          router.connect(user1).exercise(
+            escrow.target,
+            user1.address,
+            optionInfo.notional + 1n,
+            true,
+            []
+          )
+        ).to.be.revertedWithCustomError(escrow, "InvalidExerciseAmount");
+      });
+  
+      it("should successfully handle a valid exercise", async function () {
+        const optionInfo = await escrow.optionInfo();
+        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+        await ethers.provider.send("evm_mine", []);
+  
+        await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+        await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+  
+        await expect(
+          router.connect(user1).exercise(
+            escrow.target,
+            user1.address,
+            optionInfo.notional,
+            true,
+            []
+          )
+        ).to.emit(router, "Exercise");
+      });
+    });
+  });
+
   describe("Edge Cases and Reverts", function () {
     it("should push new escrow to array when creating second identical auction", async function () {
       const { auctionInitialization } = await setupAuction({
