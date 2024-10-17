@@ -346,3 +346,67 @@ export const setupAuction = async (
 
   return { escrow, auctionInitialization };
 };
+
+interface RFQInitializationParams {
+  underlyingTokenAddress: string;
+  settlementTokenAddress: string;
+  notionalAmount?: bigint;
+  strike?: bigint;
+  tenor?: number;
+  premium?: bigint;
+  validUntil?: number;
+  borrowCap?: bigint;
+  votingDelegationAllowed?: boolean;
+  allowedDelegateRegistry?: string;
+  premiumTokenIsUnderlying?: boolean;
+  oracleAddress?: string;
+}
+
+export const getRFQInitialization = async ({
+  underlyingTokenAddress,
+  settlementTokenAddress,
+  notionalAmount = ethers.parseEther("100"), // Default 100
+  strike = ethers.parseEther("1"), // Default 1
+  tenor = 86400 * 30, // Default 30 days
+  premium = ethers.parseEther("10"), // Default 10
+  validUntil, // Can be undefined, set below
+  borrowCap = 0n, // Default 0%
+  votingDelegationAllowed = true, // Default true
+  allowedDelegateRegistry = ethers.ZeroAddress, // Default zero address
+  premiumTokenIsUnderlying = false, // Default false
+  oracleAddress = ethers.ZeroAddress,
+}: RFQInitializationParams): Promise<DataTypes.RFQInitialization> => {
+  // Fetch the latest block to ensure we have the correct block timestamp
+  const latestBlock = await ethers.provider.getBlock("latest");
+  if (!latestBlock) {
+    throw new Error("Failed to retrieve the latest block.");
+  }
+
+  // Handle optional validUntil, defaulting to block timestamp + 1 day
+  validUntil = validUntil || latestBlock.timestamp + 86400;
+
+  // Return the RFQ initialization struct with defaults and custom values
+  const rfqInitialization: DataTypes.RFQInitialization = {
+    optionInfo: {
+      underlyingToken: underlyingTokenAddress,
+      settlementToken: settlementTokenAddress,
+      notional: notionalAmount,
+      strike,
+      earliestExercise: 0, // Default to 0 (no earliest exercise restriction)
+      expiry: latestBlock.timestamp + tenor, // Set based on tenor
+      advancedSettings: {
+        borrowCap,
+        oracle: oracleAddress,
+        premiumTokenIsUnderlying,
+        votingDelegationAllowed,
+        allowedDelegateRegistry,
+      },
+    },
+    rfqQuote: {
+      premium,
+      validUntil,
+      signature: ethers.hexlify(ethers.randomBytes(65)), // Mock signature
+    },
+  };
+  return rfqInitialization;
+};

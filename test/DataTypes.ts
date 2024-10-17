@@ -47,4 +47,64 @@ export namespace DataTypes {
     auctionParams: AuctionParams;
     advancedSettings: AdvancedSettings;
   }
+
+  export enum BidStatus {
+    Success = 0,
+    SpotPriceTooLow = 1,
+    OutOfRangeSpotPrice = 2,
+    AuctionAlreadySuccessful = 3,
+    PremiumTooLow = 4,
+    NotAnAuction = 5,
+    InsufficientFunding = 6,
+    InvalidProtocolFees = 7,
+  }
+
+  export interface BidPreview {
+    status: BidStatus;
+    settlementToken: string;
+    underlyingToken: string;
+    strike: bigint;
+    expiry: number;
+    earliestExercise: number;
+    premium: bigint;
+    premiumToken: string;
+    oracleSpotPrice: bigint;
+    currAsk: bigint;
+    matchFeeProtocol: bigint;
+    matchFeeDistPartner: bigint;
+  }
+
+  export enum RFQStatus {
+    Expired = 0,
+    AlreadyExecuted = 1,
+    InsufficientFunding = 2,
+    QuotesPaused = 3,
+    Success = 4,
+  }
+
+  export interface TakeQuotePreview {
+    status: RFQStatus;
+    msgHash: string;
+    quoter: string;
+    premium: bigint;
+    premiumToken: string;
+    matchFeeProtocol: bigint;
+    matchFeeDistPartner: bigint;
+  }
+
+  export interface SwapQuote {
+    takerToken: string;
+    takerAmount: bigint;
+    makerToken: string;
+    makerAmount: bigint;
+    swapRate: bigint;
+    validUntil: number;
+    signature: string;
+  }
+
+  export interface TakeSwapQuotePreview {
+    status: RFQStatus;
+    msgHash: string;
+    quoter: string;
+  }
 }
