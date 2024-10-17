@@ -353,6 +353,7 @@ interface RFQInitializationParams {
   notionalAmount?: bigint;
   strike?: bigint;
   tenor?: number;
+  earliestExerciseTenor?: number;
   premium?: bigint;
   validUntil?: number;
   borrowCap?: bigint;
@@ -368,6 +369,7 @@ export const getRFQInitialization = async ({
   notionalAmount = ethers.parseEther("100"), // Default 100
   strike = ethers.parseEther("1"), // Default 1
   tenor = 86400 * 30, // Default 30 days
+  earliestExerciseTenor = 0, // Default 0
   premium = ethers.parseEther("10"), // Default 10
   validUntil, // Can be undefined, set below
   borrowCap = 0n, // Default 0%
@@ -392,7 +394,7 @@ export const getRFQInitialization = async ({
       settlementToken: settlementTokenAddress,
       notional: notionalAmount,
       strike,
-      earliestExercise: 0, // Default to 0 (no earliest exercise restriction)
+      earliestExercise: latestBlock.timestamp + earliestExerciseTenor, // Set based on earliestExerciseTenor
       expiry: latestBlock.timestamp + tenor, // Set based on tenor
       advancedSettings: {
         borrowCap,
@@ -410,3 +412,28 @@ export const getRFQInitialization = async ({
   };
   return rfqInitialization;
 };
+
+export async function deployEscrowWithRFQ(rfqInitialization: DataTypes.RFQInitialization, router: any, owner: any, Escrow: any) {
+  const tx = await router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress);
+  const receipt = await tx.wait();
+  
+  const takeQuoteEvent = receipt?.logs.find(
+    (log : any) => {
+      try {
+        const decoded = router.interface.parseLog({ topics: log.topics as string[], data: log.data });
+        return decoded?.name === "TakeQuote";
+      } catch {
+        return false;
+      }
+    }
+  );
+
+  if (!takeQuoteEvent) {
+    throw new Error("TakeQuote event not found");
+  }
+
+  const decodedEvent = router.interface.parseLog({ topics: takeQuoteEvent.topics as string[], data: takeQuoteEvent.data });
+  const escrowAddress = decodedEvent?.args.escrow;
+
+  return Escrow.attach(escrowAddress);
+}

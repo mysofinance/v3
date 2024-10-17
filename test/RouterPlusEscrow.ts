@@ -12,7 +12,9 @@ import {
   setupTestContracts,
   setupAuction,
   rfqSignaturePayload,
-  getRFQInitialization
+  getRFQInitialization,
+  deployEscrowWithRFQ,
+  getAuctionInitialization
 } from "./testHelpers";
 
 describe("Router And Escrow Interaction", function () {
@@ -204,22 +206,22 @@ describe("Router And Escrow Interaction", function () {
       });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
-      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
       // Approve tokens
       await settlementToken
-        .connect(owner)
+        .connect(user1)
         .approve(router.target, ethers.parseEther("1000000"));
       await underlyingToken
-        .connect(user1)
+        .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
       // Take the quote
       await expect(
         router
-          .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.emit(router, "TakeQuote");
     });
 
@@ -231,22 +233,22 @@ describe("Router And Escrow Interaction", function () {
       });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
-      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
       // Approve tokens
       await settlementToken
-        .connect(owner)
+        .connect(user1)
         .approve(router.target, ethers.parseEther("1000000"));
       await underlyingToken
-        .connect(user1)
+        .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
       // Attempt to take the expired quote
       await expect(
         router
-          .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.reverted;
     });
   });
@@ -672,29 +674,13 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should allow withdrawing from expired auction and creating a new one", async function () {
-      const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: String(underlyingToken.target),
-        settlementToken: String(settlementToken.target),
-        notional: ethers.parseEther("100"),
-        auctionParams: {
-          relStrike: ethers.parseEther("1"),
-          tenor: 86400 * 30, // 30 days
-          earliestExerciseTenor: 86400 * 7, // 7 days
-          relPremiumStart: ethers.parseEther("0.01"),
-          relPremiumFloor: ethers.parseEther("0.005"),
-          decayDuration: 86400 * 7, // 7 days
-          minSpot: ethers.parseUnits("0.1", 6),
-          maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
-        },
-        advancedSettings: {
-          borrowCap: ethers.parseEther("1"),
-          oracle: String(mockOracle.target),
-          premiumTokenIsUnderlying: false,
-          votingDelegationAllowed: true,
-          allowedDelegateRegistry: ethers.ZeroAddress,
-        }
-      };
+      const { auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      }, false);
 
       // Approve and start first auction
       await underlyingToken
@@ -1168,6 +1154,214 @@ describe("Router And Escrow Interaction", function () {
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidBid");
     });
   });
+
+  describe("Escrow initializeRFQMatch", function () {
+    it("should revert when re-initializing", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6),
+      });
+  
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Approve tokens
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+  
+      const escrow = await deployEscrowWithRFQ(rfqInitialization, router, owner, escrowImpl);
+  
+      await expect(
+        escrow.initializeRFQMatch(
+          router.target,
+          owner.address,
+          user1.address,
+          0,
+          rfqInitialization,
+          1
+        )
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidInitialization");
+    });
+  
+    it("should revert with InvalidTokenPair", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(underlyingToken.target), // Same as underlying
+        premium: ethers.parseUnits("2", 6),
+      });
+  
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+  
+      await expect(
+        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidTokenPair");
+    });
+  
+    it("should revert with InvalidNotional", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6),
+        notionalAmount: 0n,
+      });
+  
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+  
+      await expect(
+        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidNotional");
+    });
+  
+    it("should revert with InvalidStrike", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6),
+        strike: 0n,
+      });
+  
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+  
+      await expect(
+        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidStrike");
+    });
+
+    it("should revert with InvalidEarliestExerciseTenor (expiry past)", async function () {
+      const shortTenor = 3600; // 1 hour
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6),
+        tenor: shortTenor,
+      });
+    
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+    
+      // Advance time beyond the expiry
+      await ethers.provider.send("evm_increaseTime", [shortTenor + 1]);
+      await ethers.provider.send("evm_mine", []);
+    
+      await expect(
+        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidEarliestExerciseTenor");
+    });
+  
+    it("should revert with InvalidEarliestExerciseTenor (earliest exercise too close to expiry)", async function () {
+      const currentTimestamp = Math.floor(Date.now() / 1000);
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6),
+        tenor: 86400, // 1 day in the future
+        earliestExerciseTenor: currentTimestamp + 86400 - 3600, // 1 hour before expiry
+      });
+  
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+  
+      await expect(
+        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidEarliestExerciseTenor");
+    });
+  
+    it("should revert with InvalidBorrowCap", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6),
+        borrowCap: ethers.parseEther("1.1"), // 110%, which is > BASE (100%)
+      });
+  
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+  
+      await expect(
+        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidBorrowCap");
+    });
+  
+    it("should successfully initialize RFQ match with valid parameters", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6),
+      });
+  
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+  
+      await expect(
+        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+    });
+  })
 
   describe("Edge Cases and Reverts", function () {
     it("should push new escrow to array when creating second identical auction", async function () {
