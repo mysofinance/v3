@@ -5,9 +5,9 @@ import {
   Escrow,
   MockERC20,
   MockERC20Votes,
-  MockOracle,
-  DataTypes,
+  MockOracle
 } from "../typechain-types";
+import { DataTypes } from "./DataTypes";
 import {
   setupTestContracts,
   setupAuction,
@@ -68,8 +68,8 @@ describe("Router And Escrow Interaction", function () {
   describe("Bid on Auction", function () {
     it("should allow bidding on an auction", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -84,12 +84,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -130,8 +129,8 @@ describe("Router And Escrow Interaction", function () {
 
     it("should revert if bidding with insufficient premium", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -146,12 +145,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -193,20 +191,19 @@ describe("Router And Escrow Interaction", function () {
     it("should allow taking a quote", async function () {
       let rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
             borrowCap: ethers.parseEther("1"),
-            oracle: mockOracle.target,
+            oracle: String(mockOracle.target),
             premiumTokenIsUnderlying: false,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-          },
-          oracle: mockOracle.target,
+          }
         },
         rfqQuote: {
           premium: ethers.parseEther("10"),
@@ -238,20 +235,19 @@ describe("Router And Escrow Interaction", function () {
     it("should revert if quote is expired", async function () {
       let rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
             borrowCap: ethers.parseEther("1"),
-            oracle: mockOracle.target,
+            oracle: String(mockOracle.target),
             premiumTokenIsUnderlying: false,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-          },
-          oracle: mockOracle.target,
+          }
         },
         rfqQuote: {
           premium: ethers.parseEther("10"),
@@ -284,8 +280,8 @@ describe("Router And Escrow Interaction", function () {
   describe("Withdraw", function () {
     it("should allow owner to withdraw after auction expiry", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -300,12 +296,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -339,8 +334,8 @@ describe("Router And Escrow Interaction", function () {
 
     it("should revert if non-owner tries to withdraw", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -355,12 +350,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -396,8 +390,8 @@ describe("Router And Escrow Interaction", function () {
   describe("Exercise Call", function () {
     it("should allow exercising a call option", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -412,12 +406,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -474,8 +467,8 @@ describe("Router And Escrow Interaction", function () {
 
     it("should revert if exercising before earliest exercise tenor", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -490,12 +483,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -549,8 +541,8 @@ describe("Router And Escrow Interaction", function () {
   describe("Borrow and Repay", function () {
     it("should allow borrowing and repaying", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -565,12 +557,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -640,8 +631,8 @@ describe("Router And Escrow Interaction", function () {
 
     it("should revert if borrowing is not allowed", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -656,12 +647,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: 0n, // Disallow borrowing
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start auction
@@ -709,8 +699,8 @@ describe("Router And Escrow Interaction", function () {
 
     it("should allow withdrawing from expired auction and creating a new one", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
-        underlyingToken: underlyingToken.target,
-        settlementToken: settlementToken.target,
+        underlyingToken: String(underlyingToken.target),
+        settlementToken: String(settlementToken.target),
         notional: ethers.parseEther("100"),
         auctionParams: {
           relStrike: ethers.parseEther("1"),
@@ -725,12 +715,11 @@ describe("Router And Escrow Interaction", function () {
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
-          oracle: mockOracle.target,
+          oracle: String(mockOracle.target),
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        },
-        oracle: mockOracle.target,
+        }
       };
 
       // Approve and start first auction

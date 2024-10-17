@@ -6,8 +6,8 @@ import {
   MockERC20,
   MockOracle,
   FeeHandler,
-  DataTypes,
 } from "../typechain-types";
+import { DataTypes } from "./DataTypes";
 
 import { setupTestContracts, setupAuction, rfqSignaturePayload } from "./testHelpers";
 
@@ -340,20 +340,19 @@ describe("Router Contract Fee Tests", function () {
     it("should apply correct fees when taking a quote", async function () {
       let rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
             borrowCap: ethers.parseEther("1"),
-            oracle: mockOracle.target,
+            oracle: String(mockOracle.target),
             premiumTokenIsUnderlying: false,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-          },
-          oracle: mockOracle.target,
+          }
         },
         rfqQuote: {
           premium: ethers.parseEther("2"), // 2% premium
@@ -415,20 +414,19 @@ describe("Router Contract Fee Tests", function () {
 
       let rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
             borrowCap: ethers.parseEther("1"),
-            oracle: mockOracle.target,
+            oracle: String(mockOracle.target),
             premiumTokenIsUnderlying: false,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-          },
-          oracle: mockOracle.target,
+          }
         },
         rfqQuote: {
           premium: ethers.parseUnits("2", 6), // 2% premium
@@ -497,20 +495,19 @@ describe("Router Contract Fee Tests", function () {
     it("should revert when attempting to reuse the same quote hash", async function () {
       let rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
             borrowCap: ethers.parseEther("1"),
-            oracle: mockOracle.target,
+            oracle: String(mockOracle.target),
             premiumTokenIsUnderlying: false,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-          },
-          oracle: mockOracle.target,
+          }
         },
         rfqQuote: {
           premium: ethers.parseUnits("2", 6), // 2% premium
@@ -549,20 +546,19 @@ describe("Router Contract Fee Tests", function () {
 
       let rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
             borrowCap: ethers.parseEther("1"),
-            oracle: mockOracle.target,
+            oracle: String(mockOracle.target),
             premiumTokenIsUnderlying: false,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-          },
-          oracle: mockOracle.target,
+          }
         },
         rfqQuote: {
           premium: ethers.parseUnits("2", 6), // 2% premium
@@ -1027,20 +1023,19 @@ describe("Router Contract Fee Tests", function () {
     it("should allow toggling pause on/off and revert when taking a quote while paused", async function () {
       let rfqInitialization: DataTypes.RFQInitialization = {
         optionInfo: {
-          underlyingToken: underlyingToken.target,
-          settlementToken: settlementToken.target,
+          underlyingToken: String(underlyingToken.target),
+          settlementToken: String(settlementToken.target),
           notional: ethers.parseEther("100"),
           strike: ethers.parseEther("1"),
           earliestExercise: 0,
           expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
           advancedSettings: {
             borrowCap: ethers.parseEther("1"),
-            oracle: mockOracle.target,
+            oracle: String(mockOracle.target),
             premiumTokenIsUnderlying: false,
             votingDelegationAllowed: true,
             allowedDelegateRegistry: ethers.ZeroAddress,
-          },
-          oracle: mockOracle.target,
+          }
         },
         rfqQuote: {
           premium: ethers.parseEther("2"), // 2% premium
