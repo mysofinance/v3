@@ -53,7 +53,8 @@ contract Router is Ownable {
         address optionReceiver,
         uint256 refSpot,
         uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner
+        uint256 matchFeeDistPartner,
+        address indexed distPartner
     );
     event Exercise(
         address indexed escrow,
@@ -77,7 +78,8 @@ contract Router is Ownable {
         address indexed escrow,
         DataTypes.RFQInitialization rfqInitialization,
         uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner
+        uint256 matchFeeDistPartner,
+        address indexed distPartner
     );
     event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
     event PauseQuotes(address indexed quoter, bool isPaused);
@@ -211,7 +213,8 @@ contract Router is Ownable {
             optionReceiver,
             _refSpot,
             preview.matchFeeProtocol,
-            preview.matchFeeDistPartner
+            preview.matchFeeDistPartner,
+            distPartner
         );
     }
 
@@ -388,7 +391,8 @@ contract Router is Ownable {
             escrow,
             rfqInitialization,
             preview.matchFeeProtocol,
-            preview.matchFeeDistPartner
+            preview.matchFeeDistPartner,
+            distPartner
         );
     }
 
