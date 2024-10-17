@@ -9,7 +9,12 @@ import {
 } from "../typechain-types";
 import { DataTypes } from "./DataTypes";
 
-import { setupTestContracts, setupAuction, rfqSignaturePayload } from "./testHelpers";
+import {
+  setupTestContracts,
+  setupAuction,
+  rfqSignaturePayload,
+  getRFQInitialization
+} from "./testHelpers";
 
 describe("Router Contract Fee Tests", function () {
   let router: Router;
@@ -338,28 +343,11 @@ describe("Router Contract Fee Tests", function () {
 
   describe("Fees in RFQ", function () {
     it("should apply correct fees when taking a quote", async function () {
-      let rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: ethers.parseEther("1"),
-            oracle: String(mockOracle.target),
-            premiumTokenIsUnderlying: false,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-          }
-        },
-        rfqQuote: {
-          premium: ethers.parseEther("2"), // 2% premium
-          validUntil: (await provider.getBlock("latest")).timestamp + 86400, // 1 day
-          signature: ethers.ZeroHash, // Placeholder, will set later
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6), // 2% premium
+      });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
@@ -412,28 +400,11 @@ describe("Router Contract Fee Tests", function () {
       // Set up a distribution partner
       await feeHandler.connect(owner).setDistPartners([user2.address], [true]);
 
-      let rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: ethers.parseEther("1"),
-            oracle: String(mockOracle.target),
-            premiumTokenIsUnderlying: false,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-          }
-        },
-        rfqQuote: {
-          premium: ethers.parseUnits("2", 6), // 2% premium
-          validUntil: (await provider.getBlock("latest")).timestamp + 86400,
-          signature: ethers.ZeroHash,
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6), // 2% premium
+      });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
@@ -493,28 +464,11 @@ describe("Router Contract Fee Tests", function () {
     });
 
     it("should revert when attempting to reuse the same quote hash", async function () {
-      let rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: ethers.parseEther("1"),
-            oracle: String(mockOracle.target),
-            premiumTokenIsUnderlying: false,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-          }
-        },
-        rfqQuote: {
-          premium: ethers.parseUnits("2", 6), // 2% premium
-          validUntil: (await provider.getBlock("latest")).timestamp + 86400,
-          signature: ethers.ZeroHash,
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6), // 2% premium
+      });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
@@ -544,28 +498,11 @@ describe("Router Contract Fee Tests", function () {
     it("should revert when the quoter has insufficient balance", async function () {
       const [, , , poorQuoter] = await ethers.getSigners(); // New signer with no balance
 
-      let rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: ethers.parseEther("1"),
-            oracle: String(mockOracle.target),
-            premiumTokenIsUnderlying: false,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-          }
-        },
-        rfqQuote: {
-          premium: ethers.parseUnits("2", 6), // 2% premium
-          validUntil: (await provider.getBlock("latest")).timestamp + 86400,
-          signature: ethers.ZeroHash,
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6), // 2% premium
+      });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await poorQuoter.signMessage(ethers.getBytes(payloadHash));
@@ -1021,28 +958,11 @@ describe("Router Contract Fee Tests", function () {
 
   describe("Quote Pausing", function () {
     it("should allow toggling pause on/off and revert when taking a quote while paused", async function () {
-      let rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: ethers.parseEther("1"),
-            oracle: String(mockOracle.target),
-            premiumTokenIsUnderlying: false,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-          }
-        },
-        rfqQuote: {
-          premium: ethers.parseEther("2"), // 2% premium
-          validUntil: (await provider.getBlock("latest")).timestamp + 86400, // 1 day
-          signature: ethers.ZeroHash, // Placeholder, will set later
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2", 6), // 2% premium
+      });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));

@@ -1,6 +1,6 @@
 const { expect } = require("chai");
 import { ethers } from "hardhat";
-import { DataTypes } from "../typechain-types";
+import { DataTypes } from "./DataTypes";
 import { MockERC20, Escrow } from "../typechain-types";
 
 export const setupTestContracts = async () => {

@@ -12,6 +12,7 @@ import {
   setupTestContracts,
   setupAuction,
   rfqSignaturePayload,
+  getRFQInitialization
 } from "./testHelpers";
 
 describe("Router And Escrow Interaction", function () {
@@ -197,28 +198,10 @@ describe("Router And Escrow Interaction", function () {
 
   describe("Take Quote", function () {
     it("should allow taking a quote", async function () {
-      let rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: ethers.parseEther("1"),
-            oracle: String(mockOracle.target),
-            premiumTokenIsUnderlying: false,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-          }
-        },
-        rfqQuote: {
-          premium: ethers.parseEther("10"),
-          validUntil: (await provider.getBlock("latest")).timestamp + 86400, // 1 day
-          signature: ethers.ZeroHash, // Placeholder, will set later
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+      });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
@@ -241,28 +224,11 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert if quote is expired", async function () {
-      let rfqInitialization: DataTypes.RFQInitialization = {
-        optionInfo: {
-          underlyingToken: String(underlyingToken.target),
-          settlementToken: String(settlementToken.target),
-          notional: ethers.parseEther("100"),
-          strike: ethers.parseEther("1"),
-          earliestExercise: 0,
-          expiry: (await provider.getBlock("latest")).timestamp + 86400 * 30, // 30 days
-          advancedSettings: {
-            borrowCap: ethers.parseEther("1"),
-            oracle: String(mockOracle.target),
-            premiumTokenIsUnderlying: false,
-            votingDelegationAllowed: true,
-            allowedDelegateRegistry: ethers.ZeroAddress,
-          }
-        },
-        rfqQuote: {
-          premium: ethers.parseEther("10"),
-          validUntil: (await provider.getBlock("latest")).timestamp - 10, // Already expired
-          signature: ethers.ZeroHash, // Placeholder, will set later
-        },
-      };
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        validUntil: (await provider.getBlock("latest")).timestamp - 1,
+      });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
@@ -1090,52 +1056,25 @@ describe("Router And Escrow Interaction", function () {
         false
       );
 
+      // rel premium start == 0
       await expect(
         router
           .connect(owner)
           .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
-    });
 
-    it("should revert when floor premium is zero", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          relPremiumStart: 1n,
-          relPremiumFloor: 0n,
-        },
-        false
-      );
-
+      // rel premium floor == 0
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(owner.address, {...auctionInitialization, auctionParams: {...auctionInitialization.auctionParams, relPremiumStart: 1n} })
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
-    });
-
-    it("should revert when floor premium > start premium", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          relPremiumStart: 1n,
-          relPremiumFloor: 2n,
-        },
-        false
-      );
-
+      
+      // rel premium floor > start premium
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(owner.address, {...auctionInitialization, auctionParams: {...auctionInitialization.auctionParams, relPremiumStart: 1n, relPremiumFloor:2n} })
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
     });
 
@@ -1153,31 +1092,18 @@ describe("Router And Escrow Interaction", function () {
         false
       );
 
+      // min spot > max spot
       await expect(
         router
           .connect(owner)
           .createAuction(owner.address, auctionInitialization)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
-    });
 
-    it("should revert when max spot is 0", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          minSpot: 0n,
-          maxSpot: 0n,
-        },
-        false
-      );
-
+      // max spot = 0
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(owner.address, {...auctionInitialization, auctionParams: {...auctionInitialization.auctionParams, maxSpot: 0n, minSpot: 0n} })
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
     });
 
