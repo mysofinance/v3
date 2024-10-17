@@ -350,22 +350,22 @@ describe("Router Contract Fee Tests", function () {
       });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
-      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
       // Approve tokens
       await settlementToken
-        .connect(owner)
+        .connect(user1)
         .approve(router.target, ethers.parseEther("1000000"));
       await underlyingToken
-        .connect(user1)
+        .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
       // Get initial balances
-      const initialOwnerBalance = await settlementToken.balanceOf(
+      const initialOwnerBalance = await underlyingToken.balanceOf(
         owner.address
       );
-      const initialUser1Balance = await underlyingToken.balanceOf(
+      const initialUser1Balance = await settlementToken.balanceOf(
         user1.address
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
@@ -374,12 +374,12 @@ describe("Router Contract Fee Tests", function () {
 
       // Take the quote
       await router
-        .connect(user1)
-        .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress);
+        .connect(owner)
+        .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress);
 
       // Get final balances
-      const finalOwnerBalance = await settlementToken.balanceOf(owner.address);
-      const finalUser1Balance = await underlyingToken.balanceOf(user1.address);
+      const finalOwnerBalance = await underlyingToken.balanceOf(owner.address);
+      const finalUser1Balance = await settlementToken.balanceOf(user1.address);
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
         feeHandler.target
       );
@@ -407,20 +407,20 @@ describe("Router Contract Fee Tests", function () {
       });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
-      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
       // Approve tokens
       await settlementToken
-        .connect(owner)
+        .connect(user1)
         .approve(router.target, ethers.parseEther("1000000"));
       await underlyingToken
-        .connect(user1)
+        .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
       // Get initial balances
-      const initialOwnerBalance = await settlementToken.balanceOf(owner.address);
-      const initialUser1Balance = await underlyingToken.balanceOf(user1.address);
+      const initialOwnerBalance = await underlyingToken.balanceOf(owner.address);
+      const initialUser1Balance = await settlementToken.balanceOf(user1.address);
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
         feeHandler.target
       );
@@ -430,12 +430,12 @@ describe("Router Contract Fee Tests", function () {
 
       // Take the quote
       await router
-        .connect(user1)
-        .takeQuote(user1.address, rfqInitialization, user2.address);
+        .connect(owner)
+        .takeQuote(owner.address, rfqInitialization, user2.address);
 
       // Get final balances
-      const finalOwnerBalance = await settlementToken.balanceOf(owner.address);
-      const finalUser1Balance = await underlyingToken.balanceOf(user1.address);
+      const finalOwnerBalance = await underlyingToken.balanceOf(owner.address);
+      const finalUser1Balance = await settlementToken.balanceOf(user1.address);
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
         feeHandler.target
       );
@@ -444,7 +444,6 @@ describe("Router Contract Fee Tests", function () {
       );
 
       // Calculate expected fees
-      const refSpot = ethers.parseUnits("1", 6);
       const expectedMatchFee =
         (rfqInitialization.rfqQuote.premium *
           ethers.parseEther("0.01")) /
@@ -471,27 +470,27 @@ describe("Router Contract Fee Tests", function () {
       });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
-      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
       // Approve tokens
       await settlementToken
-        .connect(owner)
+        .connect(user1)
         .approve(router.target, ethers.parseEther("1000000"));
       await underlyingToken
-        .connect(user1)
+        .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
       // Take the quote for the first time
       await router
-        .connect(user1)
-        .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress);
+        .connect(owner)
+        .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress);
 
       // Attempt to take the same quote again
       await expect(
         router
-          .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
@@ -510,14 +509,14 @@ describe("Router Contract Fee Tests", function () {
 
       // Approve tokens for user1
       await underlyingToken
-        .connect(user1)
+        .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
       // Attempt to take the quote
       await expect(
         router
-          .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
   });
@@ -965,39 +964,39 @@ describe("Router Contract Fee Tests", function () {
       });
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
-      const signature = await owner.signMessage(ethers.getBytes(payloadHash));
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
 
       // Approve tokens
       await settlementToken
-        .connect(owner)
+        .connect(user1)
         .approve(router.target, ethers.parseEther("1000000"));
       await underlyingToken
-        .connect(user1)
+        .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
-      // Toggle pause on
-      await expect(router.connect(owner).togglePauseQuotes())
+      // quoter pauses quotes
+      await expect(router.connect(user1).togglePauseQuotes())
         .to.emit(router, "PauseQuotes")
-        .withArgs(owner.address, true);
+        .withArgs(user1.address, true);
 
       // Attempt to take quote while paused
       await expect(
         router
-          .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
 
       // Toggle pause off
-      await expect(router.connect(owner).togglePauseQuotes())
+      await expect(router.connect(user1).togglePauseQuotes())
         .to.emit(router, "PauseQuotes")
-        .withArgs(owner.address, false);
+        .withArgs(user1.address, false);
 
       // Take quote should now succeed
       await expect(
         router
-          .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.emit(router, "TakeQuote");
     });
   })
