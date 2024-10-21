@@ -1421,6 +1421,18 @@ describe("Router And Escrow Interaction", function () {
   
         expect(await escrow.optionMinted()).to.be.true;
       });
+
+      it("should revert an execercise without successful bid", async function () {
+        await expect(
+          router.connect(user1).exercise(
+            escrow.target,
+            user1.address,
+            ethers.parseEther("1"),
+            true,
+            []
+          )
+        ).to.be.revertedWithCustomError(escrowImpl, "NoOptionMinted");
+      });
     });
   
     describe("handleExercise", function () {
@@ -1529,6 +1541,141 @@ describe("Router And Escrow Interaction", function () {
           )
         ).to.emit(router, "Exercise");
       });
+    });
+  });
+
+  describe("Escrow handleBorrow", function () {
+    let escrow: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+  
+    beforeEach(async function () {
+      const { escrow: escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+        borrowCap: ethers.parseEther("0.5"), // 50% borrow cap
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+  
+      // Setup a successful bid
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+  
+      await router.connect(user1).bidOnAuction(
+        escrow.target,
+        user1.address,
+        ethers.parseEther("0.1"),
+        ethers.parseUnits("1", 6),
+        [],
+        ethers.ZeroAddress
+      );
+    });
+  
+    it("should revert with InvalidSender if not called by router", async function () {
+      await expect(
+        escrow.connect(user1).handleBorrow(
+          user1.address,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+  
+    it("should revert with NoOptionMinted if option is not minted", async function () {
+      const { escrow: newEscrow } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+  
+      await expect(
+        router.connect(user1).borrow(
+          newEscrow.target,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(newEscrow, "NoOptionMinted");
+    });
+  
+    it("should revert with InvalidBorrowTime if borrowed too early", async function () {
+      await expect(
+        router.connect(user1).borrow(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidBorrowTime");
+    });
+  
+    it("should revert with InvalidBorrowTime if borrowed after expiry", async function () {
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.expiry) + 1]);
+      await ethers.provider.send("evm_mine", []);
+  
+      await expect(
+        router.connect(user1).borrow(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidBorrowTime");
+    });
+  
+    it("should revert with InvalidBorrowAmount if amount is zero", async function () {
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_mine", []);
+  
+      await expect(
+        router.connect(user1).borrow(
+          escrow.target,
+          user1.address,
+          0
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidBorrowAmount");
+    });
+  
+    it("should revert with InvalidBorrowAmount if amount exceeds borrow cap", async function () {
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_mine", []);
+  
+      const borrowCapExceeded = (optionInfo.notional * BigInt(auctionInitialization.advancedSettings.borrowCap)) / ethers.parseEther("1") + 1n;
+  
+      await expect(
+        router.connect(user1).borrow(
+          escrow.target,
+          user1.address,
+          borrowCapExceeded
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidBorrowAmount");
+    });
+  
+    it("should successfully handle a valid borrow", async function () {
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_mine", []);
+  
+      const validBorrowAmount = (optionInfo.notional * BigInt(auctionInitialization.advancedSettings.borrowCap)) / ethers.parseEther("1");
+  
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+  
+      await expect(
+        router.connect(user1).borrow(
+          escrow.target,
+          user1.address,
+          validBorrowAmount
+        )
+      ).to.emit(router, "Borrow");
+  
+      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+      expect(borrowedAmount).to.equal(validBorrowAmount);
     });
   });
 
