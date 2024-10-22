@@ -56,7 +56,6 @@ export namespace DataTypes {
     PremiumTooLow = 4,
     NotAnAuction = 5,
     InsufficientFunding = 6,
-    InvalidProtocolFees = 7,
   }
 
   export interface BidPreview {

@@ -5,7 +5,7 @@ import {
   Escrow,
   MockERC20,
   MockERC20Votes,
-  MockOracle
+  MockOracle,
 } from "../typechain-types";
 import { DataTypes } from "./DataTypes";
 import {
@@ -14,7 +14,7 @@ import {
   rfqSignaturePayload,
   getRFQInitialization,
   deployEscrowWithRFQ,
-  getAuctionInitialization
+  getAuctionInitialization,
 } from "./testHelpers";
 
 describe("Router And Escrow Interaction", function () {
@@ -91,7 +91,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -160,7 +160,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -276,7 +276,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -330,7 +330,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -386,7 +386,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -463,7 +463,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -537,7 +537,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -627,7 +627,7 @@ describe("Router And Escrow Interaction", function () {
           premiumTokenIsUnderlying: false,
           votingDelegationAllowed: true,
           allowedDelegateRegistry: ethers.ZeroAddress,
-        }
+        },
       };
 
       // Approve and start auction
@@ -674,13 +674,16 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should allow withdrawing from expired auction and creating a new one", async function () {
-      const { auctionInitialization } = await setupAuction({
-        underlyingTokenAddress: String(underlyingToken.target),
-        settlementTokenAddress: String(settlementToken.target),
-        oracleAddress: String(mockOracle.target),
-        router,
-        owner,
-      }, false);
+      const { auctionInitialization } = await setupAuction(
+        {
+          underlyingTokenAddress: String(underlyingToken.target),
+          settlementTokenAddress: String(settlementToken.target),
+          oracleAddress: String(mockOracle.target),
+          router,
+          owner,
+        },
+        false
+      );
 
       // Approve and start first auction
       await underlyingToken
@@ -913,7 +916,7 @@ describe("Router And Escrow Interaction", function () {
         router,
         owner,
       });
-  
+
       await expect(
         escrow.initializeAuction(
           router.target,
@@ -1051,16 +1054,25 @@ describe("Router And Escrow Interaction", function () {
 
       // rel premium floor == 0
       await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, {...auctionInitialization, auctionParams: {...auctionInitialization.auctionParams, relPremiumStart: 1n} })
+        router.connect(owner).createAuction(owner.address, {
+          ...auctionInitialization,
+          auctionParams: {
+            ...auctionInitialization.auctionParams,
+            relPremiumStart: 1n,
+          },
+        })
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
-      
+
       // rel premium floor > start premium
       await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, {...auctionInitialization, auctionParams: {...auctionInitialization.auctionParams, relPremiumStart: 1n, relPremiumFloor:2n} })
+        router.connect(owner).createAuction(owner.address, {
+          ...auctionInitialization,
+          auctionParams: {
+            ...auctionInitialization.auctionParams,
+            relPremiumStart: 1n,
+            relPremiumFloor: 2n,
+          },
+        })
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
     });
 
@@ -1087,9 +1099,14 @@ describe("Router And Escrow Interaction", function () {
 
       // max spot = 0
       await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, {...auctionInitialization, auctionParams: {...auctionInitialization.auctionParams, maxSpot: 0n, minSpot: 0n} })
+        router.connect(owner).createAuction(owner.address, {
+          ...auctionInitialization,
+          auctionParams: {
+            ...auctionInitialization.auctionParams,
+            maxSpot: 0n,
+            minSpot: 0n,
+          },
+        })
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
     });
 
@@ -1162,7 +1179,7 @@ describe("Router And Escrow Interaction", function () {
         settlementTokenAddress: String(settlementToken.target),
         premium: ethers.parseUnits("2", 6),
       });
-  
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1174,9 +1191,14 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-  
-      const escrow = await deployEscrowWithRFQ(rfqInitialization, router, owner, escrowImpl);
-  
+
+      const escrow = await deployEscrowWithRFQ(
+        rfqInitialization,
+        router,
+        owner,
+        escrowImpl
+      );
+
       await expect(
         escrow.initializeRFQMatch(
           router.target,
@@ -1188,14 +1210,14 @@ describe("Router And Escrow Interaction", function () {
         )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidInitialization");
     });
-  
+
     it("should revert with InvalidTokenPair", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(underlyingToken.target), // Same as underlying
         premium: ethers.parseUnits("2", 6),
       });
-  
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1206,12 +1228,14 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-  
+
       await expect(
-        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidTokenPair");
     });
-  
+
     it("should revert with InvalidNotional", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -1219,7 +1243,7 @@ describe("Router And Escrow Interaction", function () {
         premium: ethers.parseUnits("2", 6),
         notionalAmount: 0n,
       });
-  
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1230,12 +1254,14 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-  
+
       await expect(
-        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidNotional");
     });
-  
+
     it("should revert with InvalidStrike", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -1243,7 +1269,7 @@ describe("Router And Escrow Interaction", function () {
         premium: ethers.parseUnits("2", 6),
         strike: 0n,
       });
-  
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1254,9 +1280,11 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-  
+
       await expect(
-        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidStrike");
     });
 
@@ -1268,7 +1296,7 @@ describe("Router And Escrow Interaction", function () {
         premium: ethers.parseUnits("2", 6),
         tenor: shortTenor,
       });
-    
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1279,16 +1307,21 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-    
+
       // Advance time beyond the expiry
       await ethers.provider.send("evm_increaseTime", [shortTenor + 1]);
       await ethers.provider.send("evm_mine", []);
-    
+
       await expect(
-        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidEarliestExerciseTenor");
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(
+        escrowImpl,
+        "InvalidEarliestExerciseTenor"
+      );
     });
-  
+
     it("should revert with InvalidEarliestExerciseTenor (earliest exercise too close to expiry)", async function () {
       const currentTimestamp = Math.floor(Date.now() / 1000);
       const rfqInitialization = await getRFQInitialization({
@@ -1298,7 +1331,7 @@ describe("Router And Escrow Interaction", function () {
         tenor: 86400, // 1 day in the future
         earliestExerciseTenor: currentTimestamp + 86400 - 3600, // 1 hour before expiry
       });
-  
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1309,12 +1342,17 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-  
+
       await expect(
-        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidEarliestExerciseTenor");
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(
+        escrowImpl,
+        "InvalidEarliestExerciseTenor"
+      );
     });
-  
+
     it("should revert with InvalidBorrowCap", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -1322,7 +1360,7 @@ describe("Router And Escrow Interaction", function () {
         premium: ethers.parseUnits("2", 6),
         borrowCap: ethers.parseEther("1.1"), // 110%, which is > BASE (100%)
       });
-  
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1333,19 +1371,21 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-  
+
       await expect(
-        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidBorrowCap");
     });
-  
+
     it("should successfully initialize RFQ match with valid parameters", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         premium: ethers.parseUnits("2", 6),
       });
-  
+
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       rfqInitialization.rfqQuote.signature = signature;
@@ -1356,40 +1396,49 @@ describe("Router And Escrow Interaction", function () {
       await underlyingToken
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
-  
+
       await expect(
-        router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
       ).to.emit(router, "TakeQuote");
     });
-  })
+  });
 
   describe("Escrow handleAuctionBid and handleExercise", function () {
-    let escrow: any
-    let auctionInitialization: DataTypes.AuctionInitialization
-    beforeEach(async function(){
-      const { escrow : escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+    let escrow: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+
+    beforeEach(async function () {
+      const {
+        escrow: escrowSetup,
+        auctionInitialization: auctionInitializationSetup,
+      } = await setupAuction({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
         router,
         owner,
       });
-      escrow = escrowSetup
-      auctionInitialization = auctionInitializationSetup
-    })  
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+    });
+
     describe("handleAuctionBid", function () {
       it("should revert with InvalidSender if not called by router", async function () {
         await expect(
-          escrow.connect(user1).handleAuctionBid(
-            ethers.parseEther("0.1"),
-            user1.address,
-            ethers.parseUnits("1", 6),
-            [],
-            ethers.ZeroAddress
-          )
+          escrow
+            .connect(user1)
+            .handleAuctionBid(
+              ethers.parseEther("0.1"),
+              user1.address,
+              ethers.parseUnits("1", 6),
+              [],
+              ethers.ZeroAddress
+            )
         ).to.be.revertedWithCustomError(escrow, "InvalidSender");
       });
-  
+
       it("should revert with InvalidBid if bid preview is not successful", async function () {
         // Assuming a very low bid will result in an unsuccessful preview
         await expect(
@@ -1403,11 +1452,13 @@ describe("Router And Escrow Interaction", function () {
           )
         ).to.be.revertedWithCustomError(escrow, "InvalidBid");
       });
-  
+
       it("should successfully handle a valid bid", async function () {
         await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-        await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
-  
+        await settlementToken
+          .connect(user1)
+          .approve(router.target, ethers.parseEther("1000"));
+
         await expect(
           router.connect(user1).bidOnAuction(
             escrow.target,
@@ -1418,127 +1469,149 @@ describe("Router And Escrow Interaction", function () {
             ethers.ZeroAddress
           )
         ).to.emit(router, "BidOnAuction");
-  
+
         expect(await escrow.optionMinted()).to.be.true;
       });
 
       it("should revert an execercise without successful bid", async function () {
         await expect(
-          router.connect(user1).exercise(
-            escrow.target,
-            user1.address,
-            ethers.parseEther("1"),
-            true,
-            []
-          )
+          router
+            .connect(user1)
+            .exercise(
+              escrow.target,
+              user1.address,
+              ethers.parseEther("1"),
+              true,
+              []
+            )
         ).to.be.revertedWithCustomError(escrowImpl, "NoOptionMinted");
       });
     });
-  
+
     describe("handleExercise", function () {
       beforeEach(async function () {
         // Setup a successful bid first
         await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-        await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
-  
-        await router.connect(user1).bidOnAuction(
-          escrow.target,
-          user1.address,
-          ethers.parseEther("0.1"),
-          ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
-        );
+        await settlementToken
+          .connect(user1)
+          .approve(router.target, ethers.parseEther("1000"));
+
+        await router
+          .connect(user1)
+          .bidOnAuction(
+            escrow.target,
+            user1.address,
+            ethers.parseEther("0.1"),
+            ethers.parseUnits("1", 6),
+            [],
+            ethers.ZeroAddress
+          );
       });
-  
+
       it("should revert with InvalidSender if not called by router", async function () {
         await expect(
-          escrow.connect(user1).handleExercise(
-            user1.address,
-            user1.address,
-            ethers.parseEther("1"),
-            true,
-            []
-          )
+          escrow
+            .connect(user1)
+            .handleExercise(
+              user1.address,
+              user1.address,
+              ethers.parseEther("1"),
+              true,
+              []
+            )
         ).to.be.revertedWithCustomError(escrow, "InvalidSender");
       });
-  
+
       it("should revert with InvalidExerciseTime if exercised too early", async function () {
         await expect(
-          router.connect(user1).exercise(
-            escrow.target,
-            user1.address,
-            ethers.parseEther("1"),
-            true,
-            []
-          )
+          router
+            .connect(user1)
+            .exercise(
+              escrow.target,
+              user1.address,
+              ethers.parseEther("1"),
+              true,
+              []
+            )
         ).to.be.revertedWithCustomError(escrow, "InvalidExerciseTime");
       });
-  
+
       it("should revert with InvalidExerciseTime if exercised after expiry", async function () {
         const optionInfo = await escrow.optionInfo();
-        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.expiry) + 1]);
+        await ethers.provider.send("evm_setNextBlockTimestamp", [
+          Number(optionInfo.expiry) + 1,
+        ]);
         await ethers.provider.send("evm_mine", []);
-  
+
         await expect(
-          router.connect(user1).exercise(
-            escrow.target,
-            user1.address,
-            ethers.parseEther("1"),
-            true,
-            []
-          )
+          router
+            .connect(user1)
+            .exercise(
+              escrow.target,
+              user1.address,
+              ethers.parseEther("1"),
+              true,
+              []
+            )
         ).to.be.revertedWithCustomError(escrow, "InvalidExerciseTime");
       });
-  
+
       it("should revert with InvalidExerciseAmount if amount is zero", async function () {
         const optionInfo = await escrow.optionInfo();
-        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+        await ethers.provider.send("evm_setNextBlockTimestamp", [
+          Number(optionInfo.earliestExercise) + 1,
+        ]);
         await ethers.provider.send("evm_mine", []);
-  
+
         await expect(
-          router.connect(user1).exercise(
-            escrow.target,
-            user1.address,
-            0,
-            true,
-            []
-          )
+          router
+            .connect(user1)
+            .exercise(escrow.target, user1.address, 0, true, [])
         ).to.be.revertedWithCustomError(escrow, "InvalidExerciseAmount");
       });
-  
+
       it("should revert with InvalidExerciseAmount if amount exceeds notional", async function () {
         const optionInfo = await escrow.optionInfo();
-        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+        await ethers.provider.send("evm_setNextBlockTimestamp", [
+          Number(optionInfo.earliestExercise) + 1,
+        ]);
         await ethers.provider.send("evm_mine", []);
-  
+
         await expect(
-          router.connect(user1).exercise(
-            escrow.target,
-            user1.address,
-            optionInfo.notional + 1n,
-            true,
-            []
-          )
+          router
+            .connect(user1)
+            .exercise(
+              escrow.target,
+              user1.address,
+              optionInfo.notional + 1n,
+              true,
+              []
+            )
         ).to.be.revertedWithCustomError(escrow, "InvalidExerciseAmount");
       });
-  
+
       it("should successfully handle a valid exercise", async function () {
         const optionInfo = await escrow.optionInfo();
-        await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+        await ethers.provider.send("evm_setNextBlockTimestamp", [
+          Number(optionInfo.earliestExercise) + 1,
+        ]);
         await ethers.provider.send("evm_mine", []);
-  
+
         await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-        await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
-  
+        await settlementToken
+          .connect(user1)
+          .approve(router.target, ethers.parseEther("1000"));
+
         await expect(
-          router.connect(user1).exercise(
-            escrow.target,
-            user1.address,
-            optionInfo.notional,
-            true,
-            []
-          )
+          router
+            .connect(user1)
+            .exercise(
+              escrow.target,
+              user1.address,
+              optionInfo.notional,
+              true,
+              []
+            )
         ).to.emit(router, "Exercise");
       });
     });
@@ -1547,9 +1620,12 @@ describe("Router And Escrow Interaction", function () {
   describe("Escrow handleBorrow", function () {
     let escrow: any;
     let auctionInitialization: DataTypes.AuctionInitialization;
-  
+
     beforeEach(async function () {
-      const { escrow: escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+      const {
+        escrow: escrowSetup,
+        auctionInitialization: auctionInitializationSetup,
+      } = await setupAuction({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
@@ -1559,31 +1635,33 @@ describe("Router And Escrow Interaction", function () {
       });
       escrow = escrowSetup;
       auctionInitialization = auctionInitializationSetup;
-  
+
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
-  
-      await router.connect(user1).bidOnAuction(
-        escrow.target,
-        user1.address,
-        ethers.parseEther("0.1"),
-        ethers.parseUnits("1", 6),
-        [],
-        ethers.ZeroAddress
-      );
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
     });
-  
+
     it("should revert with InvalidSender if not called by router", async function () {
       await expect(
-        escrow.connect(user1).handleBorrow(
-          user1.address,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        escrow
+          .connect(user1)
+          .handleBorrow(user1.address, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(escrow, "InvalidSender");
     });
-  
+
     it("should revert with NoOptionMinted if option is not minted", async function () {
       const { escrow: newEscrow } = await setupAuction({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -1592,89 +1670,94 @@ describe("Router And Escrow Interaction", function () {
         router,
         owner,
       });
-  
+
       await expect(
-        router.connect(user1).borrow(
-          newEscrow.target,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        router
+          .connect(user1)
+          .borrow(newEscrow.target, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(newEscrow, "NoOptionMinted");
     });
-  
+
     it("should revert with InvalidBorrowTime if borrowed too early", async function () {
       await expect(
-        router.connect(user1).borrow(
-          escrow.target,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        router
+          .connect(user1)
+          .borrow(escrow.target, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(escrow, "InvalidBorrowTime");
     });
-  
+
     it("should revert with InvalidBorrowTime if borrowed after expiry", async function () {
       const optionInfo = await escrow.optionInfo();
-      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.expiry) + 1]);
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.expiry) + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
-  
+
       await expect(
-        router.connect(user1).borrow(
-          escrow.target,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        router
+          .connect(user1)
+          .borrow(escrow.target, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(escrow, "InvalidBorrowTime");
     });
-  
+
     it("should revert with InvalidBorrowAmount if amount is zero", async function () {
       const optionInfo = await escrow.optionInfo();
-      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.earliestExercise) + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
-  
+
       await expect(
-        router.connect(user1).borrow(
-          escrow.target,
-          user1.address,
-          0
-        )
+        router.connect(user1).borrow(escrow.target, user1.address, 0)
       ).to.be.revertedWithCustomError(escrow, "InvalidBorrowAmount");
     });
-  
+
     it("should revert with InvalidBorrowAmount if amount exceeds borrow cap", async function () {
       const optionInfo = await escrow.optionInfo();
-      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.earliestExercise) + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
-  
-      const borrowCapExceeded = (optionInfo.notional * BigInt(auctionInitialization.advancedSettings.borrowCap)) / ethers.parseEther("1") + 1n;
-  
+
+      const borrowCapExceeded =
+        (optionInfo.notional *
+          BigInt(auctionInitialization.advancedSettings.borrowCap)) /
+          ethers.parseEther("1") +
+        1n;
+
       await expect(
-        router.connect(user1).borrow(
-          escrow.target,
-          user1.address,
-          borrowCapExceeded
-        )
+        router
+          .connect(user1)
+          .borrow(escrow.target, user1.address, borrowCapExceeded)
       ).to.be.revertedWithCustomError(escrow, "InvalidBorrowAmount");
     });
-  
+
     it("should successfully handle a valid borrow", async function () {
       const optionInfo = await escrow.optionInfo();
-      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.earliestExercise) + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
-  
-      const validBorrowAmount = (optionInfo.notional * BigInt(auctionInitialization.advancedSettings.borrowCap)) / ethers.parseEther("1");
-  
+
+      const validBorrowAmount =
+        (optionInfo.notional *
+          BigInt(auctionInitialization.advancedSettings.borrowCap)) /
+        ethers.parseEther("1");
+
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
-  
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
       await expect(
-        router.connect(user1).borrow(
-          escrow.target,
-          user1.address,
-          validBorrowAmount
-        )
+        router
+          .connect(user1)
+          .borrow(escrow.target, user1.address, validBorrowAmount)
       ).to.emit(router, "Borrow");
-  
-      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+
+      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(
+        user1.address
+      );
       expect(borrowedAmount).to.equal(validBorrowAmount);
     });
   });
@@ -1682,9 +1765,12 @@ describe("Router And Escrow Interaction", function () {
   describe("Escrow handleRepay", function () {
     let escrow: any;
     let auctionInitialization: DataTypes.AuctionInitialization;
-  
+
     beforeEach(async function () {
-      const { escrow: escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+      const {
+        escrow: escrowSetup,
+        auctionInitialization: auctionInitializationSetup,
+      } = await setupAuction({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
@@ -1694,44 +1780,49 @@ describe("Router And Escrow Interaction", function () {
       });
       escrow = escrowSetup;
       auctionInitialization = auctionInitializationSetup;
-  
+
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
-  
-      await router.connect(user1).bidOnAuction(
-        escrow.target,
-        user1.address,
-        ethers.parseEther("0.1"),
-        ethers.parseUnits("1", 6),
-        [],
-        ethers.ZeroAddress
-      );
-  
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+
       // Setup a successful borrow
       const optionInfo = await escrow.optionInfo();
-      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.earliestExercise) + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
-  
-      const validBorrowAmount = (optionInfo.notional * BigInt(auctionInitialization.advancedSettings.borrowCap)) / ethers.parseEther("1");
-  
-      await router.connect(user1).borrow(
-        escrow.target,
-        user1.address,
-        validBorrowAmount
-      );
+
+      const validBorrowAmount =
+        (optionInfo.notional *
+          BigInt(auctionInitialization.advancedSettings.borrowCap)) /
+        ethers.parseEther("1");
+
+      await router
+        .connect(user1)
+        .borrow(escrow.target, user1.address, validBorrowAmount);
     });
-  
+
     it("should revert with InvalidSender if not called by router", async function () {
       await expect(
-        escrow.connect(user1).handleRepay(
-          user1.address,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        escrow
+          .connect(user1)
+          .handleRepay(user1.address, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(escrow, "InvalidSender");
     });
-  
+
     it("should revert with NoOptionMinted if option is not minted", async function () {
       const { escrow: newEscrow } = await setupAuction({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -1740,50 +1831,44 @@ describe("Router And Escrow Interaction", function () {
         router,
         owner,
       });
-  
+
       await expect(
-        router.connect(user1).repay(
-          newEscrow.target,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        router
+          .connect(user1)
+          .repay(newEscrow.target, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(newEscrow, "NoOptionMinted");
     });
-  
+
     it("should revert with InvalidRepayTime if repaid after expiry", async function () {
       const optionInfo = await escrow.optionInfo();
-      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.expiry) + 1]);
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.expiry) + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
-  
+
       await expect(
-        router.connect(user1).repay(
-          escrow.target,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        router
+          .connect(user1)
+          .repay(escrow.target, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(escrow, "InvalidRepayTime");
     });
-  
+
     it("should revert with InvalidRepayAmount if amount is zero", async function () {
       await expect(
-        router.connect(user1).repay(
-          escrow.target,
-          user1.address,
-          0
-        )
+        router.connect(user1).repay(escrow.target, user1.address, 0)
       ).to.be.revertedWithCustomError(escrow, "InvalidRepayAmount");
     });
-  
+
     it("should revert with InvalidRepayAmount if amount exceeds borrowed amount", async function () {
-      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(
+        user1.address
+      );
       const excessiveRepayAmount = borrowedAmount + 1n;
-  
+
       await expect(
-        router.connect(user1).repay(
-          escrow.target,
-          user1.address,
-          excessiveRepayAmount
-        )
+        router
+          .connect(user1)
+          .repay(escrow.target, user1.address, excessiveRepayAmount)
       ).to.be.revertedWithCustomError(escrow, "InvalidRepayAmount");
     });
 
@@ -1796,56 +1881,60 @@ describe("Router And Escrow Interaction", function () {
         owner,
         borrowCap: 0n, // Set borrow cap to 0
       });
-    
+
       // Mint tokens and approve
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
-    
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
       // Place a successful bid to mint the option
-      await router.connect(user1).bidOnAuction(
-        newEscrow.target,
-        user1.address,
-        auctionInitialization.auctionParams.relPremiumStart,
-        ethers.parseUnits("1", 6),
-        [],
-        ethers.ZeroAddress
-      );
-    
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          newEscrow.target,
+          user1.address,
+          auctionInitialization.auctionParams.relPremiumStart,
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+
       // Ensure the option is minted
       expect(await newEscrow.optionMinted()).to.be.true;
-    
+
       // Fast forward to earliest exercise time
       const optionInfo = await newEscrow.optionInfo();
 
-      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.earliestExercise) + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
-    
+
       // Attempt to repay
       await expect(
-        router.connect(user1).repay(
-          newEscrow.target,
-          user1.address,
-          ethers.parseEther("1")
-        )
+        router
+          .connect(user1)
+          .repay(newEscrow.target, user1.address, ethers.parseEther("1"))
       ).to.be.revertedWithCustomError(newEscrow, "NothingToRepay");
     });
-  
+
     it("should successfully handle a valid repay", async function () {
-      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(
+        user1.address
+      );
       const repayAmount = borrowedAmount / 2n;
-  
+
       await underlyingToken.mint(user1.address, repayAmount);
       await underlyingToken.connect(user1).approve(router.target, repayAmount);
-  
+
       await expect(
-        router.connect(user1).repay(
-          escrow.target,
-          user1.address,
-          repayAmount
-        )
+        router.connect(user1).repay(escrow.target, user1.address, repayAmount)
       ).to.emit(router, "Repay");
-  
-      const remainingBorrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+
+      const remainingBorrowedAmount = await escrow.borrowedUnderlyingAmounts(
+        user1.address
+      );
       expect(remainingBorrowedAmount).to.equal(borrowedAmount - repayAmount);
     });
   });
