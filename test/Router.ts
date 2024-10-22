@@ -305,25 +305,36 @@ describe("Router Contract", function () {
   });
 
   describe("Swap Option Token", function () {
-    it("should allow swapping of option token", async function () {
-      const auctionInitialization = await getAuctionInitialization({
+    let auctionInitialization: DataTypes.AuctionInitialization;
+    let escrow: any;
+    let swapQuote: DataTypes.SwapQuote;
+    let maker: any;
+    let optionReceiver: string;
+    let optionTokenAddr: string;
+    let optionTokenAmount: bigint;
+    let payAmount: bigint;
+
+    beforeEach(async function () {
+      // Initialize auction and escrow
+      auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
       });
-      const escrow = await createAuction(auctionInitialization, router, owner);
+
+      escrow = await createAuction(auctionInitialization, router, owner);
 
       // Approve and bid on auction
       let currentAsk = await escrow.currAsk();
       await settlementToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
+
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
       const data: any = [];
 
-      const preBal = await settlementToken.balanceOf(user1.address);
-      const optionReceiver = user1.address;
+      optionReceiver = user1.address;
       await expect(
         router
           .connect(user1)
@@ -337,34 +348,34 @@ describe("Router Contract", function () {
           )
       ).to.emit(router, "BidOnAuction");
 
+      const preBal = await settlementToken.balanceOf(user1.address);
       const postBal = await settlementToken.balanceOf(user1.address);
 
-      // Create quote to swap option token
-      const maker = user1;
-      const optionTokenAddr = String(escrow.target);
-      const optionTokenAmount = await escrow.totalSupply();
-      const payAmount = ((preBal - postBal) * BigInt(1100)) / BigInt(1000);
-      let latestBlock = await ethers.provider.getBlock("latest");
-      if (!latestBlock) {
-        throw new Error("Failed to retrieve the latest block.");
-      }
+      maker = user1;
+      optionTokenAddr = String(escrow.target);
+      optionTokenAmount = await escrow.totalSupply();
+      payAmount = ((preBal - postBal) * BigInt(1100)) / BigInt(1000);
 
       await escrow.connect(user1).approve(router.target, ethers.MaxUint256);
-      const swapQuote: DataTypes.SwapQuote = {
+
+      swapQuote = {
         takerGiveToken: String(settlementToken.target),
         takerGiveAmount: payAmount,
         makerGiveToken: optionTokenAddr,
         makerGiveAmount: optionTokenAmount,
-        validUntil: latestBlock.timestamp + 60 * 5,
+        validUntil: (await getLatestTimestamp()) + 60 * 5, // 5 minutes from now
         signature: "",
       };
 
       const payloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
       const signature = await maker.signMessage(ethers.getBytes(payloadHash));
       swapQuote.signature = signature;
+    });
 
-      // 1. Check expired quote cannot be taken
-      swapQuote.validUntil = 0; // Setting validUntil to an expired timestamp
+    it("should revert when attempting to take an expired quote", async function () {
+      // Set expired timestamp
+      swapQuote.validUntil = 0;
+
       const expiredPayloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
       const expiredSignature = await maker.signMessage(
         ethers.getBytes(expiredPayloadHash)
@@ -374,19 +385,9 @@ describe("Router Contract", function () {
       await expect(
         router.connect(user2).takeSwapQuote(user2.address, swapQuote)
       ).to.be.revertedWithCustomError(router, "SwapQuoteExpired");
+    });
 
-      // 2. Check quote cannot be taken when paused
-      latestBlock = await ethers.provider.getBlock("latest");
-      if (!latestBlock) {
-        throw new Error("Failed to retrieve the latest block.");
-      }
-      swapQuote.validUntil = latestBlock.timestamp + 60 * 5; // Reset validUntil for a valid quote
-      const validPayloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
-      const validSignature = await maker.signMessage(
-        ethers.getBytes(validPayloadHash)
-      );
-      swapQuote.signature = validSignature;
-
+    it("should revert when attempting to take a quote while the contract is paused", async function () {
       // Pausing quotes
       await router.connect(maker).togglePauseQuotes();
 
@@ -394,11 +395,13 @@ describe("Router Contract", function () {
         router.connect(user2).takeSwapQuote(user2.address, swapQuote)
       ).to.be.revertedWithCustomError(router, "SwapQuotePaused");
 
-      // Unpausing quotes
+      // Unpause for other tests
       await router.connect(maker).togglePauseQuotes();
+    });
 
-      // 3. Successful quote take
+    it("should allow a successful swap of the option token", async function () {
       const taker = user2;
+
       const preSettlementTokenBalMaker = await settlementToken.balanceOf(
         maker.address
       );
@@ -411,6 +414,7 @@ describe("Router Contract", function () {
       await settlementToken
         .connect(taker)
         .approve(router.target, ethers.MaxUint256);
+
       await expect(
         router.connect(taker).takeSwapQuote(taker.address, swapQuote)
       ).to.emit(router, "TakeSwapQuote");
@@ -424,7 +428,7 @@ describe("Router Contract", function () {
       );
       const postOptionTokenBalTaker = await escrow.balanceOf(taker.address);
 
-      // Check balances after successful swap
+      // Check balances after the swap
       expect(
         postSettlementTokenBalMaker - preSettlementTokenBalMaker
       ).to.be.equal(swapQuote.takerGiveAmount);
@@ -437,8 +441,21 @@ describe("Router Contract", function () {
       expect(postOptionTokenBalTaker - preOptionTokenBalTaker).to.be.equal(
         swapQuote.makerGiveAmount
       );
+    });
 
-      // 4. Check quote cannot be taken twice
+    it("should revert when attempting to take the same quote twice", async function () {
+      const taker = user2;
+
+      await settlementToken
+        .connect(taker)
+        .approve(router.target, ethers.MaxUint256);
+
+      // First successful take
+      await expect(
+        router.connect(taker).takeSwapQuote(taker.address, swapQuote)
+      ).to.emit(router, "TakeSwapQuote");
+
+      // Attempt to take the same quote again
       await expect(
         router.connect(taker).takeSwapQuote(taker.address, swapQuote)
       ).to.be.revertedWithCustomError(router, "SwapQuoteAlreadyUsed");
