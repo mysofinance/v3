@@ -55,7 +55,7 @@ library DataTypes {
         Success,
         SpotPriceTooLow,
         OutOfRangeSpotPrice,
-        AuctionAlreadySuccessful,
+        OptionAlreadyMinted,
         PremiumTooLow,
         NotAnAuction,
         InsufficientFunding

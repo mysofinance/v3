@@ -1473,7 +1473,7 @@ describe("Router And Escrow Interaction", function () {
         expect(await escrow.optionMinted()).to.be.true;
       });
 
-      it("should revert an execercise without successful bid", async function () {
+      it("should revert an exercise without successful bid", async function () {
         await expect(
           router
             .connect(user1)

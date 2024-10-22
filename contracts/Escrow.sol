@@ -419,9 +419,9 @@ contract Escrow is InitializableERC20 {
         address distPartner
     ) public view returns (DataTypes.BidPreview memory preview) {
         uint64 _currAsk = currAsk();
-        if (isAuction && optionMinted) {
+        if (optionMinted) {
             return
-                _createBidPreview(DataTypes.BidStatus.AuctionAlreadySuccessful);
+                _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted);
         }
         if (relBid < _currAsk) {
             return _createBidPreview(DataTypes.BidStatus.PremiumTooLow);
