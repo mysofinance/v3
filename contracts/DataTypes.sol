@@ -58,7 +58,6 @@ library DataTypes {
         AuctionAlreadySuccessful,
         PremiumTooLow,
         NotAnAuction,
-        InsufficientFunding,
         InvalidProtocolFees
     }
 
@@ -79,8 +78,8 @@ library DataTypes {
 
     enum RFQStatus {
         Expired,
+        InvalidQuote,
         AlreadyExecuted,
-        InsufficientFunding,
         QuotesPaused,
         Success
     }
@@ -96,11 +95,10 @@ library DataTypes {
     }
 
     struct SwapQuote {
-        address takerToken;
-        uint256 takerAmount;
-        address makerToken;
-        uint256 makerAmount;
-        uint256 swapRate;
+        address takerGiveToken;
+        uint256 takerGiveAmount;
+        address makerGiveToken;
+        uint256 makerGiveAmount;
         uint256 validUntil;
         bytes signature;
     }

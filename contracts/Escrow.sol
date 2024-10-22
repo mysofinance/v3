@@ -125,29 +125,6 @@ contract Escrow is InitializableERC20 {
         DataTypes.RFQInitialization calldata _rfqInitialization,
         uint256 oTokenIndex
     ) external initializer {
-        if (
-            _rfqInitialization.optionInfo.underlyingToken ==
-            _rfqInitialization.optionInfo.settlementToken
-        ) {
-            revert Errors.InvalidTokenPair();
-        }
-        if (_rfqInitialization.optionInfo.notional == 0) {
-            revert Errors.InvalidNotional();
-        }
-        if (_rfqInitialization.optionInfo.strike == 0) {
-            revert Errors.InvalidStrike();
-        }
-        if (
-            block.timestamp > _rfqInitialization.optionInfo.expiry ||
-            _rfqInitialization.optionInfo.expiry <
-            _rfqInitialization.optionInfo.earliestExercise + 1 days
-        ) {
-            revert Errors.InvalidEarliestExerciseTenor();
-        }
-        if (_rfqInitialization.optionInfo.advancedSettings.borrowCap > BASE) {
-            revert Errors.InvalidBorrowCap();
-        }
-
         optionInfo = _rfqInitialization.optionInfo;
         optionMinted = true;
         premiumPaid = _rfqInitialization.rfqQuote.premium;
@@ -158,6 +135,27 @@ contract Escrow is InitializableERC20 {
             _owner,
             _exerciseFee,
             _rfqInitialization.optionInfo.underlyingToken,
+            oTokenIndex
+        );
+    }
+
+    function initializeMintOption(
+        address _router,
+        address _owner,
+        address optionReceiver,
+        uint96 _exerciseFee,
+        DataTypes.OptionInfo calldata _optionInfo,
+        uint256 oTokenIndex
+    ) external initializer {
+        optionInfo = _optionInfo;
+        optionMinted = true;
+        _mint(optionReceiver, _optionInfo.notional);
+
+        _initialize(
+            _router,
+            _owner,
+            _exerciseFee,
+            optionInfo.underlyingToken,
             oTokenIndex
         );
     }
@@ -450,17 +448,10 @@ contract Escrow is InitializableERC20 {
             return _createBidPreview(DataTypes.BidStatus.OutOfRangeSpotPrice);
         }
 
-        uint256 notional = optionInfo.notional;
-        if (
-            IERC20Metadata(underlyingToken).balanceOf(address(this)) < notional
-        ) {
-            return _createBidPreview(DataTypes.BidStatus.InsufficientFunding);
-        }
-
         bool premiumTokenIsUnderlying = optionInfo
             .advancedSettings
             .premiumTokenIsUnderlying;
-
+        uint256 notional = optionInfo.notional;
         uint128 premium = SafeCast.toUint128(
             premiumTokenIsUnderlying
                 ? (_currAsk * notional) / BASE

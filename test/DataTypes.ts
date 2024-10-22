@@ -93,18 +93,11 @@ export namespace DataTypes {
   }
 
   export interface SwapQuote {
-    takerToken: string;
-    takerAmount: bigint;
-    makerToken: string;
-    makerAmount: bigint;
-    swapRate: bigint;
+    takerGiveToken: string;
+    takerGiveAmount: bigint;
+    makerGiveToken: string;
+    makerGiveAmount: bigint;
     validUntil: number;
     signature: string;
-  }
-
-  export interface TakeSwapQuotePreview {
-    status: RFQStatus;
-    msgHash: string;
-    quoter: string;
   }
 }
