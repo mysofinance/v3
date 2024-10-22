@@ -1679,6 +1679,177 @@ describe("Router And Escrow Interaction", function () {
     });
   });
 
+  describe("Escrow handleRepay", function () {
+    let escrow: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+  
+    beforeEach(async function () {
+      const { escrow: escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+        borrowCap: ethers.parseEther("0.5"), // 50% borrow cap
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+  
+      // Setup a successful bid
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+  
+      await router.connect(user1).bidOnAuction(
+        escrow.target,
+        user1.address,
+        ethers.parseEther("0.1"),
+        ethers.parseUnits("1", 6),
+        [],
+        ethers.ZeroAddress
+      );
+  
+      // Setup a successful borrow
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_mine", []);
+  
+      const validBorrowAmount = (optionInfo.notional * BigInt(auctionInitialization.advancedSettings.borrowCap)) / ethers.parseEther("1");
+  
+      await router.connect(user1).borrow(
+        escrow.target,
+        user1.address,
+        validBorrowAmount
+      );
+    });
+  
+    it("should revert with InvalidSender if not called by router", async function () {
+      await expect(
+        escrow.connect(user1).handleRepay(
+          user1.address,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+  
+    it("should revert with NoOptionMinted if option is not minted", async function () {
+      const { escrow: newEscrow } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+  
+      await expect(
+        router.connect(user1).repay(
+          newEscrow.target,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(newEscrow, "NoOptionMinted");
+    });
+  
+    it("should revert with InvalidRepayTime if repaid after expiry", async function () {
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.expiry) + 1]);
+      await ethers.provider.send("evm_mine", []);
+  
+      await expect(
+        router.connect(user1).repay(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidRepayTime");
+    });
+  
+    it("should revert with InvalidRepayAmount if amount is zero", async function () {
+      await expect(
+        router.connect(user1).repay(
+          escrow.target,
+          user1.address,
+          0
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidRepayAmount");
+    });
+  
+    it("should revert with InvalidRepayAmount if amount exceeds borrowed amount", async function () {
+      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+      const excessiveRepayAmount = borrowedAmount + 1n;
+  
+      await expect(
+        router.connect(user1).repay(
+          escrow.target,
+          user1.address,
+          excessiveRepayAmount
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidRepayAmount");
+    });
+
+    it("should revert with NothingToRepay if totalBorrowed is zero", async function () {
+      const { escrow: newEscrow, auctionInitialization } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+        borrowCap: 0n, // Set borrow cap to 0
+      });
+    
+      // Mint tokens and approve
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+    
+      // Place a successful bid to mint the option
+      await router.connect(user1).bidOnAuction(
+        newEscrow.target,
+        user1.address,
+        auctionInitialization.auctionParams.relPremiumStart,
+        ethers.parseUnits("1", 6),
+        [],
+        ethers.ZeroAddress
+      );
+    
+      // Ensure the option is minted
+      expect(await newEscrow.optionMinted()).to.be.true;
+    
+      // Fast forward to earliest exercise time
+      const optionInfo = await newEscrow.optionInfo();
+
+      await ethers.provider.send("evm_setNextBlockTimestamp", [Number(optionInfo.earliestExercise) + 1]);
+      await ethers.provider.send("evm_mine", []);
+    
+      // Attempt to repay
+      await expect(
+        router.connect(user1).repay(
+          newEscrow.target,
+          user1.address,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(newEscrow, "NothingToRepay");
+    });
+  
+    it("should successfully handle a valid repay", async function () {
+      const borrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+      const repayAmount = borrowedAmount / 2n;
+  
+      await underlyingToken.mint(user1.address, repayAmount);
+      await underlyingToken.connect(user1).approve(router.target, repayAmount);
+  
+      await expect(
+        router.connect(user1).repay(
+          escrow.target,
+          user1.address,
+          repayAmount
+        )
+      ).to.emit(router, "Repay");
+  
+      const remainingBorrowedAmount = await escrow.borrowedUnderlyingAmounts(user1.address);
+      expect(remainingBorrowedAmount).to.equal(borrowedAmount - repayAmount);
+    });
+  });
+
   describe("Edge Cases and Reverts", function () {
     it("should push new escrow to array when creating second identical auction", async function () {
       const { auctionInitialization } = await setupAuction({
