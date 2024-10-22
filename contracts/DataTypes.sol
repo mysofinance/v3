@@ -58,8 +58,7 @@ library DataTypes {
         AuctionAlreadySuccessful,
         PremiumTooLow,
         NotAnAuction,
-        InsufficientFunding,
-        InvalidProtocolFees
+        InsufficientFunding
     }
 
     struct BidPreview {

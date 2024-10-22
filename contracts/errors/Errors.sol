@@ -14,7 +14,6 @@ library Errors {
     error InvalidGetEscrowsQuery();
     error InvalidNotional();
     error InvalidOracle();
-    error InvalidProtocolFees();
     error InvalidRelPremiums();
     error InvalidRepayAmount();
     error InvalidRepayTime();
