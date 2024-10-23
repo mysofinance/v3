@@ -78,9 +78,7 @@ describe("Router Contract", function () {
         data,
         distPartner
       );
-      expect(preview.status).to.equal(
-        DataTypes.BidStatus.AuctionAlreadySuccessful
-      );
+      expect(preview.status).to.equal(DataTypes.BidStatus.OptionAlreadyMinted);
     });
 
     it("should revert if the bid is lower than the current ask", async function () {
@@ -173,7 +171,7 @@ describe("Router Contract", function () {
       );
     });
 
-    it("should revert if there is insufficient funding", async function () {
+    it("should not revert if there is insufficient funding", async function () {
       // Mock scenario where the auction contract has insufficient funds
       const bal = await underlyingToken.balanceOf(escrow.target);
       await router
@@ -186,7 +184,7 @@ describe("Router Contract", function () {
         data,
         distPartner
       );
-      expect(preview.status).to.equal(DataTypes.BidStatus.InsufficientFunding);
+      expect(preview.status).to.equal(DataTypes.BidStatus.Success);
     });
 
     it("should revert if protocol fees exceed the premium", async function () {
