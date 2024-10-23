@@ -101,10 +101,4 @@ library DataTypes {
         uint256 validUntil;
         bytes signature;
     }
-
-    struct TakeSwapQuotePreview {
-        RFQStatus status;
-        bytes32 msgHash;
-        address quoter;
-    }
 }
