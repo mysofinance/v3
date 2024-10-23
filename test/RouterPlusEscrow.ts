@@ -1933,6 +1933,112 @@ describe("Router And Escrow Interaction", function () {
     });
   });
 
+  describe("Escrow handleWithdraw", function () {
+    let escrow: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+  
+    beforeEach(async function () {
+      const { escrow: escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+    });
+  
+    it("should revert with InvalidSender if not called by router or owner", async function () {
+      await expect(
+        escrow.connect(user1).handleWithdraw(
+          user1.address,
+          underlyingToken.target,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+  
+    it("should revert with InvalidWithdraw if open position with minted option", async function () {
+      // First place a successful bid
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken.connect(user1).approve(router.target, ethers.parseEther("1000"));
+  
+      await router.connect(user1).bidOnAuction(
+        escrow.target,
+        user1.address,
+        ethers.parseEther("0.1"),
+        ethers.parseUnits("1", 6),
+        [],
+        ethers.ZeroAddress
+      );
+  
+      // Verify option is minted
+      expect(await escrow.optionMinted()).to.be.true;
+  
+      // Try to withdraw during active period
+      await expect(
+        router.connect(owner).withdraw(
+          escrow.target,
+          owner.address,
+          underlyingToken.target,
+          ethers.parseEther("1")
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidWithdraw");
+    });
+  });
+
+  describe("Escrow transferOwnership", function () {
+    let escrow: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+  
+    beforeEach(async function () {
+      const { escrow: escrowSetup, auctionInitialization: auctionInitializationSetup } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+    });
+  
+    it("should revert with InvalidSender if not called by owner", async function () {
+      await expect(
+        escrow.connect(user1).transferOwnership(user2.address)
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+  
+    it("should revert with OwnerAlreadySet if new owner is same as current owner", async function () {
+      const currentOwner = await escrow.owner();
+      await expect(
+        escrow.connect(owner).transferOwnership(currentOwner)
+      ).to.be.revertedWithCustomError(escrow, "OwnerAlreadySet");
+    });
+  
+    it("should successfully transfer ownership and emit correct event", async function () {
+      const oldOwner = await escrow.owner();
+  
+      await expect(escrow.connect(owner).transferOwnership(user1.address))
+        .to.emit(escrow, "TransferOwnership")
+        .withArgs(oldOwner, oldOwner, user1.address);
+  
+      // Verify ownership was transferred
+      expect(await escrow.owner()).to.equal(user1.address);
+  
+      // Verify old owner can no longer transfer ownership
+      await expect(
+        escrow.connect(owner).transferOwnership(user2.address)
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+  
+      // Verify new owner can transfer ownership
+      await expect(escrow.connect(user1).transferOwnership(user2.address))
+        .to.emit(escrow, "TransferOwnership")
+        .withArgs(user1.address, user1.address, user2.address);
+    });
+  });
+
   describe("Edge Cases and Reverts", function () {
     it("should push new escrow to array when creating second identical auction", async function () {
       const { auctionInitialization } = await setupAuction({

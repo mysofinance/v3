@@ -566,6 +566,10 @@ describe("Router Contract", function () {
       const EscrowImpl = await ethers.getContractFactory("Escrow");
       const escrow = EscrowImpl.attach(escrowAddrs[0]) as Escrow;
       const escrowOptionInfo = await escrow.optionInfo();
+      expect(
+        escrow
+          .initializeMintOption(router.target, escrowOwner, optionReceiver, 0n, optionInfo, 0n)
+      ).to.revertedWithCustomError(escrowImpl, "InvalidInitialization");
       expect(escrowOptionInfo.underlyingToken).to.be.equal(
         optionInfo.underlyingToken
       );
