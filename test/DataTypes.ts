@@ -54,7 +54,6 @@ export namespace DataTypes {
     OutOfRangeSpotPrice = 2,
     OptionAlreadyMinted = 3,
     PremiumTooLow = 4,
-    InvalidProtocolFees = 5,
   }
 
   export interface BidPreview {

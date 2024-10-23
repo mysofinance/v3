@@ -13,7 +13,7 @@ import {
   setupTestContracts,
   setupAuction,
   rfqSignaturePayload,
-  getRFQInitialization
+  getRFQInitialization,
 } from "./testHelpers";
 
 describe("Router Contract Fee Tests", function () {
@@ -425,10 +425,10 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, ethers.parseEther("100"));
 
       // Get initial balances
-      const initialOwnerBalance = await settlementToken.balanceOf(
+      const initialOwnerBalance = await underlyingToken.balanceOf(
         owner.address
       );
-      const initialUser1Balance = await underlyingToken.balanceOf(
+      const initialUser1Balance = await settlementToken.balanceOf(
         user1.address
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(

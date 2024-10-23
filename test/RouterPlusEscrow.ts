@@ -1402,6 +1402,7 @@ describe("Router And Escrow Interaction", function () {
   describe("Escrow handleAuctionBid and handleExercise", function () {
     let escrow: any;
     let auctionInitialization: DataTypes.AuctionInitialization;
+
     beforeEach(async function () {
       const {
         escrow: escrowSetup,
@@ -1416,6 +1417,7 @@ describe("Router And Escrow Interaction", function () {
       escrow = escrowSetup;
       auctionInitialization = auctionInitializationSetup;
     });
+
     describe("handleAuctionBid", function () {
       it("should revert with InvalidSender if not called by router", async function () {
         await expect(
@@ -2073,14 +2075,3 @@ describe("Router And Escrow Interaction", function () {
     });
   });
 });
-
-/*
-async function deployEscrow(auctionInitialization: DataTypes.AuctionInitialization) {
-      const tx = await router.connect(owner).createAuction(owner.address, auctionInitialization);
-      const receipt = await tx.wait();
-      const event = receipt?.logs.find(
-        (e: any) => e.fragment.name === "CreateAuction"
-      );
-      return Escrow.attach(event?.args.escrow);
-    }
-      */

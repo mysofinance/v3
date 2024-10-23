@@ -467,10 +467,6 @@ contract Escrow is InitializableERC20 {
         (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = Router(router)
             .getMatchFees(distPartner, premium);
 
-        if (matchFeeProtocol + matchFeeDistPartner >= premium) {
-            return _createBidPreview(DataTypes.BidStatus.InvalidProtocolFees);
-        }
-
         return
             DataTypes.BidPreview({
                 status: DataTypes.BidStatus.Success,

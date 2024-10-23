@@ -56,8 +56,7 @@ library DataTypes {
         SpotPriceTooLow,
         OutOfRangeSpotPrice,
         OptionAlreadyMinted,
-        PremiumTooLow,
-        InvalidProtocolFees
+        PremiumTooLow
     }
 
     struct BidPreview {
