@@ -8,7 +8,13 @@ import {
   calculateExpectedAsk,
   getRFQInitialization,
   rfqSignaturePayload,
+  swapSignaturePayload,
+  getLatestTimestamp,
+  getDefaultOptionInfo,
 } from "./testHelpers";
+import { DataTypes } from "./DataTypes";
+
+const BASE = ethers.parseEther("1");
 
 describe("Router Contract", function () {
   let router: Router;
@@ -294,6 +300,289 @@ describe("Router Contract", function () {
       );
       expect(preOptionTokenBalance - postOptionTokenBalance).to.be.equal(
         preOptionTokenSupply - postOptionTokenSupply
+      );
+    });
+  });
+
+  describe("Swap Option Token", function () {
+    let auctionInitialization: DataTypes.AuctionInitialization;
+    let escrow: any;
+    let swapQuote: DataTypes.SwapQuote;
+    let maker: any;
+    let optionReceiver: string;
+    let optionTokenAddr: string;
+    let optionTokenAmount: bigint;
+    let payAmount: bigint;
+
+    beforeEach(async function () {
+      // Initialize auction and escrow
+      auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+      });
+
+      escrow = await createAuction(auctionInitialization, router, owner);
+
+      // Approve and bid on auction
+      let currentAsk = await escrow.currAsk();
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+
+      const relBid = currentAsk;
+      const refSpot = ethers.parseUnits("1", 6);
+      const data: any = [];
+
+      optionReceiver = user1.address;
+      await expect(
+        router
+          .connect(user1)
+          .bidOnAuction(
+            escrow.target,
+            optionReceiver,
+            relBid,
+            refSpot,
+            data,
+            ethers.ZeroAddress
+          )
+      ).to.emit(router, "BidOnAuction");
+
+      const preBal = await settlementToken.balanceOf(user1.address);
+      const postBal = await settlementToken.balanceOf(user1.address);
+
+      maker = user1;
+      optionTokenAddr = String(escrow.target);
+      optionTokenAmount = await escrow.totalSupply();
+      payAmount = ((preBal - postBal) * BigInt(1100)) / BigInt(1000);
+
+      await escrow.connect(user1).approve(router.target, ethers.MaxUint256);
+
+      swapQuote = {
+        takerGiveToken: String(settlementToken.target),
+        takerGiveAmount: payAmount,
+        makerGiveToken: optionTokenAddr,
+        makerGiveAmount: optionTokenAmount,
+        validUntil: (await getLatestTimestamp()) + 60 * 5, // 5 minutes from now
+        signature: "",
+      };
+
+      const payloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
+      const signature = await maker.signMessage(ethers.getBytes(payloadHash));
+      swapQuote.signature = signature;
+    });
+
+    it("should revert when attempting to take an expired quote", async function () {
+      // Set expired timestamp
+      swapQuote.validUntil = 0;
+
+      const expiredPayloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
+      const expiredSignature = await maker.signMessage(
+        ethers.getBytes(expiredPayloadHash)
+      );
+      swapQuote.signature = expiredSignature;
+
+      await expect(
+        router.connect(user2).takeSwapQuote(user2.address, swapQuote)
+      ).to.be.revertedWithCustomError(router, "SwapQuoteExpired");
+    });
+
+    it("should revert when attempting to take a quote while the contract is paused", async function () {
+      // Pausing quotes
+      await router.connect(maker).togglePauseQuotes();
+
+      await expect(
+        router.connect(user2).takeSwapQuote(user2.address, swapQuote)
+      ).to.be.revertedWithCustomError(router, "SwapQuotePaused");
+
+      // Unpause for other tests
+      await router.connect(maker).togglePauseQuotes();
+    });
+
+    it("should allow a successful swap of the option token", async function () {
+      const taker = user2;
+
+      const preSettlementTokenBalMaker = await settlementToken.balanceOf(
+        maker.address
+      );
+      const preOptionTokenBalMaker = await escrow.balanceOf(maker.address);
+      const preSettlementTokenBalTaker = await settlementToken.balanceOf(
+        taker.address
+      );
+      const preOptionTokenBalTaker = await escrow.balanceOf(taker.address);
+
+      await settlementToken
+        .connect(taker)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router.connect(taker).takeSwapQuote(taker.address, swapQuote)
+      ).to.emit(router, "TakeSwapQuote");
+
+      const postSettlementTokenBalMaker = await settlementToken.balanceOf(
+        maker.address
+      );
+      const postOptionTokenBalMaker = await escrow.balanceOf(maker.address);
+      const postSettlementTokenBalTaker = await settlementToken.balanceOf(
+        taker.address
+      );
+      const postOptionTokenBalTaker = await escrow.balanceOf(taker.address);
+
+      // Check balances after the swap
+      expect(
+        postSettlementTokenBalMaker - preSettlementTokenBalMaker
+      ).to.be.equal(swapQuote.takerGiveAmount);
+      expect(
+        preSettlementTokenBalTaker - postSettlementTokenBalTaker
+      ).to.be.equal(swapQuote.takerGiveAmount);
+      expect(preOptionTokenBalMaker - postOptionTokenBalMaker).to.be.equal(
+        swapQuote.makerGiveAmount
+      );
+      expect(postOptionTokenBalTaker - preOptionTokenBalTaker).to.be.equal(
+        swapQuote.makerGiveAmount
+      );
+    });
+
+    it("should revert when attempting to take the same quote twice", async function () {
+      const taker = user2;
+
+      await settlementToken
+        .connect(taker)
+        .approve(router.target, ethers.MaxUint256);
+
+      // First successful take
+      await expect(
+        router.connect(taker).takeSwapQuote(taker.address, swapQuote)
+      ).to.emit(router, "TakeSwapQuote");
+
+      // Attempt to take the same quote again
+      await expect(
+        router.connect(taker).takeSwapQuote(taker.address, swapQuote)
+      ).to.be.revertedWithCustomError(router, "SwapQuoteAlreadyUsed");
+    });
+  });
+
+  describe("Option Token Minting", function () {
+    let optionInfo: DataTypes.OptionInfo;
+    let optionReceiver: string;
+    let escrowOwner: string;
+
+    beforeEach(async function () {
+      // Initialize the necessary variables
+      optionInfo = await getDefaultOptionInfo(
+        String(underlyingToken.target),
+        String(settlementToken.target),
+        ethers.parseUnits("1", await settlementToken.decimals())
+      );
+      optionReceiver = user1.address;
+      escrowOwner = user1.address;
+    });
+
+    it("should revert when the underlying token is the same as the settlement token", async function () {
+      // Set underlyingToken and settlementToken to be the same
+      optionInfo.underlyingToken = optionInfo.settlementToken;
+
+      await expect(
+        router
+          .connect(user1)
+          .mintOption(optionReceiver, escrowOwner, optionInfo)
+      ).to.be.revertedWithCustomError(router, "InvalidTokenPair");
+    });
+
+    it("should revert when the notional is zero", async function () {
+      // Set notional to 0
+      optionInfo.notional = 0n;
+
+      await expect(
+        router
+          .connect(user1)
+          .mintOption(optionReceiver, escrowOwner, optionInfo)
+      ).to.be.revertedWithCustomError(router, "InvalidNotional");
+    });
+
+    it("should revert when the expiry is in the past", async function () {
+      // Set expiry to a timestamp in the past
+      optionInfo.expiry = (await getLatestTimestamp()) - 100;
+
+      await expect(
+        router
+          .connect(user1)
+          .mintOption(optionReceiver, escrowOwner, optionInfo)
+      ).to.be.revertedWithCustomError(router, "InvalidExpiry");
+    });
+
+    it("should revert when the earliest exercise is not at least 1 day before expiry", async function () {
+      // Set expiry to less than 1 day after earliestExercise
+      optionInfo.expiry = optionInfo.earliestExercise + 60 * 60 * 12; // 12 hours later
+
+      await expect(
+        router
+          .connect(user1)
+          .mintOption(optionReceiver, escrowOwner, optionInfo)
+      ).to.be.revertedWithCustomError(router, "InvalidEarliestExercise");
+    });
+
+    it("should revert when the borrow cap exceeds the base", async function () {
+      // Set borrowCap greater than BASE
+      optionInfo.advancedSettings.borrowCap = BASE + 1n;
+
+      await expect(
+        router
+          .connect(user1)
+          .mintOption(optionReceiver, escrowOwner, optionInfo)
+      ).to.be.revertedWithCustomError(router, "InvalidBorrowCap");
+    });
+
+    it("should allow minting of option token with valid parameters", async function () {
+      // Adjust optionInfo to valid parameters
+      optionInfo.underlyingToken = String(underlyingToken.target);
+      optionInfo.settlementToken = String(settlementToken.target);
+      optionInfo.notional = ethers.parseUnits("1000", 18); // Set a valid notional
+      optionInfo.expiry = (await getLatestTimestamp()) + 60 * 60 * 24 * 7; // 7 days from now
+      optionInfo.earliestExercise =
+        (await getLatestTimestamp()) + 60 * 60 * 24 * 2; // 2 days from now
+      optionInfo.advancedSettings.borrowCap = BASE; // Set borrowCap to a valid value
+
+      // Assume user1 will transfer underlying tokens for the option
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, optionInfo.notional);
+
+      // Mint the option
+      const preUnderlyingUserBal = await underlyingToken.balanceOf(
+        user1.address
+      );
+      await expect(
+        router
+          .connect(user1)
+          .mintOption(optionReceiver, escrowOwner, optionInfo)
+      ).to.emit(router, "MintOption");
+      const postUnderlyingUserBal = await underlyingToken.balanceOf(
+        user1.address
+      );
+
+      // Check if the escrow is created and initialized correctly
+      const escrowAddrs = await router.getEscrows(0, 1);
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddrs[0]) as Escrow;
+      const escrowOptionInfo = await escrow.optionInfo();
+      expect(escrowOptionInfo.underlyingToken).to.be.equal(
+        optionInfo.underlyingToken
+      );
+      expect(escrowOptionInfo.settlementToken).to.be.equal(
+        optionInfo.settlementToken
+      );
+      expect(escrowOptionInfo.notional).to.be.equal(optionInfo.notional);
+      expect(escrowOptionInfo.expiry).to.be.equal(optionInfo.expiry);
+      expect(escrowOptionInfo.earliestExercise).to.be.equal(
+        optionInfo.earliestExercise
+      );
+
+      // Ensure the underlying token has been transferred to the escrow
+      const escrowBalance = await underlyingToken.balanceOf(escrow.target);
+      expect(escrowBalance).to.be.equal(optionInfo.notional);
+      expect(preUnderlyingUserBal - postUnderlyingUserBal).to.be.equal(
+        optionInfo.notional
       );
     });
   });

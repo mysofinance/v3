@@ -26,6 +26,7 @@ contract Router is Ownable {
 
     mapping(address => bool) public isEscrow;
     mapping(bytes32 => bool) public isQuoteUsed;
+    mapping(bytes32 => bool) public isSwapQuoteUsed;
     mapping(address => bool) public quotesPaused;
     address[] public escrows;
 
@@ -80,6 +81,16 @@ contract Router is Ownable {
         uint256 matchFeeProtocol,
         uint256 matchFeeDistPartner,
         address indexed distPartner
+    );
+    event TakeSwapQuote(
+        address indexed to,
+        address indexed maker,
+        DataTypes.SwapQuote swapQuote
+    );
+    event MintOption(
+        address indexed optionReceiver,
+        address indexed escrowOwner,
+        DataTypes.OptionInfo optionInfo
     );
     event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
     event PauseQuotes(address indexed quoter, bool isPaused);
@@ -396,22 +407,89 @@ contract Router is Ownable {
         );
     }
 
-    function takeSwapQuote(DataTypes.SwapQuote calldata swapQuote) external {
-        DataTypes.TakeSwapQuotePreview memory preview = previewTakeSwapQuote(
-            swapQuote
-        );
-
-        if (preview.status != DataTypes.RFQStatus.Success) {
-            revert Errors.InvalidTakeQuote();
+    function takeSwapQuote(
+        address to,
+        DataTypes.SwapQuote calldata swapQuote
+    ) external {
+        if (block.timestamp > swapQuote.validUntil) {
+            revert Errors.SwapQuoteExpired();
         }
 
-        // @dev: placeholder
+        bytes32 msgHash = keccak256(
+            abi.encode(
+                block.chainid,
+                swapQuote.takerGiveToken,
+                swapQuote.takerGiveAmount,
+                swapQuote.makerGiveToken,
+                swapQuote.makerGiveAmount,
+                swapQuote.validUntil
+            )
+        );
+        address maker = ECDSA.recover(
+            MessageHashUtils.toEthSignedMessageHash(msgHash),
+            swapQuote.signature
+        );
+        if (quotesPaused[maker]) {
+            revert Errors.SwapQuotePaused();
+        }
+        if (isSwapQuoteUsed[msgHash]) {
+            revert Errors.SwapQuoteAlreadyUsed();
+        }
+        isSwapQuoteUsed[msgHash] = true;
+        IERC20Metadata(swapQuote.takerGiveToken).safeTransferFrom(
+            msg.sender,
+            maker,
+            swapQuote.takerGiveAmount
+        );
+        IERC20Metadata(swapQuote.makerGiveToken).safeTransferFrom(
+            maker,
+            to,
+            swapQuote.makerGiveAmount
+        );
+        emit TakeSwapQuote(to, maker, swapQuote);
     }
 
     function togglePauseQuotes() external {
         bool isPaused = quotesPaused[msg.sender];
         quotesPaused[msg.sender] = !isPaused;
         emit PauseQuotes(msg.sender, !isPaused);
+    }
+
+    function mintOption(
+        address optionReceiver,
+        address escrowOwner,
+        DataTypes.OptionInfo calldata optionInfo
+    ) external {
+        if (optionInfo.underlyingToken == optionInfo.settlementToken) {
+            revert Errors.InvalidTokenPair();
+        }
+        if (optionInfo.notional == 0) {
+            revert Errors.InvalidNotional();
+        }
+        if (block.timestamp > optionInfo.expiry) {
+            revert Errors.InvalidExpiry();
+        }
+        if (optionInfo.expiry < optionInfo.earliestExercise + 1 days) {
+            revert Errors.InvalidEarliestExercise();
+        }
+        if (optionInfo.advancedSettings.borrowCap > BASE) {
+            revert Errors.InvalidBorrowCap();
+        }
+        (address escrow, uint256 oTokenIndex) = _createEscrow();
+        Escrow(escrow).initializeMintOption(
+            address(this),
+            escrowOwner,
+            optionReceiver,
+            getExerciseFee(),
+            optionInfo,
+            oTokenIndex
+        );
+        IERC20Metadata(optionInfo.underlyingToken).safeTransferFrom(
+            msg.sender,
+            escrow,
+            optionInfo.notional
+        );
+        emit MintOption(optionReceiver, escrowOwner, optionInfo);
     }
 
     function setFeeHandler(address newFeeHandler) external onlyOwner {
@@ -481,7 +559,27 @@ contract Router is Ownable {
             rfqInitialization.rfqQuote.signature
         );
 
-        if (block.timestamp > rfqInitialization.rfqQuote.validUntil) {
+        if (
+            rfqInitialization.optionInfo.underlyingToken ==
+            rfqInitialization.optionInfo.settlementToken ||
+            rfqInitialization.optionInfo.notional == 0 ||
+            rfqInitialization.optionInfo.strike == 0 ||
+            rfqInitialization.optionInfo.expiry <
+            rfqInitialization.optionInfo.earliestExercise + 1 days ||
+            rfqInitialization.optionInfo.advancedSettings.borrowCap > BASE
+        ) {
+            return
+                _createTakeQuotePreview(
+                    DataTypes.RFQStatus.InvalidQuote,
+                    msgHash,
+                    quoter
+                );
+        }
+
+        if (
+            block.timestamp > rfqInitialization.rfqQuote.validUntil ||
+            block.timestamp > rfqInitialization.optionInfo.expiry
+        ) {
             return
                 _createTakeQuotePreview(
                     DataTypes.RFQStatus.Expired,
@@ -489,7 +587,6 @@ contract Router is Ownable {
                     quoter
                 );
         }
-
         if (isQuoteUsed[msgHash]) {
             return
                 _createTakeQuotePreview(
@@ -503,19 +600,6 @@ contract Router is Ownable {
             return
                 _createTakeQuotePreview(
                     DataTypes.RFQStatus.QuotesPaused,
-                    msgHash,
-                    quoter
-                );
-        }
-
-        uint256 balance = IERC20Metadata(
-            rfqInitialization.optionInfo.settlementToken
-        ).balanceOf(quoter);
-
-        if (balance < rfqInitialization.rfqQuote.premium) {
-            return
-                _createTakeQuotePreview(
-                    DataTypes.RFQStatus.InsufficientFunding,
                     msgHash,
                     quoter
                 );
@@ -540,10 +624,6 @@ contract Router is Ownable {
                 matchFeeDistPartner: matchFeeDistPartner
             });
     }
-
-    function previewTakeSwapQuote(
-        DataTypes.SwapQuote calldata swapQuote
-    ) public view returns (DataTypes.TakeSwapQuotePreview memory) {}
 
     function getEscrows(
         uint256 from,

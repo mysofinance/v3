@@ -1211,7 +1211,7 @@ describe("Router And Escrow Interaction", function () {
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidInitialization");
     });
 
-    it("should revert with InvalidTokenPair", async function () {
+    it("should revert with InvalidTakeQuote if underlying and settlement token are the same", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(underlyingToken.target), // Same as underlying
@@ -1233,10 +1233,10 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(owner)
           .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidTokenPair");
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
-    it("should revert with InvalidNotional", async function () {
+    it("should revert with InvalidTakeQuote if notional is zero", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
@@ -1259,10 +1259,10 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(owner)
           .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidNotional");
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
-    it("should revert with InvalidStrike", async function () {
+    it("should revert with InvalidTakeQuote if strike is zero", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
@@ -1285,10 +1285,10 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(owner)
           .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidStrike");
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
-    it("should revert with InvalidEarliestExerciseTenor (expiry past)", async function () {
+    it("should revert with InvalidTakeQuote if expiry is in the past", async function () {
       const shortTenor = 3600; // 1 hour
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -1316,13 +1316,10 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(owner)
           .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(
-        escrowImpl,
-        "InvalidEarliestExerciseTenor"
-      );
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
-    it("should revert with InvalidEarliestExerciseTenor (earliest exercise too close to expiry)", async function () {
+    it("should revert with InvalidTakeQuote if earliest exercise is too close to expiry", async function () {
       const currentTimestamp = Math.floor(Date.now() / 1000);
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -1347,13 +1344,10 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(owner)
           .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(
-        escrowImpl,
-        "InvalidEarliestExerciseTenor"
-      );
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
-    it("should revert with InvalidBorrowCap", async function () {
+    it("should revert with InvalidTakeQuote if borrow cap > BASE", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
@@ -1376,7 +1370,7 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(owner)
           .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidBorrowCap");
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
     it("should successfully initialize RFQ match with valid parameters", async function () {
@@ -1473,7 +1467,7 @@ describe("Router And Escrow Interaction", function () {
         expect(await escrow.optionMinted()).to.be.true;
       });
 
-      it("should revert an exercise without successful bid", async function () {
+      it("should revert on exercise without successful bid", async function () {
         await expect(
           router
             .connect(user1)
@@ -2081,14 +2075,3 @@ describe("Router And Escrow Interaction", function () {
     });
   });
 });
-
-/*
-async function deployEscrow(auctionInitialization: DataTypes.AuctionInitialization) {
-      const tx = await router.connect(owner).createAuction(owner.address, auctionInitialization);
-      const receipt = await tx.wait();
-      const event = receipt?.logs.find(
-        (e: any) => e.fragment.name === "CreateAuction"
-      );
-      return Escrow.attach(event?.args.escrow);
-    }
-      */
