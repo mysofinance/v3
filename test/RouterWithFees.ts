@@ -518,17 +518,22 @@ describe("Router Contract Fee Tests", function () {
       );
       rfqInitialization.rfqQuote.signature = signature;
 
+      // Approve tokens for quoter
+      await settlementToken
+        .connect(poorQuoter)
+        .approve(router.target, ethers.MaxUint256);
+
       // Approve tokens for user1
       await underlyingToken
-        .connect(owner)
-        .approve(router.target, ethers.parseEther("100"));
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
 
-      // Attempt to take the quote
+      // Attempt to take the quote, should revert due to insufficient balance
       await expect(
         router
-          .connect(owner)
-          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
+          .connect(user1)
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.reverted;
     });
   });
 

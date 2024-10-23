@@ -7,7 +7,9 @@ library Errors {
     error InvalidBorrowAmount();
     error InvalidBorrowCap();
     error InvalidBorrowTime();
+    error InvalidEarliestExercise();
     error InvalidEarliestExerciseTenor();
+    error InvalidExpiry();
     error InvalidExercise();
     error InvalidExerciseAmount();
     error InvalidExerciseTime();
@@ -29,5 +31,8 @@ library Errors {
     error NotAnEscrow();
     error NothingToRepay();
     error OwnerAlreadySet();
+    error SwapQuoteAlreadyUsed();
+    error SwapQuoteExpired();
+    error SwapQuotePaused();
     error VotingDelegationNotAllowed();
 }
