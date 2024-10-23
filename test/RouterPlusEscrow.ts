@@ -1611,6 +1611,56 @@ describe("Router And Escrow Interaction", function () {
         ).to.be.revertedWithCustomError(escrow, "InvalidExercise");
       });
 
+      it("should revert if exercising with underlying token but exercise cost is zero", async function () {
+        const optionInfo: DataTypes.OptionInfo = await escrow.optionInfo();
+        await ethers.provider.send("evm_setNextBlockTimestamp", [
+          Number(optionInfo.earliestExercise) + 1,
+        ]);
+        await ethers.provider.send("evm_mine", []);
+
+        // Calculate break-even price at option becomes out-of-the-money
+        const underlyingTokenDecimals = await underlyingToken.decimals();
+        const settlementTokenDecimals = await settlementToken.decimals();
+        const priceOfSettlementTokenInUnderlying =
+          (ethers.parseUnits("1", underlyingTokenDecimals) *
+            10n ** settlementTokenDecimals) /
+          optionInfo.strike;
+
+        // To make option be out-of-the-money an underlying units needs to be
+        // worth less than strike; since here price is denominated in underlying
+        // the price needs to be increased (if price was denominated in settlement
+        // token one would need to decrease)
+        const otmPrice = priceOfSettlementTokenInUnderlying + 1n;
+        await mockOracle.setPrice(
+          settlementToken.target,
+          underlyingToken.target,
+          otmPrice
+        );
+
+        // Assume user wants to exercise on whole notional amount
+        const exerciseCostInSettlementToken =
+          (optionInfo.strike * optionInfo.notional) /
+          10n ** underlyingTokenDecimals;
+        const exerciseCostInUnderlyingToken =
+          (exerciseCostInSettlementToken * otmPrice) /
+          10n ** settlementTokenDecimals;
+
+        // Check that expected exercise cost in underlying tokens would be less than notional
+        expect(exerciseCostInUnderlyingToken).to.be.gt(optionInfo.notional);
+
+        await expect(
+          router
+            .connect(user1)
+            .exercise(
+              escrow.target,
+              user1.address,
+              optionInfo.notional,
+              false,
+              []
+            )
+        ).to.be.revertedWithCustomError(escrow, "InvalidExercise");
+      });
+
       it("should successfully handle a valid exercise", async function () {
         const optionInfo = await escrow.optionInfo();
         await ethers.provider.send("evm_setNextBlockTimestamp", [
