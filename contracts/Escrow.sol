@@ -330,7 +330,7 @@ contract Escrow is InitializableERC20 {
         ) {
             revert Errors.InvalidRepayTime();
         }
-        if (totalBorrowed == 0 || optionInfo.advancedSettings.borrowCap == 0) {
+        if (totalBorrowed == 0) {
             revert Errors.NothingToRepay();
         }
         if (
@@ -417,13 +417,9 @@ contract Escrow is InitializableERC20 {
         address distPartner
     ) public view returns (DataTypes.BidPreview memory preview) {
         uint64 _currAsk = currAsk();
-
-        if (!isAuction) {
-            return _createBidPreview(DataTypes.BidStatus.NotAnAuction);
-        }
         if (optionMinted) {
             return
-                _createBidPreview(DataTypes.BidStatus.AuctionAlreadySuccessful);
+                _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted);
         }
         if (relBid < _currAsk) {
             return _createBidPreview(DataTypes.BidStatus.PremiumTooLow);
