@@ -54,8 +54,7 @@ export namespace DataTypes {
     OutOfRangeSpotPrice = 2,
     OptionAlreadyMinted = 3,
     PremiumTooLow = 4,
-    InsufficientFunding = 5,
-    InvalidProtocolFees = 6,
+    InvalidProtocolFees = 5,
   }
 
   export interface BidPreview {
@@ -75,8 +74,8 @@ export namespace DataTypes {
 
   export enum RFQStatus {
     Expired = 0,
-    AlreadyExecuted = 1,
-    InsufficientFunding = 2,
+    InvalidQuote = 1,
+    AlreadyExecuted = 2,
     QuotesPaused = 3,
     Success = 4,
   }
@@ -92,18 +91,11 @@ export namespace DataTypes {
   }
 
   export interface SwapQuote {
-    takerToken: string;
-    takerAmount: bigint;
-    makerToken: string;
-    makerAmount: bigint;
-    swapRate: bigint;
+    takerGiveToken: string;
+    takerGiveAmount: bigint;
+    makerGiveToken: string;
+    makerGiveAmount: bigint;
     validUntil: number;
     signature: string;
-  }
-
-  export interface TakeSwapQuotePreview {
-    status: RFQStatus;
-    msgHash: string;
-    quoter: string;
   }
 }

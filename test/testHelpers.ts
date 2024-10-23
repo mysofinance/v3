@@ -252,6 +252,32 @@ interface AuctionParams {
   owner: any;
 }
 
+export const swapSignaturePayload = (
+  swapQuote: DataTypes.SwapQuote,
+  chainId: number
+): string => {
+  const abiCoder = new ethers.AbiCoder();
+  const payload = abiCoder.encode(
+    [
+      "uint256", // CHAIN_ID
+      "address",
+      "uint256",
+      "address",
+      "uint256",
+      "uint256",
+    ],
+    [
+      chainId,
+      swapQuote.takerGiveToken,
+      swapQuote.takerGiveAmount,
+      swapQuote.makerGiveToken,
+      swapQuote.makerGiveAmount,
+      swapQuote.validUntil,
+    ]
+  );
+  return ethers.keccak256(payload);
+};
+
 export const setupAuction = async (
   {
     underlyingTokenAddress,
@@ -324,7 +350,9 @@ export const setupAuction = async (
 
   // Attach the underlying token and settlement token to their contract instances
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-  const underlyingToken = await MockERC20Factory.attach(underlyingTokenAddress);
+  const underlyingToken: any = await MockERC20Factory.attach(
+    underlyingTokenAddress
+  );
   let escrow: any;
 
   if (setupFullAuction) {
@@ -411,6 +439,38 @@ export const getRFQInitialization = async ({
     },
   };
   return rfqInitialization;
+};
+
+export const getLatestTimestamp = async () => {
+  const latestBlock = await ethers.provider.getBlock("latest");
+  return latestBlock ? latestBlock.timestamp : Date.now() / 1000;
+};
+
+export const getDefaultOptionInfo = async (
+  underlyingToken: string,
+  settlementToken: string,
+  strike: BigInt,
+  overrides: Partial<DataTypes.OptionInfo> = {}
+): Promise<DataTypes.OptionInfo> => {
+  const latestTimestamp = await getLatestTimestamp();
+
+  const defaultOptionInfo: DataTypes.OptionInfo = {
+    underlyingToken,
+    settlementToken,
+    notional: ethers.parseUnits("1", 18), // Default notional amount
+    strike,
+    earliestExercise: latestTimestamp, // Default now
+    expiry: latestTimestamp + 60 * 60 * 24 * 30, // Default in 30 days
+    advancedSettings: {
+      borrowCap: 0,
+      oracle: ethers.ZeroAddress,
+      premiumTokenIsUnderlying: false,
+      votingDelegationAllowed: false,
+      allowedDelegateRegistry: ethers.ZeroAddress,
+    },
+  };
+
+  return { ...defaultOptionInfo, ...overrides };
 };
 
 export async function deployEscrowWithRFQ(rfqInitialization: DataTypes.RFQInitialization, router: any, owner: any, Escrow: any) {
