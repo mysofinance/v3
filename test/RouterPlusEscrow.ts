@@ -14,7 +14,7 @@ import {
   rfqSignaturePayload,
   getRFQInitialization,
   deployEscrowWithRFQ,
-  getAuctionInitialization,
+  getLatestTimestamp,
 } from "./testHelpers";
 
 describe("Router And Escrow Interaction", function () {
@@ -225,7 +225,7 @@ describe("Router And Escrow Interaction", function () {
       ).to.emit(router, "TakeQuote");
     });
 
-    it("should revert if quote is expired", async function () {
+    it("should revert if quote is expired (1/2)", async function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
@@ -249,7 +249,43 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(owner)
           .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.reverted;
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
+    });
+
+    it("should revert if quote is expired (2/2)", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+      });
+
+      // Set option expiry to be in the past
+      rfqInitialization.optionInfo.expiry = (await getLatestTimestamp()) - 1;
+      rfqInitialization.optionInfo.earliestExercise = 0;
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Approve tokens
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000000"));
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.parseEther("100"));
+
+      const takeQuotePreview: any = await router.previewTakeQuote(
+        rfqInitialization,
+        ethers.ZeroAddress
+      );
+      expect(takeQuotePreview.status).to.be.equal(DataTypes.RFQStatus.Expired);
+
+      // Attempt to take the expired quote
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
   });
 
