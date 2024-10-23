@@ -295,9 +295,12 @@ contract Escrow is InitializableERC20 {
             revert Errors.InvalidBorrowAmount();
         }
         settlementToken = optionInfo.settlementToken;
-        collateralAmount =
-            (optionInfo.strike * underlyingBorrowAmount) /
-            optionInfo.notional;
+        collateralAmount = _getCollateralAmount(
+            optionInfo.strike,
+            underlyingBorrowAmount,
+            optionInfo.notional
+        );
+
         // @dev: apply exercise fee to ensure equivalence between
         // "borrowing and not repaying" and "regular exercise"
         collateralFeeAmount = (collateralAmount * exerciseFee) / BASE;
@@ -324,10 +327,7 @@ contract Escrow is InitializableERC20 {
         if (!optionMinted) {
             revert Errors.NoOptionMinted();
         }
-        if (
-            block.timestamp > optionInfo.expiry ||
-            block.timestamp < optionInfo.earliestExercise
-        ) {
+        if (block.timestamp > optionInfo.expiry) {
             revert Errors.InvalidRepayTime();
         }
         if (totalBorrowed == 0) {
@@ -340,9 +340,11 @@ contract Escrow is InitializableERC20 {
             revert Errors.InvalidRepayAmount();
         }
         underlyingToken = optionInfo.underlyingToken;
-        unlockedCollateralAmount =
-            (optionInfo.strike * underlyingRepayAmount) /
-            optionInfo.notional;
+        unlockedCollateralAmount = _getCollateralAmount(
+            optionInfo.strike,
+            underlyingRepayAmount,
+            optionInfo.notional
+        );
         totalBorrowed -= underlyingRepayAmount;
         borrowedUnderlyingAmounts[borrower] -= underlyingRepayAmount;
         _mint(borrower, underlyingRepayAmount);
@@ -418,8 +420,7 @@ contract Escrow is InitializableERC20 {
     ) public view returns (DataTypes.BidPreview memory preview) {
         uint64 _currAsk = currAsk();
         if (optionMinted) {
-            return
-                _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted);
+            return _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted);
         }
         if (relBid < _currAsk) {
             return _createBidPreview(DataTypes.BidStatus.PremiumTooLow);
@@ -545,5 +546,13 @@ contract Escrow is InitializableERC20 {
                 matchFeeProtocol: 0,
                 matchFeeDistPartner: 0
             });
+    }
+
+    function _getCollateralAmount(
+        uint256 strike,
+        uint256 borrowOrRepayAmount,
+        uint256 notional
+    ) internal pure returns (uint256) {
+        return (strike * borrowOrRepayAmount) / notional;
     }
 }

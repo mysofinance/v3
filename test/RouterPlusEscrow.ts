@@ -829,6 +829,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(escrow.connect(owner).handleOnChainVoting(delegate))
         .to.emit(escrow, "OnChainVotingDelegation")
         .withArgs(delegate);
+
+      // Check revert when invalid sender tries to delegate
+      await expect(
+        escrow.connect(user1).handleOnChainVoting(delegate)
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
     });
 
     it("should revert if delegation is not allowed", async function () {
@@ -875,8 +880,9 @@ describe("Router And Escrow Interaction", function () {
 
       // Attempt to delegate voting when not allowed
       const delegate = user2.address;
-      await expect(escrow.connect(user1).handleOnChainVoting(delegate)).to.be
-        .reverted;
+      await expect(
+        escrow.connect(owner).handleOnChainVoting(delegate)
+      ).to.be.revertedWithCustomError(escrow, "VotingDelegationNotAllowed");
     });
   });
 
@@ -1584,6 +1590,27 @@ describe("Router And Escrow Interaction", function () {
         ).to.be.revertedWithCustomError(escrow, "InvalidExerciseAmount");
       });
 
+      it("should revert if exercising with underlying token but exercise cost is zero", async function () {
+        const optionInfo = await escrow.optionInfo();
+        await ethers.provider.send("evm_setNextBlockTimestamp", [
+          Number(optionInfo.earliestExercise) + 1,
+        ]);
+        await ethers.provider.send("evm_mine", []);
+
+        // Set artificially low mock price for settlement token, denominated in underlying token
+        await mockOracle.setPrice(
+          settlementToken.target,
+          underlyingToken.target,
+          1
+        );
+
+        await expect(
+          router
+            .connect(user1)
+            .exercise(escrow.target, user1.address, 1, false, [])
+        ).to.be.revertedWithCustomError(escrow, "InvalidExercise");
+      });
+
       it("should successfully handle a valid exercise", async function () {
         const optionInfo = await escrow.optionInfo();
         await ethers.provider.send("evm_setNextBlockTimestamp", [
@@ -1771,6 +1798,8 @@ describe("Router And Escrow Interaction", function () {
         router,
         owner,
         borrowCap: ethers.parseEther("0.5"), // 50% borrow cap
+        tenor: 60 * 60 * 24 * 30,
+        earliestExerciseTenor: 60 * 60 * 24,
       });
       escrow = escrowSetup;
       auctionInitialization = auctionInitializationSetup;
@@ -1833,7 +1862,7 @@ describe("Router And Escrow Interaction", function () {
       ).to.be.revertedWithCustomError(newEscrow, "NoOptionMinted");
     });
 
-    it("should revert with InvalidRepayTime if repaid after expiry", async function () {
+    it("should revert with InvalidRepayTime if repay called after expiry", async function () {
       const optionInfo = await escrow.optionInfo();
       await ethers.provider.send("evm_setNextBlockTimestamp", [
         Number(optionInfo.expiry) + 1,
@@ -1933,6 +1962,273 @@ describe("Router And Escrow Interaction", function () {
     });
   });
 
+  describe("Escrow transfer ownership", function () {
+    let escrow: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+
+    beforeEach(async function () {
+      const {
+        escrow: escrowSetup,
+        auctionInitialization: auctionInitializationSetup,
+      } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+
+      // Setup a successful bid
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+    });
+
+    it("should allow the owner to transfer ownership to a new address", async function () {
+      const newOwner = user2.address;
+      await expect(escrow.connect(owner).transferOwnership(newOwner))
+        .to.emit(escrow, "TransferOwnership")
+        .withArgs(owner.address, owner.address, newOwner);
+      expect(await escrow.owner()).to.equal(newOwner);
+    });
+
+    it("should revert if a non-owner tries to transfer ownership", async function () {
+      const newOwner = user2.address;
+      await expect(
+        escrow.connect(user1).transferOwnership(newOwner)
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+
+    it("should revert if the new owner is the same as the current owner", async function () {
+      const currentOwner = await escrow.owner();
+      await expect(
+        escrow.connect(owner).transferOwnership(currentOwner)
+      ).to.be.revertedWithCustomError(escrow, "OwnerAlreadySet");
+    });
+  });
+
+  describe("Escrow handleWithdraw", function () {
+    let escrow: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+
+    beforeEach(async function () {
+      const {
+        escrow: escrowSetup,
+        auctionInitialization: auctionInitializationSetup,
+      } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+
+      // Setup a successful bid
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+    });
+
+    it("should allow the owner to withdraw after option expiry", async function () {
+      // Fast forward time to after expiry
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.expiry) + 1,
+      ]);
+      await ethers.provider.send("evm_mine", []);
+
+      const withdrawAmount = optionInfo.notional;
+
+      const userBalPreWithdrawal = await underlyingToken.balanceOf(
+        user1.address
+      );
+      await expect(
+        escrow
+          .connect(owner)
+          .handleWithdraw(user1.address, underlyingToken.target, withdrawAmount)
+      )
+        .to.emit(escrow, "Withdraw")
+        .withArgs(
+          owner.address,
+          user1.address,
+          underlyingToken.target,
+          withdrawAmount
+        );
+      const userBalPostWithdrawal = await underlyingToken.balanceOf(
+        user1.address
+      );
+
+      // Check the balances to confirm the transfer
+      expect(userBalPostWithdrawal - userBalPreWithdrawal).to.equal(
+        withdrawAmount
+      );
+    });
+
+    it("should revert if a non-owner or non-router tries to withdraw", async function () {
+      const optionInfo = await escrow.optionInfo();
+      await ethers.provider.send("evm_setNextBlockTimestamp", [
+        Number(optionInfo.expiry) + 1,
+      ]);
+      await ethers.provider.send("evm_mine", []);
+
+      const withdrawAmount = optionInfo.notional;
+      await expect(
+        escrow
+          .connect(user1)
+          .handleWithdraw(user1.address, underlyingToken.target, withdrawAmount)
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+
+    it("should revert if withdrawal is attempted before expiry when option is minted", async function () {
+      const optionInfo = await escrow.optionInfo();
+      const withdrawAmount = optionInfo.notional;
+
+      await expect(
+        escrow
+          .connect(owner)
+          .handleWithdraw(owner.address, underlyingToken.target, withdrawAmount)
+      ).to.be.revertedWithCustomError(escrow, "InvalidWithdraw");
+    });
+  });
+
+  describe("Escrow handleOffChainVoting", function () {
+    let escrow: any;
+    let delegateRegistry: any;
+    let auctionInitialization: DataTypes.AuctionInitialization;
+
+    beforeEach(async function () {
+      // Deploy a MockDelegateRegistry for testing
+      const DelegateRegistry = await ethers.getContractFactory(
+        "MockDelegateRegistry"
+      );
+      delegateRegistry = await DelegateRegistry.deploy();
+
+      const {
+        escrow: escrowSetup,
+        auctionInitialization: auctionInitializationSetup,
+      } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+        allowedDelegateRegistry: delegateRegistry.target,
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+
+      // Setup a successful bid
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+    });
+
+    it("should allow the owner to delegate off-chain voting", async function () {
+      const spaceId = ethers.encodeBytes32String("space1");
+      const delegate = user2.address;
+
+      await expect(
+        escrow.connect(owner).handleOffChainVoting(spaceId, delegate)
+      )
+        .to.emit(escrow, "OffChainVotingDelegation")
+        .withArgs(delegateRegistry.target, spaceId, delegate);
+
+      // Check the delegation in the MockDelegateRegistry
+      expect(
+        await delegateRegistry.delegation(escrow.target, spaceId)
+      ).to.equal(delegate);
+    });
+
+    it("should revert if a non-owner tries to delegate", async function () {
+      const spaceId = ethers.encodeBytes32String("space1");
+      const delegate = user2.address;
+
+      await expect(
+        escrow.connect(user1).handleOffChainVoting(spaceId, delegate)
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+
+    it("should revert if no allowed delegate registry is set", async function () {
+      const {
+        escrow: escrowSetup,
+        auctionInitialization: auctionInitializationSetup,
+      } = await setupAuction({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        router,
+        owner,
+        allowedDelegateRegistry: ethers.ZeroAddress,
+      });
+      escrow = escrowSetup;
+      auctionInitialization = auctionInitializationSetup;
+
+      // Setup a successful bid
+      await settlementToken.mint(user1.address, ethers.parseEther("1000"));
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("1000"));
+
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrow.target,
+          user1.address,
+          ethers.parseEther("0.1"),
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+
+      const spaceId = ethers.encodeBytes32String("space1");
+      const delegate = user2.address;
+
+      await expect(
+        escrow.connect(owner).handleOffChainVoting(spaceId, delegate)
+      ).to.be.revertedWithCustomError(escrow, "NoAllowedDelegateRegistry");
+    });
+  });
+
   describe("Edge Cases and Reverts", function () {
     it("should push new escrow to array when creating second identical auction", async function () {
       const { auctionInitialization } = await setupAuction({
@@ -1977,7 +2273,7 @@ describe("Router And Escrow Interaction", function () {
             underlyingToken.target,
             ethers.parseEther("10")
           )
-      ).to.be.reverted;
+      ).to.be.revertedWithCustomError;
     });
 
     it("should revert when bidding on non-existent escrow", async function () {
