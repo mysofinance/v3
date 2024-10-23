@@ -52,10 +52,9 @@ export namespace DataTypes {
     Success = 0,
     SpotPriceTooLow = 1,
     OutOfRangeSpotPrice = 2,
-    AuctionAlreadySuccessful = 3,
+    OptionAlreadyMinted = 3,
     PremiumTooLow = 4,
-    NotAnAuction = 5,
-    InsufficientFunding = 6,
+    InsufficientFunding = 5
   }
 
   export interface BidPreview {

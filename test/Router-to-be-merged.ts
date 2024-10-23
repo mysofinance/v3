@@ -79,7 +79,7 @@ describe("Router Contract", function () {
         distPartner
       );
       expect(preview.status).to.equal(
-        DataTypes.BidStatus.AuctionAlreadySuccessful
+        DataTypes.BidStatus.OptionAlreadyMinted
       );
     });
 

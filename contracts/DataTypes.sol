@@ -57,7 +57,6 @@ library DataTypes {
         OutOfRangeSpotPrice,
         OptionAlreadyMinted,
         PremiumTooLow,
-        NotAnAuction,
         InsufficientFunding
     }
 
