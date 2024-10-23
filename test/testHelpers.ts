@@ -449,7 +449,7 @@ export const getLatestTimestamp = async () => {
 export const getDefaultOptionInfo = async (
   underlyingToken: string,
   settlementToken: string,
-  strike: BigInt,
+  strike: bigint,
   overrides: Partial<DataTypes.OptionInfo> = {}
 ): Promise<DataTypes.OptionInfo> => {
   const latestTimestamp = await getLatestTimestamp();
@@ -462,7 +462,7 @@ export const getDefaultOptionInfo = async (
     earliestExercise: latestTimestamp, // Default now
     expiry: latestTimestamp + 60 * 60 * 24 * 30, // Default in 30 days
     advancedSettings: {
-      borrowCap: 0,
+      borrowCap: 0n,
       oracle: ethers.ZeroAddress,
       premiumTokenIsUnderlying: false,
       votingDelegationAllowed: false,
@@ -473,26 +473,37 @@ export const getDefaultOptionInfo = async (
   return { ...defaultOptionInfo, ...overrides };
 };
 
-export async function deployEscrowWithRFQ(rfqInitialization: DataTypes.RFQInitialization, router: any, owner: any, Escrow: any) {
-  const tx = await router.connect(owner).takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress);
+export async function deployEscrowWithRFQ(
+  rfqInitialization: DataTypes.RFQInitialization,
+  router: any,
+  owner: any,
+  Escrow: any
+) {
+  const tx = await router
+    .connect(owner)
+    .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress);
   const receipt = await tx.wait();
-  
-  const takeQuoteEvent = receipt?.logs.find(
-    (log : any) => {
-      try {
-        const decoded = router.interface.parseLog({ topics: log.topics as string[], data: log.data });
-        return decoded?.name === "TakeQuote";
-      } catch {
-        return false;
-      }
+
+  const takeQuoteEvent = receipt?.logs.find((log: any) => {
+    try {
+      const decoded = router.interface.parseLog({
+        topics: log.topics as string[],
+        data: log.data,
+      });
+      return decoded?.name === "TakeQuote";
+    } catch {
+      return false;
     }
-  );
+  });
 
   if (!takeQuoteEvent) {
     throw new Error("TakeQuote event not found");
   }
 
-  const decodedEvent = router.interface.parseLog({ topics: takeQuoteEvent.topics as string[], data: takeQuoteEvent.data });
+  const decodedEvent = router.interface.parseLog({
+    topics: takeQuoteEvent.topics as string[],
+    data: takeQuoteEvent.data,
+  });
   const escrowAddress = decodedEvent?.args.escrow;
 
   return Escrow.attach(escrowAddress);

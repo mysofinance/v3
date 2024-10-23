@@ -584,6 +584,18 @@ describe("Router Contract", function () {
       expect(preUnderlyingUserBal - postUnderlyingUserBal).to.be.equal(
         optionInfo.notional
       );
+
+      // Ensure option cannot be re-initialized
+      await expect(
+        escrow.initializeMintOption(
+          router.target,
+          owner.address,
+          owner.address,
+          0,
+          optionInfo,
+          0
+        )
+      ).to.be.reverted;
     });
   });
 });
