@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-interface IERC1271 {
+interface IEIP1271 {
     /**
      * @dev Should return whether the signature provided is valid for the provided hash
      * @param _hash      Hash of the data to be signed

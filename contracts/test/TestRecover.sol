@@ -2,8 +2,10 @@
 pragma solidity 0.8.24;
 
 contract TestRecover {
-
-    function testRecover(bytes32 dataHash, bytes memory signatures) public pure returns (address) {
+    function testRecover(
+        bytes32 dataHash,
+        bytes memory signatures
+    ) public pure returns (address) {
         require(signatures.length >= 65, "Invalid signature length");
 
         uint8 v;
@@ -20,6 +22,17 @@ contract TestRecover {
             v += 27;
         }
 
-        return ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", dataHash)), v, r, s);
+        return
+            ecrecover(
+                keccak256(
+                    abi.encodePacked(
+                        "\x19Ethereum Signed Message:\n32",
+                        dataHash
+                    )
+                ),
+                v,
+                r,
+                s
+            );
     }
 }

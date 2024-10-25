@@ -129,7 +129,9 @@ contract Escrow is InitializableERC20 {
         optionMinted = true;
         premiumPaid = _rfqInitialization.rfqQuote.premium;
         _mint(optionReceiver, _rfqInitialization.optionInfo.notional);
-
+        // @dev: automatically set max. allowance to minimize
+        // overhead for follow-on option token swapping via router
+        _approve(optionReceiver, _router, type(uint256).max);
         _initialize(
             _router,
             _owner,
@@ -150,7 +152,9 @@ contract Escrow is InitializableERC20 {
         optionInfo = _optionInfo;
         optionMinted = true;
         _mint(optionReceiver, _optionInfo.notional);
-
+        // @dev: automatically set max. allowance to minimize
+        // overhead for follow-on option token swapping via router
+        _approve(optionReceiver, _router, type(uint256).max);
         _initialize(
             _router,
             _owner,
@@ -167,7 +171,8 @@ contract Escrow is InitializableERC20 {
         bytes[] memory _oracleData,
         address distPartner
     ) external returns (DataTypes.BidPreview memory preview) {
-        if (msg.sender != router) {
+        address _router = router;
+        if (msg.sender != _router) {
             revert Errors.InvalidSender();
         }
         preview = previewBid(relBid, _refSpot, _oracleData, distPartner);
@@ -183,6 +188,9 @@ contract Escrow is InitializableERC20 {
         optionMinted = true;
         premiumPaid = preview.premium;
         _mint(optionReceiver, optionInfo.notional);
+        // @dev: automatically set max. allowance to minimize
+        // overhead for follow-on option token swapping via router
+        _approve(optionReceiver, _router, type(uint256).max);
     }
 
     function handleExercise(

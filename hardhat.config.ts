@@ -22,10 +22,12 @@ const config: HardhatUserConfig = {
       accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
     },
     hardhat: {
+      /*
       forking: {
         url: `https://arb1.arbitrum.io/rpc`,
       },
       chainId: 42161,
+      */
     },
   },
   etherscan: {
