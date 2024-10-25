@@ -8,12 +8,13 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {DataTypes} from "./DataTypes.sol";
-import {Router} from "./Router.sol";
 import {Errors} from "./errors/Errors.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
+import {IEscrow} from "./interfaces/IEscrow.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
 
-contract Escrow is InitializableERC20 {
+contract Escrow is InitializableERC20, IEscrow {
     using SafeERC20 for IERC20Metadata;
 
     uint256 internal constant BASE = 1 ether;
@@ -32,24 +33,6 @@ contract Escrow is InitializableERC20 {
 
     DataTypes.OptionInfo public optionInfo;
     DataTypes.AuctionParams public auctionParams;
-
-    event OnChainVotingDelegation(address delegate);
-    event OffChainVotingDelegation(
-        address allowedDelegateRegistry,
-        bytes32 spaceId,
-        address delegate
-    );
-    event Withdraw(
-        address indexed sender,
-        address indexed to,
-        address indexed token,
-        uint256 amount
-    );
-    event TransferOwnership(
-        address indexed sender,
-        address oldOwner,
-        address newOwner
-    );
 
     function initializeAuction(
         address _router,
@@ -473,8 +456,9 @@ contract Escrow is InitializableERC20 {
         uint48 earliestExerciseTime = SafeCast.toUint48(
             block.timestamp + auctionParams.earliestExerciseTenor
         );
-        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = Router(router)
-            .getMatchFees(distPartner, premium);
+        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = IRouter(
+            router
+        ).getMatchFees(distPartner, premium);
 
         return
             DataTypes.BidPreview({
