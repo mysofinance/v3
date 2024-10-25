@@ -128,6 +128,7 @@ describe("Router And Escrow Interaction", function () {
       )
         .to.emit(router, "BidOnAuction")
         .withArgs(
+          user1.address,
           escrowAddress,
           relBid,
           user1.address,

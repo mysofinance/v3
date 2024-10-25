@@ -12,8 +12,9 @@ import {Escrow} from "./Escrow.sol";
 import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "./errors/Errors.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
 
-contract Router is Ownable {
+contract Router is Ownable, IRouter {
     using SafeERC20 for IERC20Metadata;
 
     uint64 internal constant BASE = 1 ether;
@@ -32,71 +33,6 @@ contract Router is Ownable {
     mapping(bytes32 => bool) public isSwapQuoteUsed;
     mapping(address => bool) public quotesPaused;
     address[] public escrows;
-
-    event CreateAuction(
-        address indexed escrowOwner,
-        address indexed escrow,
-        DataTypes.AuctionInitialization auctionInitialization
-    );
-    event WithdrawFromEscrowAndCreateAuction(
-        address indexed escrowOwner,
-        address indexed oldEscrow,
-        address indexed newEscrow,
-        DataTypes.AuctionInitialization auctionInitialization
-    );
-    event Withdraw(
-        address indexed sender,
-        address indexed escrow,
-        address to,
-        address indexed token,
-        uint256 amount
-    );
-    event BidOnAuction(
-        address indexed escrow,
-        uint256 relBid,
-        address optionReceiver,
-        uint256 refSpot,
-        uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner,
-        address indexed distPartner
-    );
-    event Exercise(
-        address indexed escrow,
-        address underlyingReceiver,
-        uint256 underlyingAmount,
-        uint256 exerciseFeeAmount
-    );
-    event Borrow(
-        address indexed escrow,
-        address underlyingReceiver,
-        uint128 underlyingAmount,
-        uint256 collateralFeeAmount
-    );
-    event Repay(
-        address indexed escrow,
-        address collateralReceiver,
-        uint128 repayUnderlyingAmount
-    );
-    event TakeQuote(
-        address indexed escrowOwner,
-        address indexed escrow,
-        DataTypes.RFQInitialization rfqInitialization,
-        uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner,
-        address indexed distPartner
-    );
-    event TakeSwapQuote(
-        address indexed to,
-        address indexed maker,
-        DataTypes.SwapQuote swapQuote
-    );
-    event MintOption(
-        address indexed optionReceiver,
-        address indexed escrowOwner,
-        DataTypes.OptionInfo optionInfo
-    );
-    event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
-    event PauseQuotes(address indexed quoter, bool isPaused);
 
     constructor(address initOwner, address _escrowImpl) Ownable(initOwner) {
         escrowImpl = _escrowImpl;
@@ -222,6 +158,7 @@ contract Router is Ownable {
         }
 
         emit BidOnAuction(
+            msg.sender,
             escrow,
             relBid,
             optionReceiver,
@@ -273,6 +210,7 @@ contract Router is Ownable {
             );
         }
         emit Exercise(
+            msg.sender,
             escrow,
             underlyingReceiver,
             underlyingAmount,
@@ -315,9 +253,11 @@ contract Router is Ownable {
             );
         }
         emit Borrow(
+            msg.sender,
             escrow,
             underlyingReceiver,
             borrowUnderlyingAmount,
+            collateralAmount,
             collateralFeeAmount
         );
     }
@@ -330,17 +270,21 @@ contract Router is Ownable {
         if (!isEscrow[escrow]) {
             revert Errors.NotAnEscrow();
         }
-        (address underlyingToken, ) = Escrow(escrow).handleRepay(
-            msg.sender,
-            collateralReceiver,
-            repayUnderlyingAmount
-        );
+        (address underlyingToken, uint256 unlockedCollateralAmount) = Escrow(
+            escrow
+        ).handleRepay(msg.sender, collateralReceiver, repayUnderlyingAmount);
         IERC20Metadata(underlyingToken).safeTransferFrom(
             msg.sender,
             escrow,
             repayUnderlyingAmount
         );
-        emit Repay(escrow, collateralReceiver, repayUnderlyingAmount);
+        emit Repay(
+            escrow,
+            escrow,
+            collateralReceiver,
+            repayUnderlyingAmount,
+            unlockedCollateralAmount
+        );
     }
 
     function takeQuote(
@@ -401,6 +345,7 @@ contract Router is Ownable {
             );
         }
         emit TakeQuote(
+            msg.sender,
             escrowOwner,
             escrow,
             rfqInitialization,
@@ -464,7 +409,7 @@ contract Router is Ownable {
             to,
             swapQuote.makerGiveAmount
         );
-        emit TakeSwapQuote(to, maker, swapQuote);
+        emit TakeSwapQuote(msg.sender, to, maker, swapQuote);
     }
 
     function togglePauseQuotes() external {
@@ -507,7 +452,7 @@ contract Router is Ownable {
             escrow,
             optionInfo.notional
         );
-        emit MintOption(optionReceiver, escrowOwner, optionInfo);
+        emit MintOption(msg.sender, optionReceiver, escrowOwner, optionInfo);
     }
 
     function setFeeHandler(address newFeeHandler) external onlyOwner {

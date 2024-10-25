@@ -157,6 +157,7 @@ describe("Router Contract", function () {
       )
         .to.emit(router, "BidOnAuction")
         .withArgs(
+          user1.address,
           escrow.target,
           relBid,
           user1.address,
