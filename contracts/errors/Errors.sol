@@ -22,6 +22,7 @@ library Errors {
     error InvalidRepayTime();
     error InvalidSender();
     error InvalidMinMaxSpot();
+    error InvalidRedeem();
     error InvalidStrike();
     error InvalidTakeQuote();
     error InvalidTenor();
@@ -30,6 +31,7 @@ library Errors {
     error NoAllowedDelegateRegistry();
     error NoOptionMinted();
     error NotAnEscrow();
+    error NothingToRedeem();
     error NothingToRepay();
     error OwnerAlreadySet();
     error SwapQuoteAlreadyUsed();

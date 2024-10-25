@@ -809,4 +809,123 @@ describe("Router Contract", function () {
       expect(preview.status).to.equal(DataTypes.BidStatus.Success);
     });
   });
+
+  describe("Redeem Underlying Tokens", function () {
+    let auctionInitialization: DataTypes.AuctionInitialization;
+    let escrow: Escrow;
+
+    beforeEach(async function () {
+      auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        earliestExerciseTenor: 0,
+        borrowCap: BASE,
+      });
+
+      // Create auction and bid on it to obtain full option token supply
+      escrow = await createAuction(auctionInitialization, router, owner);
+      const currentAsk = await escrow.currAsk();
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await router
+        .connect(user1)
+        .bidOnAuction(
+          escrow.target,
+          user1.address,
+          currentAsk,
+          ethers.parseUnits("1", 6),
+          [],
+          ethers.ZeroAddress
+        );
+    });
+
+    it("should allow owner to redeem underlying tokens if they hold the entire option token supply", async function () {
+      // Transfer all option tokens back to the owner
+      const totalSupply = await escrow.totalSupply();
+      await escrow.connect(user1).transfer(owner.address, totalSupply);
+
+      // Check initial balances
+      const underlyingBalanceBefore = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const escrowBalanceBefore = await underlyingToken.balanceOf(
+        escrow.target
+      );
+
+      // Redeem underlying tokens
+      await expect(escrow.connect(owner).redeem(owner.address))
+        .to.emit(escrow, "Redeem")
+        .withArgs(
+          owner.address,
+          owner.address,
+          underlyingToken.target,
+          escrowBalanceBefore
+        );
+
+      // Check final balances
+      const underlyingBalanceAfter = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const escrowBalanceAfter = await underlyingToken.balanceOf(escrow.target);
+      expect(underlyingBalanceAfter - underlyingBalanceBefore).to.equal(
+        escrowBalanceBefore
+      );
+      expect(escrowBalanceAfter).to.equal(0);
+    });
+
+    it("should revert if a non-owner tries to redeem", async function () {
+      await expect(
+        escrow.connect(user1).redeem(user1.address)
+      ).to.be.revertedWithCustomError(escrow, "InvalidSender");
+    });
+
+    it("should revert if there are outstanding borrows", async function () {
+      // Simulate borrowing from escrow
+      await settlementToken.mint(
+        user1.address,
+        ethers.parseUnits("1000000", 6)
+      );
+      await router
+        .connect(user1)
+        .borrow(
+          escrow.target,
+          user1.address,
+          auctionInitialization.notional / 2n
+        );
+
+      await expect(
+        escrow.connect(owner).redeem(owner.address)
+      ).to.be.revertedWithCustomError(escrow, "InvalidRedeem");
+    });
+
+    it("should revert if owner does not hold the full option token supply", async function () {
+      // Transfer a portion of option tokens to another user
+      await escrow
+        .connect(owner)
+        .transfer(user2.address, (await escrow.balanceOf(owner.address)) / 2n);
+
+      await expect(
+        escrow.connect(owner).redeem(owner.address)
+      ).to.be.revertedWithCustomError(escrow, "InvalidRedeem");
+    });
+
+    it("should revert if there is nothing to redeem", async function () {
+      // Option holder exercises option and thereby burns all supply
+      await router
+        .connect(user1)
+        .exercise(
+          escrow.target,
+          user1.address,
+          auctionInitialization.notional,
+          true,
+          []
+        );
+
+      await expect(
+        escrow.connect(owner).redeem(owner.address)
+      ).to.be.revertedWithCustomError(escrow, "NothingToRedeem");
+    });
+  });
 });

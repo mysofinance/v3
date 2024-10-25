@@ -45,6 +45,18 @@ interface IEscrow {
         address newOwner
     );
 
+    /// @notice Emitted when a redeem action is performed.
+    /// @param sender The address initiating the redemption.
+    /// @param to The address receiving the redeemed underlying tokens.
+    /// @param underlyingToken The address of the underlying token being redeemed.
+    /// @param amount The amount of underlying tokens redeemed.
+    event Redeem(
+        address indexed sender,
+        address to,
+        address underlyingToken,
+        uint256 amount
+    );
+
     /// @notice Returns the premium paid for the option.
     /// @return premiumPaid Amount of premium paid for the option.
     function premiumPaid() external view returns (uint128);
@@ -204,6 +216,10 @@ interface IEscrow {
     /// @param token Address of the token to withdraw.
     /// @param amount Amount of tokens to withdraw.
     function handleWithdraw(address to, address token, uint256 amount) external;
+
+    /// @notice Redeems the underlying tokens iff the escrow owner holds all option tokens.
+    /// @param to The address that will receive the underlying tokens upon redemption.
+    function redeem(address to) external;
 
     /// @notice Transfers ownership of the Escrow to a new owner.
     /// @param newOwner Address of the new owner.

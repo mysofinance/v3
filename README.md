@@ -9,7 +9,7 @@ MYSO v3 offers two settlement methods for covered call match-making:
 
 Upon a match, the option position is represented as an ERC20 option token, which is transferable and can be resold. The option writer gains ownership of an escrow account backing the option with the specified underlying asset. Depending on the given option configuration, various post-settlement use cases can be supported, such as allowing the owner to retain voting power over the collateral or enabling the option holder to borrow and repay underlying tokens.
 
-## Contract structure
+## Contracts
 
 ```
 contracts/
@@ -40,7 +40,7 @@ contracts/
 ┗ Router.sol                       # Core Router contract for auction and option operations
 ```
 
-## Test structure
+## Test Files
 
 ```
 test/
