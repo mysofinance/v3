@@ -78,7 +78,6 @@ describe("EIP-1271 Signer Tests", function () {
 
   it("should reconstruct and verify a signature with Safe multisig checkNSignatures", async function () {
     if (chainId !== "0xa4b1") {
-      // 42161 in hexadecimal
       console.log(
         "Skipping test: Only meant for forked mainnet on Arbitrum to test with Safe multisig (chain ID 42161)."
       );
