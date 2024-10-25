@@ -365,6 +365,7 @@ describe("Router Contract", function () {
         makerGiveAmount: optionTokenAmount,
         validUntil: (await getLatestTimestamp()) + 60 * 5, // 5 minutes from now
         signature: "",
+        erc1271Maker: ethers.ZeroAddress,
       };
 
       const payloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);

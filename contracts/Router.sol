@@ -12,6 +12,7 @@ import {Escrow} from "./Escrow.sol";
 import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "./errors/Errors.sol";
+import {IERC1271} from "./interfaces/IERC1271.sol";
 
 contract Router is Ownable {
     using SafeERC20 for IERC20Metadata;
@@ -19,6 +20,9 @@ contract Router is Ownable {
     uint64 internal constant BASE = 1 ether;
     uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
     uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
+
+    bytes4 internal constant ERC1271_CHECK_SELECTOR =
+        bytes4(keccak256("isValidSignature(bytes32,bytes)"));
 
     address public immutable escrowImpl;
     address public feeHandler;
@@ -425,10 +429,25 @@ contract Router is Ownable {
                 swapQuote.validUntil
             )
         );
-        address maker = ECDSA.recover(
-            MessageHashUtils.toEthSignedMessageHash(msgHash),
-            swapQuote.signature
-        );
+
+        address maker;
+        if (swapQuote.erc1271Maker == address(0)) {
+            maker = ECDSA.recover(
+                MessageHashUtils.toEthSignedMessageHash(msgHash),
+                swapQuote.signature
+            );
+        } else {
+            bool isValid = _checkERC1271Signature(
+                swapQuote.erc1271Maker,
+                msgHash,
+                swapQuote.signature
+            );
+            if (!isValid) {
+                revert Errors.InvalidERC1271Signature();
+            }
+            maker = swapQuote.erc1271Maker;
+        }
+
         if (quotesPaused[maker]) {
             revert Errors.SwapQuotePaused();
         }
@@ -554,10 +573,23 @@ contract Router is Ownable {
             )
         );
 
-        address quoter = ECDSA.recover(
-            MessageHashUtils.toEthSignedMessageHash(msgHash),
-            rfqInitialization.rfqQuote.signature
-        );
+        address quoter;
+        if (rfqInitialization.rfqQuote.erc1271Maker == address(0)) {
+            quoter = ECDSA.recover(
+                MessageHashUtils.toEthSignedMessageHash(msgHash),
+                rfqInitialization.rfqQuote.signature
+            );
+        } else {
+            bool isValid = _checkERC1271Signature(
+                rfqInitialization.rfqQuote.erc1271Maker,
+                msgHash,
+                rfqInitialization.rfqQuote.signature
+            );
+            if (!isValid) {
+                revert Errors.InvalidERC1271Signature();
+            }
+            quoter = rfqInitialization.rfqQuote.erc1271Maker;
+        }
 
         if (
             rfqInitialization.optionInfo.underlyingToken ==
@@ -668,5 +700,22 @@ contract Router is Ownable {
                 matchFeeProtocol: 0,
                 matchFeeDistPartner: 0
             });
+    }
+
+    function _checkERC1271Signature(
+        address erc1271Wallet,
+        bytes32 msgHash,
+        bytes calldata signature
+    ) internal view returns (bool isValid) {
+        (bool success, bytes memory returnData) = erc1271Wallet.staticcall(
+            abi.encodeWithSelector(ERC1271_CHECK_SELECTOR, msgHash, signature)
+        );
+
+        if (success && returnData.length == 32) {
+            bytes4 result = abi.decode(returnData, (bytes4));
+            return result == 0x1626ba7e;
+        }
+
+        return false;
     }
 }

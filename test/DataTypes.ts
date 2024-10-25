@@ -33,6 +33,7 @@ export namespace DataTypes {
     premium: bigint;
     validUntil: number;
     signature: string;
+    erc1271Maker: string;
   }
 
   export interface RFQInitialization {
@@ -96,5 +97,6 @@ export namespace DataTypes {
     makerGiveAmount: bigint;
     validUntil: number;
     signature: string;
+    erc1271Maker: string;
   }
 }

@@ -49,6 +49,7 @@ library DataTypes {
         uint128 premium;
         uint256 validUntil;
         bytes signature;
+        address erc1271Maker;
     }
 
     enum BidStatus {
@@ -99,5 +100,6 @@ library DataTypes {
         uint256 makerGiveAmount;
         uint256 validUntil;
         bytes signature;
+        address erc1271Maker;
     }
 }
