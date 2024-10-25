@@ -40,6 +40,8 @@ contract ChainlinkOracle is IOracle, Ownable {
     error NoOracle();
     error OracleAlreadySet(address oracleAddr);
 
+    event OracleMappingAdded(address token, address oracle);
+
     // Mapping from token address to its OracleInfo
     mapping(address => OracleInfo) public oracleInfos;
 
@@ -95,6 +97,7 @@ contract ChainlinkOracle is IOracle, Ownable {
                 revert OracleAlreadySet(existingInfo.oracleAddr);
             }
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
+            emit OracleMappingAdded(_tokenAddrs[i], _oracleAddrs[i]);
         }
     }
 

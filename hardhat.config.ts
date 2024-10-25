@@ -22,12 +22,21 @@ const config: HardhatUserConfig = {
       accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
     },
     hardhat: {
-      /*
       forking: {
-        url: `https://arb1.arbitrum.io/rpc`,
+        url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        blockNumber: 19261000,
       },
-      chainId: 42161,
-      */
+      gas: "auto",
+      gasPrice: "auto",
+      gasMultiplier: 2,
+      // Add these lines for more stable gas handling
+      mining: {
+        auto: true,
+        interval: 0,
+        mempool: {
+          order: "fifo"
+        }
+      }
     },
   },
   etherscan: {
