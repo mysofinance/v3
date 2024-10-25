@@ -15,13 +15,9 @@ import {IOracle} from "../interfaces/IOracle.sol";
  *      it uses the ETH/USD oracle to convert the price to ETH.
  */
 contract ChainlinkOracle is IOracle, Ownable {
-    // Immutable address for the ETH/USD Chainlink oracle
+    uint256 public immutable MAX_TIME_SINCE_LAST_UPDATE;
     address public immutable ETH_USD_ORACLE;
-
     address public immutable WETH;
-
-    // Maximum timestamp divergence for price updates
-    uint256 private constant MAX_PRICE_UPDATE_TIMESTAMP_DIVERGENCE = 1 days;
 
     /**
      * @dev Struct to store oracle address and its decimals.
@@ -33,9 +29,10 @@ contract ChainlinkOracle is IOracle, Ownable {
         uint8 decimals;
     }
 
-    error InvalidOracleAnswer();
     error InvalidAddress();
     error InvalidArrayLength();
+    error InvalidMaxTimeSinceLastUpdate();
+    error InvalidOracleAnswer();
     error InvalidOracleDecimals();
     error NoOracle();
     error OracleAlreadySet(address oracleAddr);
@@ -51,25 +48,32 @@ contract ChainlinkOracle is IOracle, Ownable {
      * @param _oracleAddrs Array of corresponding oracle addresses.
      * @param _ethUsdOracle Address of the ETH/USD Chainlink oracle.
      * @param _owner Address of the owner.
+     * @param _maxTimeSinceLastUpdate Maximum time since last update.
      */
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address _ethUsdOracle,
         address _owner,
-        address _weth
+        address _weth,
+        uint256 _maxTimeSinceLastUpdate
     ) Ownable(_owner) {
         uint256 tokenAddrsLength = _tokenAddrs.length;
         if (tokenAddrsLength == 0 || tokenAddrsLength != _oracleAddrs.length) {
             revert InvalidArrayLength();
         }
 
-        if (_ethUsdOracle == address(0)) {
+        if (_ethUsdOracle == address(0) || _weth == address(0)) {
             revert InvalidAddress();
+        }
+
+        if (_maxTimeSinceLastUpdate == 0) {
+            revert InvalidMaxTimeSinceLastUpdate();
         }
 
         ETH_USD_ORACLE = _ethUsdOracle;
         WETH = _weth;
+        MAX_TIME_SINCE_LAST_UPDATE = _maxTimeSinceLastUpdate;
 
         for (uint256 i = 0; i < tokenAddrsLength; ++i) {
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
@@ -179,7 +183,7 @@ contract ChainlinkOracle is IOracle, Ownable {
             answeredInRound < roundId ||
             answer < 1 ||
             updatedAt > block.timestamp ||
-            updatedAt + MAX_PRICE_UPDATE_TIMESTAMP_DIVERGENCE < block.timestamp
+            updatedAt + MAX_TIME_SINCE_LAST_UPDATE < block.timestamp
         ) {
             revert InvalidOracleAnswer();
         }

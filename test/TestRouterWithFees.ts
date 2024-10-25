@@ -7,18 +7,17 @@ import {
   MockOracle,
   FeeHandler,
 } from "../typechain-types";
-import { DataTypes } from "./DataTypes";
 
 import {
   setupTestContracts,
-  setupAuction,
   rfqSignaturePayload,
   getRFQInitialization,
-} from "./testHelpers";
+  getAuctionInitialization,
+  createAuction,
+} from "./helpers";
 
 describe("Router Contract Fee Tests", function () {
   let router: Router;
-  let escrowImpl: Escrow;
   let settlementToken: MockERC20;
   let underlyingToken: MockERC20;
   let mockOracle: MockOracle;
@@ -41,7 +40,6 @@ describe("Router Contract Fee Tests", function () {
       provider,
       settlementToken,
       underlyingToken,
-      escrowImpl,
       router,
       mockOracle,
     } = contracts);
@@ -184,26 +182,16 @@ describe("Router Contract Fee Tests", function () {
 
   describe("Fees in Auction", function () {
     it("should apply correct fees when bidding on an auction", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve settlement token for bidding and fees
       const bidAmount = ethers.parseEther("2"); // 2% of notional
@@ -259,27 +247,16 @@ describe("Router Contract Fee Tests", function () {
       );
     });
     it("should apply correct fees when borrowing", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         borrowCap: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -542,27 +519,16 @@ describe("Router Contract Fee Tests", function () {
       await feeHandler
         .connect(owner)
         .setExerciseFee(ethers.parseEther("0.001"));
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         borrowCap: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -650,27 +616,16 @@ describe("Router Contract Fee Tests", function () {
       await feeHandler
         .connect(owner)
         .setExerciseFee(ethers.parseEther("0.001"));
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         borrowCap: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -757,26 +712,16 @@ describe("Router Contract Fee Tests", function () {
       await feeHandler.connect(owner).setMatchFeeInfo(MAX_MATCH_FEE, BASE);
       await feeHandler.connect(owner).setExerciseFee(MAX_EXERCISE_FEE);
 
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
 
-      // Start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Bid on auction
       const bidAmount = ethers.parseEther("20"); // 20% of notional
@@ -864,26 +809,16 @@ describe("Router Contract Fee Tests", function () {
         .connect(owner)
         .setMatchFeeInfo(matchFee, distPartnerShare);
 
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
 
-      // Start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Bid on auction
       const bidAmount = ethers.parseEther("10");

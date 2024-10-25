@@ -8,12 +8,13 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {Escrow} from "./Escrow.sol";
 import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "./errors/Errors.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
+import {IEscrow} from "./interfaces/IEscrow.sol";
 
-contract Router is Ownable {
+contract Router is Ownable, IRouter {
     using SafeERC20 for IERC20Metadata;
 
     uint64 internal constant BASE = 1 ether;
@@ -31,72 +32,8 @@ contract Router is Ownable {
     mapping(bytes32 => bool) public isQuoteUsed;
     mapping(bytes32 => bool) public isSwapQuoteUsed;
     mapping(address => bool) public quotesPaused;
-    address[] public escrows;
 
-    event CreateAuction(
-        address indexed escrowOwner,
-        address indexed escrow,
-        DataTypes.AuctionInitialization auctionInitialization
-    );
-    event WithdrawFromEscrowAndCreateAuction(
-        address indexed escrowOwner,
-        address indexed oldEscrow,
-        address indexed newEscrow,
-        DataTypes.AuctionInitialization auctionInitialization
-    );
-    event Withdraw(
-        address indexed sender,
-        address indexed escrow,
-        address to,
-        address indexed token,
-        uint256 amount
-    );
-    event BidOnAuction(
-        address indexed escrow,
-        uint256 relBid,
-        address optionReceiver,
-        uint256 refSpot,
-        uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner,
-        address indexed distPartner
-    );
-    event Exercise(
-        address indexed escrow,
-        address underlyingReceiver,
-        uint256 underlyingAmount,
-        uint256 exerciseFeeAmount
-    );
-    event Borrow(
-        address indexed escrow,
-        address underlyingReceiver,
-        uint128 underlyingAmount,
-        uint256 collateralFeeAmount
-    );
-    event Repay(
-        address indexed escrow,
-        address collateralReceiver,
-        uint128 repayUnderlyingAmount
-    );
-    event TakeQuote(
-        address indexed escrowOwner,
-        address indexed escrow,
-        DataTypes.RFQInitialization rfqInitialization,
-        uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner,
-        address indexed distPartner
-    );
-    event TakeSwapQuote(
-        address indexed to,
-        address indexed maker,
-        DataTypes.SwapQuote swapQuote
-    );
-    event MintOption(
-        address indexed optionReceiver,
-        address indexed escrowOwner,
-        DataTypes.OptionInfo optionInfo
-    );
-    event NewFeeHandler(address oldFeeHandler, address newFeeHandler);
-    event PauseQuotes(address indexed quoter, bool isPaused);
+    address[] internal _escrows;
 
     constructor(address initOwner, address _escrowImpl) Ownable(initOwner) {
         escrowImpl = _escrowImpl;
@@ -107,7 +44,7 @@ contract Router is Ownable {
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
         (address escrow, uint256 oTokenIndex) = _createEscrow();
-        Escrow(escrow).initializeAuction(
+        IEscrow(escrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
@@ -130,10 +67,10 @@ contract Router is Ownable {
         if (!isEscrow[oldEscrow]) {
             revert Errors.NotAnEscrow();
         }
-        if (msg.sender != Escrow(oldEscrow).owner()) {
+        if (msg.sender != IEscrow(oldEscrow).owner()) {
             revert Errors.InvalidSender();
         }
-        Escrow(oldEscrow).handleWithdraw(
+        IEscrow(oldEscrow).handleWithdraw(
             msg.sender,
             auctionInitialization.underlyingToken,
             IERC20Metadata(auctionInitialization.underlyingToken).balanceOf(
@@ -141,7 +78,7 @@ contract Router is Ownable {
             )
         );
         (address newEscrow, uint256 oTokenIndex) = _createEscrow();
-        Escrow(newEscrow).initializeAuction(
+        IEscrow(newEscrow).initializeAuction(
             address(this),
             escrowOwner,
             getExerciseFee(),
@@ -170,10 +107,10 @@ contract Router is Ownable {
         if (!isEscrow[escrow]) {
             revert Errors.NotAnEscrow();
         }
-        if (msg.sender != Escrow(escrow).owner()) {
+        if (msg.sender != IEscrow(escrow).owner()) {
             revert Errors.InvalidSender();
         }
-        Escrow(escrow).handleWithdraw(to, token, amount);
+        IEscrow(escrow).handleWithdraw(to, token, amount);
         emit Withdraw(msg.sender, escrow, to, token, amount);
     }
 
@@ -188,7 +125,7 @@ contract Router is Ownable {
         if (!isEscrow[escrow]) {
             revert Errors.NotAnEscrow();
         }
-        preview = Escrow(escrow).handleAuctionBid(
+        preview = IEscrow(escrow).handleAuctionBid(
             relBid,
             optionReceiver,
             _refSpot,
@@ -197,7 +134,7 @@ contract Router is Ownable {
         );
         IERC20Metadata(preview.premiumToken).safeTransferFrom(
             msg.sender,
-            Escrow(escrow).owner(),
+            IEscrow(escrow).owner(),
             preview.premium -
                 preview.matchFeeDistPartner -
                 preview.matchFeeProtocol
@@ -222,6 +159,7 @@ contract Router is Ownable {
         }
 
         emit BidOnAuction(
+            msg.sender,
             escrow,
             relBid,
             optionReceiver,
@@ -246,7 +184,7 @@ contract Router is Ownable {
             address settlementToken,
             uint256 settlementAmount,
             uint256 exerciseFeeAmount
-        ) = Escrow(escrow).handleExercise(
+        ) = IEscrow(escrow).handleExercise(
                 msg.sender,
                 underlyingReceiver,
                 underlyingAmount,
@@ -256,7 +194,7 @@ contract Router is Ownable {
         if (payInSettlementToken) {
             IERC20Metadata(settlementToken).safeTransferFrom(
                 msg.sender,
-                Escrow(escrow).owner(),
+                IEscrow(escrow).owner(),
                 settlementAmount
             );
         }
@@ -273,6 +211,7 @@ contract Router is Ownable {
             );
         }
         emit Exercise(
+            msg.sender,
             escrow,
             underlyingReceiver,
             underlyingAmount,
@@ -292,7 +231,7 @@ contract Router is Ownable {
             address settlementToken,
             uint256 collateralAmount,
             uint256 collateralFeeAmount
-        ) = Escrow(escrow).handleBorrow(
+        ) = IEscrow(escrow).handleBorrow(
                 msg.sender,
                 underlyingReceiver,
                 borrowUnderlyingAmount
@@ -315,9 +254,11 @@ contract Router is Ownable {
             );
         }
         emit Borrow(
+            msg.sender,
             escrow,
             underlyingReceiver,
             borrowUnderlyingAmount,
+            collateralAmount,
             collateralFeeAmount
         );
     }
@@ -330,17 +271,21 @@ contract Router is Ownable {
         if (!isEscrow[escrow]) {
             revert Errors.NotAnEscrow();
         }
-        (address underlyingToken, ) = Escrow(escrow).handleRepay(
-            msg.sender,
-            collateralReceiver,
-            repayUnderlyingAmount
-        );
+        (address underlyingToken, uint256 unlockedCollateralAmount) = IEscrow(
+            escrow
+        ).handleRepay(msg.sender, collateralReceiver, repayUnderlyingAmount);
         IERC20Metadata(underlyingToken).safeTransferFrom(
             msg.sender,
             escrow,
             repayUnderlyingAmount
         );
-        emit Repay(escrow, collateralReceiver, repayUnderlyingAmount);
+        emit Repay(
+            escrow,
+            escrow,
+            collateralReceiver,
+            repayUnderlyingAmount,
+            unlockedCollateralAmount
+        );
     }
 
     function takeQuote(
@@ -360,7 +305,7 @@ contract Router is Ownable {
         isQuoteUsed[preview.msgHash] = true;
 
         (address escrow, uint256 oTokenIndex) = _createEscrow();
-        Escrow(escrow).initializeRFQMatch(
+        IEscrow(escrow).initializeRFQMatch(
             address(this),
             escrowOwner,
             preview.quoter,
@@ -401,6 +346,7 @@ contract Router is Ownable {
             );
         }
         emit TakeQuote(
+            msg.sender,
             escrowOwner,
             escrow,
             rfqInitialization,
@@ -464,7 +410,7 @@ contract Router is Ownable {
             to,
             swapQuote.makerGiveAmount
         );
-        emit TakeSwapQuote(to, maker, swapQuote);
+        emit TakeSwapQuote(msg.sender, to, maker, swapQuote);
     }
 
     function togglePauseQuotes() external {
@@ -494,7 +440,7 @@ contract Router is Ownable {
             revert Errors.InvalidBorrowCap();
         }
         (address escrow, uint256 oTokenIndex) = _createEscrow();
-        Escrow(escrow).initializeMintOption(
+        IEscrow(escrow).initializeMintOption(
             address(this),
             escrowOwner,
             optionReceiver,
@@ -507,7 +453,7 @@ contract Router is Ownable {
             escrow,
             optionInfo.notional
         );
-        emit MintOption(optionReceiver, escrowOwner, optionInfo);
+        emit MintOption(msg.sender, optionReceiver, escrowOwner, optionInfo);
     }
 
     function setFeeHandler(address newFeeHandler) external onlyOwner {
@@ -664,14 +610,14 @@ contract Router is Ownable {
     function getEscrows(
         uint256 from,
         uint256 numElements
-    ) external view returns (address[] memory _escrows) {
-        uint256 length = escrows.length;
+    ) external view returns (address[] memory _escrowArray) {
+        uint256 length = _escrows.length;
         if (numElements == 0 || from + numElements > length) {
             revert Errors.InvalidGetEscrowsQuery();
         }
-        _escrows = new address[](numElements);
+        _escrowArray = new address[](numElements);
         for (uint256 i = 0; i < numElements; ++i) {
-            _escrows[i] = escrows[from + i];
+            _escrowArray[i] = _escrows[from + i];
         }
     }
 
@@ -686,7 +632,7 @@ contract Router is Ownable {
         );
         numEscrows = oTokenIndex;
         isEscrow[escrow] = true;
-        escrows.push(escrow);
+        _escrows.push(escrow);
     }
 
     function _createTakeQuotePreview(
