@@ -33,6 +33,7 @@ export namespace DataTypes {
     premium: bigint;
     validUntil: number;
     signature: string;
+    eip1271Maker: string;
   }
 
   export interface RFQInitialization {
@@ -77,6 +78,7 @@ export namespace DataTypes {
     AlreadyExecuted = 2,
     QuotesPaused = 3,
     Success = 4,
+    InvalidEIP1271Signature = 5,
   }
 
   export interface TakeQuotePreview {
@@ -96,5 +98,6 @@ export namespace DataTypes {
     makerGiveAmount: bigint;
     validUntil: number;
     signature: string;
+    eip1271Maker: string;
   }
 }

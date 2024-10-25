@@ -49,6 +49,7 @@ library DataTypes {
         uint128 premium;
         uint256 validUntil;
         bytes signature;
+        address eip1271Maker;
     }
 
     enum BidStatus {
@@ -79,7 +80,8 @@ library DataTypes {
         InvalidQuote,
         AlreadyExecuted,
         QuotesPaused,
-        Success
+        Success,
+        InvalidEIP1271Signature
     }
 
     struct TakeQuotePreview {
@@ -99,5 +101,6 @@ library DataTypes {
         uint256 makerGiveAmount;
         uint256 validUntil;
         bytes signature;
+        address eip1271Maker;
     }
 }

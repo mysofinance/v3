@@ -436,6 +436,7 @@ export const getRFQInitialization = async ({
       premium,
       validUntil,
       signature: ethers.hexlify(ethers.randomBytes(65)), // Mock signature
+      eip1271Maker: ethers.ZeroAddress,
     },
   };
   return rfqInitialization;

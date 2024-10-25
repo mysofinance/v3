@@ -9,6 +9,7 @@ library Errors {
     error InvalidBorrowTime();
     error InvalidEarliestExercise();
     error InvalidEarliestExerciseTenor();
+    error InvalidEIP1271Signature();
     error InvalidExpiry();
     error InvalidExercise();
     error InvalidExerciseAmount();

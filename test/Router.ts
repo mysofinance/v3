@@ -356,7 +356,11 @@ describe("Router Contract", function () {
       optionTokenAmount = await escrow.totalSupply();
       payAmount = ((preBal - postBal) * BigInt(1100)) / BigInt(1000);
 
-      await escrow.connect(user1).approve(router.target, ethers.MaxUint256);
+      // Expect allowance to be automatically set to max. on mint to
+      // minimize overhead for follow-on option token swapping via router
+      expect(await escrow.allowance(user1.address, router.target)).to.be.equal(
+        ethers.MaxUint256
+      );
 
       swapQuote = {
         takerGiveToken: String(settlementToken.target),
@@ -365,6 +369,7 @@ describe("Router Contract", function () {
         makerGiveAmount: optionTokenAmount,
         validUntil: (await getLatestTimestamp()) + 60 * 5, // 5 minutes from now
         signature: "",
+        eip1271Maker: ethers.ZeroAddress,
       };
 
       const payloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
