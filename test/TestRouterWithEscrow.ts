@@ -10,12 +10,13 @@ import {
 import { DataTypes } from "./DataTypes";
 import {
   setupTestContracts,
-  setupAuction,
   rfqSignaturePayload,
   getRFQInitialization,
   deployEscrowWithRFQ,
   getLatestTimestamp,
-} from "./testHelpers";
+  getAuctionInitialization,
+  createAuction,
+} from "./helpers";
 
 describe("Router And Escrow Interaction", function () {
   let router: Router;
@@ -48,23 +49,12 @@ describe("Router And Escrow Interaction", function () {
 
   describe("Start Auction", function () {
     it("should allow starting an auction", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
-      ).to.emit(router, "CreateAuction");
+      await createAuction(auctionInitialization, router, owner);
     });
   });
 
@@ -94,17 +84,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -164,17 +145,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and attempt to bid with low relBid
       await settlementToken
@@ -316,17 +288,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Fast forward time to after auction expiry
       await ethers.provider.send("evm_increaseTime", [3 * 86400]);
@@ -370,17 +333,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Fast forward time to after auction expiry
       await ethers.provider.send("evm_increaseTime", [3 * 86400]);
@@ -426,17 +380,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -503,17 +448,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -577,17 +513,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -667,17 +594,8 @@ describe("Router And Escrow Interaction", function () {
         },
       };
 
-      // Approve and start auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -711,27 +629,13 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should allow withdrawing from expired auction and creating a new one", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-        },
-        false
-      );
-
-      // Approve and start first auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional * 2n);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const oldEscrowAddress = escrows[0];
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+      });
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const oldEscrowAddress = escrow.target;
 
       // Fast forward time to after auction expiry (30 days + 1 hour)
       await ethers.provider.send("evm_increaseTime", [86400 * 30 + 3600]);
@@ -819,28 +723,16 @@ describe("Router And Escrow Interaction", function () {
 
   describe("Delegation", function () {
     it("should allow on-chain voting delegation", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(votingUnderlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
         votingDelegationAllowed: true,
-        router,
-        owner,
       });
-
-      // Approve and start auction
-      await votingUnderlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -874,27 +766,15 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert if delegation is not allowed", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(votingUnderlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-
-      // Approve and start auction
-      await votingUnderlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
-
-      const escrows = await router.getEscrows(0, 1);
-      const escrowAddress = escrows[0];
-      const escrow: any = await escrowImpl.attach(escrowAddress);
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrowAddress = escrow.target;
 
       // Approve and bid on auction
       await settlementToken
@@ -952,13 +832,12 @@ describe("Router And Escrow Interaction", function () {
 
   describe("Escrow initializeAuction", function () {
     it("should revert when re-initializing", async function () {
-      const { escrow, auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      const escrow = await createAuction(auctionInitialization, router, owner);
 
       await expect(
         escrow.initializeAuction(
@@ -972,16 +851,11 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidTokenPair", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(underlyingToken.target), // Same as underlying
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(underlyingToken.target), // Same as underlying
+        oracleAddress: String(mockOracle.target),
+      });
 
       await expect(
         router
@@ -991,17 +865,12 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidNotional", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          notionalAmount: 0n,
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        notionalAmount: 0n,
+      });
 
       await expect(
         router
@@ -1011,17 +880,12 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidStrike", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          relStrike: 0n,
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        relStrike: 0n,
+      });
 
       await expect(
         router
@@ -1031,17 +895,12 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidTenor", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          tenor: 0,
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        tenor: 0,
+      });
 
       await expect(
         router
@@ -1051,18 +910,13 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidEarliestExerciseTenor", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          tenor: 86400, // 1 day
-          earliestExerciseTenor: 86400, // 1 day (should be less than tenor - 1 day)
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        tenor: 86400, // 1 day
+        earliestExerciseTenor: 86400, // 1 day (should be less than tenor - 1 day)
+      });
 
       await expect(
         router
@@ -1075,18 +929,13 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidRelPremiums", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          relPremiumStart: 0n,
-          relPremiumFloor: 0n,
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        relPremiumStart: 0n,
+        relPremiumFloor: 0n,
+      });
 
       // rel premium start == 0
       await expect(
@@ -1120,18 +969,13 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidMinMaxSpot", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          minSpot: 2n,
-          maxSpot: 1n,
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        minSpot: 2n,
+        maxSpot: 1n,
+      });
 
       // min spot > max spot
       await expect(
@@ -1154,16 +998,11 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidOracle", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: ethers.ZeroAddress,
-          router,
-          owner,
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: ethers.ZeroAddress,
+      });
 
       await expect(
         router
@@ -1173,17 +1012,12 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidBorrowCap", async function () {
-      const { auctionInitialization } = await setupAuction(
-        {
-          underlyingTokenAddress: String(underlyingToken.target),
-          settlementTokenAddress: String(settlementToken.target),
-          oracleAddress: String(mockOracle.target),
-          router,
-          owner,
-          borrowCap: ethers.parseEther("1.1"), // 110%, which is > BASE (100%)
-        },
-        false
-      );
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        borrowCap: ethers.parseEther("1.1"), // 110%, which is > BASE (100%)
+      });
 
       await expect(
         router
@@ -1193,13 +1027,12 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert when bidding with invalid parameters", async function () {
-      const { escrow, auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      const escrow = await createAuction(auctionInitialization, router, owner);
 
       // Attempt to bid with invalid parameters (e.g., zero relBid)
       await expect(
@@ -1447,18 +1280,12 @@ describe("Router And Escrow Interaction", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
-      const {
-        escrow: escrowSetup,
-        auctionInitialization: auctionInitializationSetup,
-      } = await setupAuction({
+      auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-      escrow = escrowSetup;
-      auctionInitialization = auctionInitializationSetup;
+      escrow = await createAuction(auctionInitialization, router, owner);
     });
 
     describe("handleAuctionBid", function () {
@@ -1730,19 +1557,13 @@ describe("Router And Escrow Interaction", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
-      const {
-        escrow: escrowSetup,
-        auctionInitialization: auctionInitializationSetup,
-      } = await setupAuction({
+      auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
         borrowCap: ethers.parseEther("0.5"), // 50% borrow cap
       });
-      escrow = escrowSetup;
-      auctionInitialization = auctionInitializationSetup;
+      escrow = await createAuction(auctionInitialization, router, owner);
 
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -1771,13 +1592,16 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with NoOptionMinted if option is not minted", async function () {
-      const { escrow: newEscrow } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      const newEscrow = await createAuction(
+        auctionInitialization,
+        router,
+        owner
+      );
 
       await expect(
         router
@@ -1875,21 +1699,15 @@ describe("Router And Escrow Interaction", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
-      const {
-        escrow: escrowSetup,
-        auctionInitialization: auctionInitializationSetup,
-      } = await setupAuction({
+      auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
         borrowCap: ethers.parseEther("0.5"), // 50% borrow cap
         tenor: 60 * 60 * 24 * 30,
         earliestExerciseTenor: 60 * 60 * 24,
       });
-      escrow = escrowSetup;
-      auctionInitialization = auctionInitializationSetup;
+      escrow = await createAuction(auctionInitialization, router, owner);
 
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -1934,13 +1752,16 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with NoOptionMinted if option is not minted", async function () {
-      const { escrow: newEscrow } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      const newEscrow = await createAuction(
+        auctionInitialization,
+        router,
+        owner
+      );
 
       await expect(
         router
@@ -1983,14 +1804,17 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with NothingToRepay if totalBorrowed is zero", async function () {
-      const { escrow: newEscrow, auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
         borrowCap: 0n, // Set borrow cap to 0
       });
+      const newEscrow = await createAuction(
+        auctionInitialization,
+        router,
+        owner
+      );
 
       // Mint tokens and approve
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -2054,18 +1878,12 @@ describe("Router And Escrow Interaction", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
-      const {
-        escrow: escrowSetup,
-        auctionInitialization: auctionInitializationSetup,
-      } = await setupAuction({
+      auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-      escrow = escrowSetup;
-      auctionInitialization = auctionInitializationSetup;
+      escrow = await createAuction(auctionInitialization, router, owner);
 
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -2113,18 +1931,12 @@ describe("Router And Escrow Interaction", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
-      const {
-        escrow: escrowSetup,
-        auctionInitialization: auctionInitializationSetup,
-      } = await setupAuction({
+      auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
-      escrow = escrowSetup;
-      auctionInitialization = auctionInitializationSetup;
+      escrow = await createAuction(auctionInitialization, router, owner);
 
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -2218,19 +2030,13 @@ describe("Router And Escrow Interaction", function () {
       );
       delegateRegistry = await DelegateRegistry.deploy();
 
-      const {
-        escrow: escrowSetup,
-        auctionInitialization: auctionInitializationSetup,
-      } = await setupAuction({
+      auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
         allowedDelegateRegistry: delegateRegistry.target,
       });
-      escrow = escrowSetup;
-      auctionInitialization = auctionInitializationSetup;
+      escrow = await createAuction(auctionInitialization, router, owner);
 
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -2276,19 +2082,13 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert if no allowed delegate registry is set", async function () {
-      const {
-        escrow: escrowSetup,
-        auctionInitialization: auctionInitializationSetup,
-      } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
         allowedDelegateRegistry: ethers.ZeroAddress,
       });
-      escrow = escrowSetup;
-      auctionInitialization = auctionInitializationSetup;
+      escrow = await createAuction(auctionInitialization, router, owner);
 
       // Setup a successful bid
       await settlementToken.mint(user1.address, ethers.parseEther("1000"));
@@ -2318,35 +2118,27 @@ describe("Router And Escrow Interaction", function () {
 
   describe("Edge Cases and Reverts", function () {
     it("should push new escrow to array when creating second identical auction", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         notionalAmount: ethers.parseEther("100") / 2n,
         relStrike: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
+      expect(await router.numEscrows()).to.be.equal(0);
 
-      // Approve and start first auction
-      await underlyingToken
-        .connect(owner)
-        .approve(router.target, auctionInitialization.notional * 2n);
-      await router
-        .connect(owner)
-        .createAuction(owner.address, auctionInitialization);
+      const escrow1 = await createAuction(auctionInitialization, router, owner);
+      expect(await router.numEscrows()).to.be.equal(1);
 
-      // Attempt to start another auction with the same nonce (should create a new escrow)
-      await expect(
-        router
-          .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
-      ).to.emit(router, "CreateAuction");
+      const escrow2 = await createAuction(auctionInitialization, router, owner);
+      expect(await router.numEscrows()).to.be.equal(2);
 
       // Fetch both escrows and ensure they are unique
       const escrows = await router.getEscrows(0, 2);
-      expect(escrows[0]).to.not.equal(escrows[1]);
+      expect(escrow1.target).to.not.equal(escrow2.target);
+      expect(escrow1.target).to.be.equal(escrows[0]);
+      expect(escrow2.target).to.be.equal(escrows[1]);
     });
 
     it("should revert when non-escrow address tries to interact", async function () {
@@ -2417,28 +2209,21 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should revert with InvalidGetEscrowsQuery for invalid queries", async function () {
-      const { auctionInitialization } = await setupAuction({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         relStrike: ethers.parseEther("1"),
         relPremiumStart: ethers.parseEther("0.01"),
         oracleAddress: String(mockOracle.target),
-        router,
-        owner,
       });
 
-      // Create a few more escrows
+      // Create several escrows
       for (let i = 0; i < 3; i++) {
-        await underlyingToken
-          .connect(owner)
-          .approve(router.target, auctionInitialization.notional);
-        await router
-          .connect(owner)
-          .createAuction(owner.address, auctionInitialization);
+        await createAuction(auctionInitialization, router, owner);
       }
 
       const numEscrows = await router.numEscrows();
-      expect(numEscrows).to.equal(4);
+      expect(numEscrows).to.equal(3);
 
       // Case 1: numElements is 0
       await expect(router.getEscrows(0, 0)).to.be.revertedWithCustomError(
