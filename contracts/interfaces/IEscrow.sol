@@ -45,6 +45,34 @@ interface IEscrow {
         address newOwner
     );
 
+    /// @notice Returns the premium paid for the option.
+    /// @return premiumPaid Amount of premium paid for the option.
+    function premiumPaid() external view returns (uint128);
+
+    /// @notice Returns the total amount borrowed in the underlying token.
+    /// @return totalBorrowed Total borrowed amount.
+    function totalBorrowed() external view returns (uint128);
+
+    /// @notice Returns the address of the router linked to this Escrow.
+    /// @return router The address of the router.
+    function router() external view returns (address);
+
+    /// @notice Returns the exercise fee set in the Escrow.
+    /// @return exerciseFee The exercise fee as a percentage.
+    function exerciseFee() external view returns (uint96);
+
+    /// @notice Returns the address of the owner of the Escrow.
+    /// @return owner The address of the current owner.
+    function owner() external view returns (address);
+
+    /// @notice Indicates if the escrow is set up for an auction.
+    /// @return isAuction Boolean indicating auction status.
+    function isAuction() external view returns (bool);
+
+    /// @notice Indicates if the option has been minted.
+    /// @return optionMinted Boolean indicating if the option is minted.
+    function optionMinted() external view returns (bool);
+
     /// @notice Initializes the Escrow contract for an auction.
     /// @param _router The router address.
     /// @param _owner The address of the auction owner.

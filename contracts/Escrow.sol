@@ -8,11 +8,11 @@ import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {DataTypes} from "./DataTypes.sol";
-import {Router} from "./Router.sol";
 import {Errors} from "./errors/Errors.sol";
 import {IOracle} from "./interfaces/IOracle.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
 
 contract Escrow is InitializableERC20, IEscrow {
     using SafeERC20 for IERC20Metadata;
@@ -456,8 +456,9 @@ contract Escrow is InitializableERC20, IEscrow {
         uint48 earliestExerciseTime = SafeCast.toUint48(
             block.timestamp + auctionParams.earliestExerciseTenor
         );
-        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = Router(router)
-            .getMatchFees(distPartner, premium);
+        (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = IRouter(
+            router
+        ).getMatchFees(distPartner, premium);
 
         return
             DataTypes.BidPreview({

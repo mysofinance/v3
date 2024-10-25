@@ -158,6 +158,40 @@ interface IRouter {
     /// @param isPaused The new pause status
     event PauseQuotes(address indexed quoter, bool isPaused);
 
+    /// @notice Returns the address of the escrow implementation contract.
+    /// @return escrowImpl The address of the escrow implementation contract.
+    function escrowImpl() external view returns (address);
+
+    /// @notice Returns the address of the fee handler contract.
+    /// @return feeHandler The address of the fee handler.
+    function feeHandler() external view returns (address);
+
+    /// @notice Returns the total number of escrows created.
+    /// @return numEscrows The total number of escrows.
+    function numEscrows() external view returns (uint256);
+
+    /// @notice Checks if a specific address is registered as an escrow.
+    /// @param escrow The address to check.
+    /// @return True if the address is an escrow, false otherwise.
+    function isEscrow(address escrow) external view returns (bool);
+
+    /// @notice Checks if a specific quote has been used.
+    /// @param quoteHash The hash of the quote.
+    /// @return True if the quote has been used, false otherwise.
+    function isQuoteUsed(bytes32 quoteHash) external view returns (bool);
+
+    /// @notice Checks if a specific swap quote has been used.
+    /// @param swapQuoteHash The hash of the swap quote.
+    /// @return True if the swap quote has been used, false otherwise.
+    function isSwapQuoteUsed(
+        bytes32 swapQuoteHash
+    ) external view returns (bool);
+
+    /// @notice Checks if quotes are paused for a specific address.
+    /// @param quoter The address to check.
+    /// @return True if quotes are paused for the address, false otherwise.
+    function quotesPaused(address quoter) external view returns (bool);
+
     /// @notice Creates a new Dutch auction
     /// @param escrowOwner The address of the escrow owner
     /// @param auctionInitialization The initialization data for the auction
