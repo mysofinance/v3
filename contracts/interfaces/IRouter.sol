@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {DataTypes} from "../DataTypes.sol";
 
 /// @title IRouter
-/// @notice Interface for the Router contract handling auction creation, bidding, exercising, and other related operations
+/// @notice Interface for the Router contract handling auction creation, bidding, exercising, and other related functionalities
 interface IRouter {
     /// @notice Emitted when a new auction is created
     /// @param escrowOwner The address of the escrow owner
