@@ -176,7 +176,7 @@ describe("Router Contract Fee Tests", function () {
         feeHandler
           .connect(user1)
           .provisionFees(underlyingToken.target, ethers.parseEther("10"))
-      ).to.be.reverted;
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidSender");
     });
   });
 
@@ -1032,7 +1032,10 @@ describe("Router Contract Fee Tests", function () {
       // Attempt to set to true again
       await expect(
         feeHandler.connect(owner).setDistPartners(accounts, statuses)
-      ).to.be.reverted;
+      ).to.be.revertedWithCustomError(
+        feeHandler,
+        "DistributionPartnerAlreadySet"
+      );
     });
   });
 

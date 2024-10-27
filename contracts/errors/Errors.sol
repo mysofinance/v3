@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 library Errors {
+    error DistributionPartnerAlreadySet();
     error FeeHandlerAlreadySet();
     error InvalidBid();
     error InvalidBorrowAmount();
@@ -13,6 +14,7 @@ library Errors {
     error InvalidExpiry();
     error InvalidExercise();
     error InvalidExerciseAmount();
+    error InvalidExerciseFee();
     error InvalidExerciseTime();
     error InvalidGetEscrowsQuery();
     error InvalidNotional();
@@ -21,7 +23,9 @@ library Errors {
     error InvalidRepayAmount();
     error InvalidRepayTime();
     error InvalidSender();
+    error InvalidMatchFee();
     error InvalidMinMaxSpot();
+    error InvalidPartnerFeeShare();
     error InvalidRedeem();
     error InvalidStrike();
     error InvalidTakeQuote();

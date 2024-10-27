@@ -1,3 +1,3 @@
 module.exports = {
-    skipFiles: ['interfaces', 'test', 'utils', 'oracles', 'DataTypes.sol']
+  skipFiles: ["interfaces", "test", "utils", "DataTypes.sol"],
 };

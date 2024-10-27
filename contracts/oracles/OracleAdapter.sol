@@ -6,24 +6,21 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IOracle} from "../interfaces/IOracle.sol";
+import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
-/**
- * @title ChainlinkOracle
- * @dev Abstract contract supporting Chainlink oracles with flexible decimal handling.
- *      Allows oracles with 18 (ETH) or 8 (USD) decimals. If an oracle has 8 decimals,
- *      it uses the ETH/USD oracle to convert the price to ETH.
- */
-contract ChainlinkOracle is IOracle, Ownable {
+/// @title OracleAdapter
+/// @dev Abstract contract supporting Chainlink and similar oracles with flexible decimal handling.
+///      Allows oracles with 18 (ETH) or 8 (USD) decimals. If an oracle has 8 decimals,
+///      it uses the ETH/USD oracle to convert the price to ETH.
+contract OracleAdapter is IOracleAdapter, Ownable {
     uint256 public immutable MAX_TIME_SINCE_LAST_UPDATE;
     address public immutable ETH_USD_ORACLE;
     address public immutable WETH;
+    bool public immutable ORACLE_MAPPING_IS_APPEND_ONLY;
 
-    /**
-     * @dev Struct to store oracle address and its decimals.
-     * Packed to optimize storage.
-     * decimals are the number of decimals in the oracle's price output, not underlying token.
-     */
+    /// @dev Struct to store oracle address and its decimals.
+    /// Packed to optimize storage.
+    /// decimals are the number of decimals in the oracle's price output, not underlying token.
     struct OracleInfo {
         address oracleAddr;
         uint8 decimals;
@@ -40,28 +37,34 @@ contract ChainlinkOracle is IOracle, Ownable {
     // Mapping from token address to its OracleInfo
     mapping(address => OracleInfo) public oracleInfos;
 
-    /**
-     * @dev Constructor initializes oracle mappings and sets the ETH/USD oracle.
-     * @param _tokenAddrs Array of token addresses.
-     * @param _oracleAddrs Array of corresponding oracle addresses.
-     * @param _ethUsdOracle Address of the ETH/USD Chainlink oracle.
-     * @param _owner Address of the owner.
-     * @param _maxTimeSinceLastUpdate Maximum time since last update.
-     */
+    event AddOracleMapping(address indexed tokenAddress, address oracleAddress);
+
+    /// @dev Constructor initializes oracle mappings and sets the ETH/USD oracle.
+    /// @param _tokenAddrs Array of token addresses.
+    /// @param _oracleAddrs Array of corresponding oracle addresses.
+    /// @param _ethUsdOracle Address of the ETH/USD Chainlink oracle.
+    /// @param _owner Address of the owner.
+    /// @param _maxTimeSinceLastUpdate Maximum time since last update.
+    /// @param _oracleMappingIsAppendOnly Flag if oracle mapping is append only.
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
         address _ethUsdOracle,
         address _owner,
         address _weth,
-        uint256 _maxTimeSinceLastUpdate
+        uint256 _maxTimeSinceLastUpdate,
+        bool _oracleMappingIsAppendOnly
     ) Ownable(_owner) {
         uint256 tokenAddrsLength = _tokenAddrs.length;
-        if (tokenAddrsLength == 0 || tokenAddrsLength != _oracleAddrs.length) {
+        if (tokenAddrsLength != _oracleAddrs.length) {
             revert InvalidArrayLength();
         }
 
-        if (_ethUsdOracle == address(0) || _weth == address(0)) {
+        if (
+            _ethUsdOracle == address(0) ||
+            _weth == address(0) ||
+            _ethUsdOracle == _weth
+        ) {
             revert InvalidAddress();
         }
 
@@ -72,18 +75,17 @@ contract ChainlinkOracle is IOracle, Ownable {
         ETH_USD_ORACLE = _ethUsdOracle;
         WETH = _weth;
         MAX_TIME_SINCE_LAST_UPDATE = _maxTimeSinceLastUpdate;
+        ORACLE_MAPPING_IS_APPEND_ONLY = _oracleMappingIsAppendOnly;
 
         for (uint256 i = 0; i < tokenAddrsLength; ++i) {
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
         }
     }
 
-    /**
-     * @dev Allows setting new oracles for tokens that do not already have an oracle set.
-     *      Reverts if an oracle is already set for a token.
-     * @param _tokenAddrs Array of token addresses.
-     * @param _oracleAddrs Array of corresponding new oracle addresses.
-     */
+    /// @dev Allows setting new oracles for tokens that do not already have an oracle set.
+    ///      Reverts if an oracle is already set for a token.
+    /// @param _tokenAddrs Array of token addresses.
+    /// @param _oracleAddrs Array of corresponding new oracle addresses.
     function addOracleMapping(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
@@ -95,19 +97,21 @@ contract ChainlinkOracle is IOracle, Ownable {
 
         for (uint256 i = 0; i < length; ++i) {
             OracleInfo storage existingInfo = oracleInfos[_tokenAddrs[i]];
-            if (existingInfo.oracleAddr != address(0)) {
+            if (
+                ORACLE_MAPPING_IS_APPEND_ONLY &&
+                existingInfo.oracleAddr != address(0)
+            ) {
                 revert OracleAlreadySet(existingInfo.oracleAddr);
             }
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
+            emit AddOracleMapping(_tokenAddrs[i], _oracleAddrs[i]);
         }
     }
 
-    /**
-     * @notice Retrieves the price of a specified token quoted in another token.
-     * @param token The address of the token for which the price is to be retrieved.
-     * @param quoteToken The address of the token in which the price is to be quoted.
-     * @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
-     */
+    /// @notice Retrieves the price of a specified token quoted in another token.
+    /// @param token The address of the token for which the price is to be retrieved.
+    /// @param quoteToken The address of the token in which the price is to be quoted.
+    /// @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
     function getPrice(
         address token,
         address quoteToken,
@@ -125,12 +129,10 @@ contract ChainlinkOracle is IOracle, Ownable {
         );
     }
 
-    /**
-     * @dev Public function to get the price of a single token.
-     * @dev Converts USD prices to ETH if necessary.
-     * @param token Address of the token.
-     * @return tokenPriceRaw Price of the token in ETH.
-     */
+    /// @dev Public function to get the price of a single token in ETH.
+    /// @dev Converts USD prices to ETH if necessary.
+    /// @param token Address of the token.
+    /// @return tokenPriceRaw Price of the token in ETH.
     function getPriceOfToken(
         address token
     ) public view virtual returns (uint256 tokenPriceRaw) {
@@ -159,11 +161,9 @@ contract ChainlinkOracle is IOracle, Ownable {
         }
     }
 
-    /**
-     * @dev Internal function to fetch and validate the latest round data from a Chainlink oracle.
-     * @param oracleAddr Address of the Chainlink oracle.
-     * @return tokenPriceRaw The latest valid price from the oracle.
-     */
+    /// @dev Internal function to fetch and validate the latest round data from a Chainlink oracle.
+    /// @param oracleAddr Address of the Chainlink oracle.
+    /// @return tokenPriceRaw The latest valid price from the oracle.
     function _checkAndReturnLatestRoundData(
         address oracleAddr
     ) internal view virtual returns (uint256 tokenPriceRaw) {
@@ -189,7 +189,12 @@ contract ChainlinkOracle is IOracle, Ownable {
     }
 
     function _checkAndStoreOracleInfo(address token, address oracle) internal {
-        if (token == address(0) || oracle == address(0)) {
+        if (
+            token == address(0) ||
+            oracle == address(0) ||
+            token == WETH ||
+            oracle == ETH_USD_ORACLE
+        ) {
             revert InvalidAddress();
         }
 

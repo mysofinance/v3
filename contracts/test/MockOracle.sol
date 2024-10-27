@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "../interfaces/IOracle.sol";
+import "../interfaces/IOracleAdapter.sol";
 
-contract MockOracle is IOracle {
+contract MockOracle is IOracleAdapter {
     mapping(address => mapping(address => uint256)) public prices;
 
     function setPrice(
