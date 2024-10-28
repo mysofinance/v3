@@ -220,6 +220,124 @@ describe("Router Contract", function () {
     });
   });
 
+  describe("Put Writing", function () {
+    it("should allow put writing", async function () {
+      const tradingFirm = user1;
+      const client = user2;
+
+      const weth = underlyingToken;
+      const usdc = settlementToken;
+
+      const ethPriceInUsdc = ethers.parseUnits("2500", 6);
+      const strikePriceInUsdc = ethers.parseUnits("2000", 6);
+
+      const notionalAmountInUsdc = ethers.parseUnits("100000", 6);
+      const strikePriceInEth =
+        (ethers.parseEther("1") * strikePriceInUsdc) / ethPriceInUsdc;
+      const tenor = 30 * 24 * 60 * 60;
+      const premiumTokenIsUnderlying = true;
+      const putPremium = ethers.parseUnits("1010", 6);
+
+      const putWritingRfqInit = await getRFQInitialization({
+        underlyingTokenAddress: String(usdc.target),
+        settlementTokenAddress: String(weth.target),
+        notionalAmount: notionalAmountInUsdc,
+        strike: strikePriceInEth,
+        tenor: tenor,
+        premiumTokenIsUnderlying: premiumTokenIsUnderlying,
+        premium: putPremium,
+        earliestExerciseTenor: 0,
+      });
+
+      // Trading firm prepares signature
+      const payloadHash = rfqSignaturePayload(putWritingRfqInit, CHAIN_ID);
+      const signature = await tradingFirm.signMessage(
+        ethers.getBytes(payloadHash)
+      );
+      putWritingRfqInit.rfqQuote.signature = signature;
+
+      // Trading firm approves USDC to pay for premium
+      await usdc.mint(tradingFirm, putPremium);
+      await usdc.connect(tradingFirm).approve(router.target, ethers.MaxUint256);
+
+      // Client approves USDC to provide collateral for WETH put
+      await usdc.mint(client, notionalAmountInUsdc);
+      await usdc.connect(client).approve(router.target, ethers.MaxUint256);
+
+      // Client takes quote
+      const preBalUsdcClient = await usdc.balanceOf(client);
+      const preBalUsdcTradingFirm = await usdc.balanceOf(tradingFirm);
+      const preBalWethClient = await weth.balanceOf(client);
+      const preBalWethTradingFirm = await weth.balanceOf(tradingFirm);
+      await expect(
+        router
+          .connect(client)
+          .takeQuote(client, putWritingRfqInit, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+      const postBalUsdcClient = await usdc.balanceOf(client);
+      const postBalUsdcTradingFirm = await usdc.balanceOf(tradingFirm);
+      const postBalWethClient = await weth.balanceOf(client);
+      const postBalWethTradingFirm = await weth.balanceOf(tradingFirm);
+
+      // Check balance changes
+      // Client provides cash collateral for put and receives premium
+      expect(preBalUsdcClient - postBalUsdcClient).to.be.equal(
+        notionalAmountInUsdc - putPremium
+      );
+      // Trading firms pays premium
+      expect(preBalUsdcTradingFirm - postBalUsdcTradingFirm).to.be.equal(
+        putPremium
+      );
+      expect(preBalWethClient - postBalWethClient).to.be.equal(0);
+      expect(postBalWethTradingFirm).to.be.equal(preBalWethTradingFirm);
+
+      // Get escrow contract
+      const numEscrows = await router.numEscrows();
+      const escrowAddrs = await router.getEscrows(numEscrows - 1n, 1);
+      const postBalWethEscrow = await usdc.balanceOf(escrowAddrs[0]);
+      expect(postBalWethEscrow).to.be.equal(notionalAmountInUsdc);
+
+      // Trading firm exercises put and sells WETH to get USDC
+      const wethPayAmount =
+        (strikePriceInEth * notionalAmountInUsdc) / ethers.parseUnits("1", 6);
+      await weth.mint(tradingFirm, wethPayAmount);
+      const preBal2UsdcClient = await usdc.balanceOf(client);
+      const preBal2UsdcTradingFirm = await usdc.balanceOf(tradingFirm);
+      const preBal2WethClient = await weth.balanceOf(client);
+      const preBal2WethTradingFirm = await weth.balanceOf(tradingFirm);
+      const payInSettlementToken = true; // pay in WETH
+      const oracleData: any = [];
+      await weth.connect(tradingFirm).approve(router.target, ethers.MaxUint256);
+      await router
+        .connect(tradingFirm)
+        .exercise(
+          escrowAddrs[0],
+          tradingFirm,
+          notionalAmountInUsdc,
+          payInSettlementToken,
+          oracleData
+        );
+      const postBal2UsdcClient = await usdc.balanceOf(client);
+      const postBal2UsdcTradingFirm = await usdc.balanceOf(tradingFirm);
+      const postBal2WethClient = await weth.balanceOf(client);
+      const postBal2WethTradingFirm = await weth.balanceOf(tradingFirm);
+
+      // Check balance changes
+      // Trading firm gets cash collateral from selling WETH
+      expect(postBal2UsdcTradingFirm - preBal2UsdcTradingFirm).to.be.equal(
+        notionalAmountInUsdc
+      );
+      expect(preBal2WethTradingFirm - postBal2WethTradingFirm).to.be.equal(
+        wethPayAmount
+      );
+      expect(postBal2UsdcClient).to.be.equal(preBal2UsdcClient);
+      expect(postBal2WethClient - preBal2WethClient).to.be.equal(wethPayAmount);
+
+      const postBal2WethEscrow = await usdc.balanceOf(escrowAddrs[0]);
+      expect(postBal2WethEscrow).to.be.equal(0);
+    });
+  });
+
   describe("Exercising Option Token", function () {
     it("should allow exercising option token", async function () {
       const auctionInitialization = await getAuctionInitialization({
