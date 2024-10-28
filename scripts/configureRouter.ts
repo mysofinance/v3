@@ -1,5 +1,5 @@
 import { ethers } from "hardhat";
-import { getNetworkInfo } from "./utils";  // Import utility
+import { getNetworkInfo } from "./utils"; // Import utility
 import readline from "readline";
 
 const rl = readline.createInterface({
@@ -11,10 +11,14 @@ async function askQuestion(query: string): Promise<string> {
   return new Promise((resolve) => rl.question(query, resolve));
 }
 
-async function configureRouter(routerAddr: string, feeHandlerAddr: string, deployer: any) {
+async function configureRouter(
+  routerAddr: string,
+  feeHandlerAddr: string,
+  deployer: any
+) {
   // Get the deployed Router
   const Router = await ethers.getContractFactory("Router");
-  const router = await Router.attach(routerAddr);
+  const router: any = await Router.attach(routerAddr);
 
   // Set Fee Handler
   await router.connect(deployer).setFeeHandler(feeHandlerAddr);
@@ -36,9 +40,13 @@ async function main() {
 
   while (continueConfigure) {
     const routerAddr = await askQuestion("Enter the Router contract address: ");
-    const feeHandlerAddr = await askQuestion("Enter the Fee Handler contract address: ");
+    const feeHandlerAddr = await askQuestion(
+      "Enter the Fee Handler contract address: "
+    );
 
-    console.log(`\nYou entered:\nRouter Address: ${routerAddr}\nFee Handler Address: ${feeHandlerAddr}`);
+    console.log(
+      `\nYou entered:\nRouter Address: ${routerAddr}\nFee Handler Address: ${feeHandlerAddr}`
+    );
     const confirm = await askQuestion("Proceed with configuration? (yes/no): ");
 
     if (confirm.toLowerCase() === "yes") {
@@ -49,9 +57,11 @@ async function main() {
       console.log(
         `npx hardhat verify --network ${NETWORK_NAME} "${routerAddr}" "${feeHandlerAddr}"`
       );
-    } 
+    }
 
-    const continueAnswer = await askQuestion("Would you like to continue configuring the router? (yes/no): ");
+    const continueAnswer = await askQuestion(
+      "Would you like to continue configuring the router? (yes/no): "
+    );
     if (continueAnswer.toLowerCase() !== "yes") {
       continueConfigure = false;
     }
