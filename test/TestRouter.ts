@@ -786,7 +786,10 @@ describe("Router Contract", function () {
       // Set 0x as fee distributor to check fee share cap
       await mockFeeHandler
         .connect(owner)
-        .setDistPartnerFeeShares([ethers.ZeroAddress], [BASE]);
+        .setDistPartnerFeeShares(
+          [ethers.ZeroAddress],
+          [ethers.parseEther("1.1")]
+        );
 
       const preview = await escrow.previewBid(
         relBid,
