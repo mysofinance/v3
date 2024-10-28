@@ -310,10 +310,11 @@ describe("EIP-1271 Signer Tests", function () {
     let user1: any;
     let user2: any;
     let swapQuote: any;
-    const CHAIN_ID = 31337;
+    let CHAIN_ID: any;
     const FUND_AMOUNT = ethers.parseUnits("1000", 18);
 
     beforeEach(async function () {
+      CHAIN_ID = await ethers.provider.send("eth_chainId");
       // Set up contracts and users
       const contracts = await setupTestContracts();
       ({ owner, user1, user2, settlementToken, underlyingToken, router } =
@@ -356,6 +357,13 @@ describe("EIP-1271 Signer Tests", function () {
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
       swapQuote.signature = signature;
 
+      // Check recovered signer matches
+      const recoveredAddress = ethers.verifyMessage(
+        ethers.getBytes(payloadHash),
+        signature
+      );
+      expect(recoveredAddress).to.be.equal(user1.address);
+
       // Mint tokens to user2 and approve
       await settlementToken.connect(user2).mint(user2.address, FUND_AMOUNT);
       await settlementToken
@@ -388,7 +396,7 @@ describe("EIP-1271 Signer Tests", function () {
       ).to.be.revertedWithCustomError(router, "InvalidEIP1271Signature");
     });
 
-    it("should revert when attempting to take swap quote from EIP1271 maker", async function () {
+    it("should revert when attempting to take swap quote from random EIP1271 maker", async function () {
       // Random non-EIP-1271 maker
       swapQuote.eip1271Maker = ethers.Wallet.createRandom().address;
 
@@ -399,6 +407,19 @@ describe("EIP-1271 Signer Tests", function () {
 
     it("should revert when attempting to take a swap quote while the contract is paused", async function () {
       const taker = user2;
+
+      // Ensure eip1271Maker is set correctly and signer is registered on EIP1271 wallet
+      swapQuote.eip1271Maker = eip1271Maker.target;
+      expect(await eip1271Maker.isSigner(user1.address)).to.be.true;
+      expect(swapQuote.eip1271Maker).to.be.equal(eip1271Maker.target);
+
+      // Check signature
+      const payloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
+      const isValidSignature = await eip1271Maker.isValidSignature(
+        payloadHash,
+        swapQuote.signature
+      );
+      expect(isValidSignature).to.be.equal("0x1626ba7e");
 
       // Pause quotes
       await eip1271Maker.connect(owner).togglePauseQuotes();

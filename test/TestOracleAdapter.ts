@@ -94,15 +94,15 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
       [owner, unauthorizedUser] = await ethers.getSigners();
 
       // Deploy ChainlinkOracle contract
-      const ChainlinkOracle =
-        await ethers.getContractFactory("ChainlinkOracle");
+      const ChainlinkOracle = await ethers.getContractFactory("OracleAdapter");
       chainlinkOracle = await ChainlinkOracle.deploy(
-        [USDC, WETH, UNI],
-        [USDC_USD_ORACLE, ETH_USD_ORACLE, UNI_USD_ORACLE],
+        [USDC, UNI],
+        [USDC_USD_ORACLE, UNI_USD_ORACLE],
         ETH_USD_ORACLE,
         owner.address,
         WETH,
-        MAX_TIME_SINCE_LAST_UPDATE
+        MAX_TIME_SINCE_LAST_UPDATE,
+        true
       );
     });
 
@@ -232,15 +232,16 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         // Deploy ChainlinkOracle contract
         const veryShortStaleTime = 1;
         const ChainlinkOracle =
-          await ethers.getContractFactory("ChainlinkOracle");
+          await ethers.getContractFactory("OracleAdapter");
         const chainlinkOracleWithVeryShortStaleTime =
           await ChainlinkOracle.deploy(
-            [USDC, WETH, UNI],
-            [USDC_USD_ORACLE, ETH_USD_ORACLE, UNI_USD_ORACLE],
+            [USDC, UNI],
+            [USDC_USD_ORACLE, UNI_USD_ORACLE],
             ETH_USD_ORACLE,
             owner.address,
             WETH,
-            veryShortStaleTime
+            veryShortStaleTime,
+            true
           );
 
         await expect(
@@ -255,7 +256,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
     describe("Deployment", function () {
       it("should revert if deploying with invalid parameters", async function () {
         const ChainlinkOracle =
-          await ethers.getContractFactory("ChainlinkOracle");
+          await ethers.getContractFactory("OracleAdapter");
 
         await expect(
           ChainlinkOracle.deploy(
@@ -264,7 +265,8 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             ETH_USD_ORACLE,
             owner.address,
             WETH,
-            MAX_TIME_SINCE_LAST_UPDATE
+            MAX_TIME_SINCE_LAST_UPDATE,
+            true
           )
         ).to.be.revertedWithCustomError(chainlinkOracle, "InvalidArrayLength");
 
@@ -275,7 +277,8 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             ethers.ZeroAddress, // Invalid ETH/USD oracle address
             owner.address,
             WETH,
-            MAX_TIME_SINCE_LAST_UPDATE
+            MAX_TIME_SINCE_LAST_UPDATE,
+            true
           )
         ).to.be.revertedWithCustomError(chainlinkOracle, "InvalidAddress");
 
@@ -286,7 +289,8 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             ETH_USD_ORACLE,
             owner.address,
             ethers.ZeroAddress, // Invalid WETH address
-            MAX_TIME_SINCE_LAST_UPDATE
+            MAX_TIME_SINCE_LAST_UPDATE,
+            true
           )
         ).to.be.revertedWithCustomError(chainlinkOracle, "InvalidAddress");
 
@@ -297,7 +301,8 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             ETH_USD_ORACLE,
             owner.address,
             WETH,
-            0 // Invalid max time since last update
+            0, // Invalid max time since last update
+            true
           )
         ).to.be.revertedWithCustomError(
           chainlinkOracle,
@@ -315,10 +320,16 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         ).to.be.reverted;
       });
 
-      it("should revert if attempting to overwrite an already set mapping", async function () {
-        await expect(chainlinkOracle.addOracleMapping([WETH], [ETH_USD_ORACLE]))
+      it("should revert if oracle is append only and attempting to overwrite an already set mapping", async function () {
+        expect(await chainlinkOracle.ORACLE_MAPPING_IS_APPEND_ONLY()).to.be
+          .true;
+        const oracleInfos = await chainlinkOracle.oracleInfos(USDC);
+        expect(oracleInfos[0]).to.be.equal(USDC_USD_ORACLE);
+        await expect(
+          chainlinkOracle.addOracleMapping([USDC], [USDC_USD_ORACLE])
+        )
           .to.be.revertedWithCustomError(chainlinkOracle, "OracleAlreadySet")
-          .withArgs(ETH_USD_ORACLE);
+          .withArgs(USDC_USD_ORACLE);
       });
 
       it("should be able to add a new mapping", async function () {
