@@ -400,24 +400,14 @@ contract Escrow is InitializableERC20, IEscrow {
         if (msg.sender != _owner) {
             revert Errors.InvalidSender();
         }
-        uint256 oustandingOptionTokens = totalSupply();
-        if (oustandingOptionTokens == 0) {
+        uint256 bal = balanceOf(msg.sender);
+        if (bal == 0) {
             revert Errors.NothingToRedeem();
         }
-        if (
-            totalBorrowed > 0 || balanceOf(msg.sender) != oustandingOptionTokens
-        ) {
-            // @dev: cannot redeem in case of outstanding borrows or
-            // if escrow owner doesn't hold full option token supply
-            revert Errors.InvalidRedeem();
-        }
-        _burn(msg.sender, oustandingOptionTokens);
         address underlyingToken = optionInfo.underlyingToken;
-        uint256 amount = IERC20Metadata(underlyingToken).balanceOf(
-            address(this)
-        );
-        IERC20Metadata(underlyingToken).transfer(to, amount);
-        emit Redeem(msg.sender, to, underlyingToken, amount);
+        _burn(msg.sender, bal);
+        IERC20Metadata(underlyingToken).transfer(to, bal);
+        emit Redeem(msg.sender, to, underlyingToken, bal);
     }
 
     function transferOwnership(address newOwner) external {

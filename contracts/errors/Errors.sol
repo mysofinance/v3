@@ -28,7 +28,6 @@ library Errors {
     error InvalidOracle();
     error InvalidOracleAnswer();
     error InvalidOracleDecimals();
-    error InvalidRedeem();
     error InvalidRelPremiums();
     error InvalidRepayAmount();
     error InvalidRepayTime();

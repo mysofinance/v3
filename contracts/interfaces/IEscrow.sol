@@ -217,7 +217,7 @@ interface IEscrow {
     /// @param amount Amount of tokens to withdraw.
     function handleWithdraw(address to, address token, uint256 amount) external;
 
-    /// @notice Redeems the underlying tokens iff the escrow owner holds all option tokens.
+    /// @notice Allows the escrow owner to redeem option tokens for underlying.
     /// @param to The address that will receive the underlying tokens upon redemption.
     function redeem(address to) external;
 
