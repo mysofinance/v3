@@ -49,7 +49,6 @@ describe("Router Contract Fee Tests", function () {
       owner.address,
       router.target,
       ethers.parseEther("0.01"), // 1% match fee
-      ethers.parseEther("0.05"), // 5% distribution partner share
       ethers.parseEther("0.001") // 0.1% exercise fee
     );
 
@@ -110,19 +109,15 @@ describe("Router Contract Fee Tests", function () {
     it("Should allow only owner to setMatchFeeInfo", async function () {
       // Attempt to setMatchFeeInfo from non-owner
       await expect(
-        feeHandler
-          .connect(user1)
-          .setMatchFeeInfo(ethers.parseEther("0.05"), ethers.parseEther("0.3"))
+        feeHandler.connect(user1).setMatchFee(ethers.parseEther("0.05"))
       ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
 
       // Owner sets matchFeeInfo
       await expect(
-        feeHandler
-          .connect(owner)
-          .setMatchFeeInfo(ethers.parseEther("0.05"), ethers.parseEther("0.3"))
+        feeHandler.connect(owner).setMatchFee(ethers.parseEther("0.05"))
       )
-        .to.emit(feeHandler, "SetMatchFeeInfo")
-        .withArgs(ethers.parseEther("0.05"), ethers.parseEther("0.3"));
+        .to.emit(feeHandler, "SetMatchFee")
+        .withArgs(ethers.parseEther("0.05"));
 
       // Verify changes
       const matchFeeInfo = await feeHandler.getMatchFeeInfo(user1.address);
@@ -151,23 +146,27 @@ describe("Router Contract Fee Tests", function () {
 
     it("Should allow only owner to setDistPartners", async function () {
       const accounts = [user1.address, user2.address];
-      const statuses = [true, true];
+      const feesShares = [BASE, BASE / 2n];
 
       // Attempt to setDistPartners from non-owner
       await expect(
-        feeHandler.connect(user1).setDistPartners(accounts, statuses)
+        feeHandler.connect(user1).setDistPartnerFeeShares(accounts, feesShares)
       ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
 
       // Owner sets distPartners
       await expect(
-        feeHandler.connect(owner).setDistPartners(accounts, statuses)
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feesShares)
       )
-        .to.emit(feeHandler, "SetDistributionPartners")
-        .withArgs(accounts, statuses);
+        .to.emit(feeHandler, "SetDistPartnerFeeShares")
+        .withArgs(accounts, feesShares);
 
       // Verify changes
-      expect(await feeHandler.isDistPartner(user1.address)).to.be.true;
-      expect(await feeHandler.isDistPartner(user2.address)).to.be.true;
+      expect(await feeHandler.distPartnerFeeShare(user1.address)).to.be.equal(
+        feesShares[0]
+      );
+      expect(await feeHandler.distPartnerFeeShare(user2.address)).to.be.equal(
+        feesShares[1]
+      );
     });
 
     it("Should allow only router to call provisionFees", async function () {
@@ -381,7 +380,9 @@ describe("Router Contract Fee Tests", function () {
 
     it("should apply correct fees when taking a quote with a distribution partner", async function () {
       // Set up a distribution partner
-      await feeHandler.connect(owner).setDistPartners([user2.address], [true]);
+      await feeHandler
+        .connect(owner)
+        .setDistPartnerFeeShares([user2.address], [ethers.parseEther("0.05")]);
 
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -709,7 +710,7 @@ describe("Router Contract Fee Tests", function () {
   describe("Fee Limits", function () {
     it("should respect maximum fee limits", async function () {
       // Set fees to maximum allowed values
-      await feeHandler.connect(owner).setMatchFeeInfo(MAX_MATCH_FEE, BASE);
+      await feeHandler.connect(owner).setMatchFee(MAX_MATCH_FEE);
       await feeHandler.connect(owner).setExerciseFee(MAX_EXERCISE_FEE);
 
       const auctionInitialization = await getAuctionInitialization({
@@ -790,7 +791,7 @@ describe("Router Contract Fee Tests", function () {
 
     it("should revert when trying to set fees above maximum limits", async function () {
       await expect(
-        feeHandler.connect(owner).setMatchFeeInfo(MAX_MATCH_FEE + 1n, BASE)
+        feeHandler.connect(owner).setMatchFee(MAX_MATCH_FEE + 1n)
       ).to.be.revertedWithCustomError(feeHandler, "InvalidMatchFee");
 
       await expect(
@@ -799,15 +800,13 @@ describe("Router Contract Fee Tests", function () {
     });
 
     it("should handle fee distribution to distribution partners correctly", async function () {
-      // Set a distribution partner
-      await feeHandler.connect(owner).setDistPartners([user2.address], [true]);
-
-      // Set fees
+      // Set fees and distribution partner
       const matchFee = ethers.parseEther("0.01"); // 1%
       const distPartnerShare = ethers.parseEther("0.05"); // 5%
+      await feeHandler.connect(owner).setMatchFee(matchFee);
       await feeHandler
         .connect(owner)
-        .setMatchFeeInfo(matchFee, distPartnerShare);
+        .setDistPartnerFeeShares([user2.address], [ethers.parseEther("0.05")]);
 
       const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -879,7 +878,6 @@ describe("Router Contract Fee Tests", function () {
         owner.address,
         router.target,
         ethers.parseEther("0.5"), // 50% match fee
-        ethers.parseEther("0.05"), // 5% distribution partner share
         ethers.parseEther("0.5") // 50% exercise fee
       );
 
@@ -890,7 +888,10 @@ describe("Router Contract Fee Tests", function () {
       const exerciseFee = await router.getExerciseFee();
       expect(exerciseFee).to.equal(ethers.parseEther("0.005")); // Max exercise fee is 0.5%
 
-      await highFeeHandler.setDistPartners([user1.address], [true]);
+      await highFeeHandler.setDistPartnerFeeShares(
+        [user1.address],
+        [ethers.parseEther("0.05")]
+      );
 
       // Check match fees
       const optionPremium = ethers.parseEther("100"); // Example premium
@@ -914,9 +915,9 @@ describe("Router Contract Fee Tests", function () {
       );
 
       // set dist partner fee over Base
-      await highFeeHandler.setMatchFeeInfo(
-        ethers.parseEther("0.5"),
-        ethers.parseEther("1.5")
+      await highFeeHandler.setDistPartnerFeeShares(
+        [user1.address],
+        [ethers.parseEther("1.5")]
       );
       const [secondMatchFeeProtocol, secondMatchFeeDistPartner] =
         await router.getMatchFees(user1.address, optionPremium);
@@ -976,9 +977,7 @@ describe("Router Contract Fee Tests", function () {
       const excessiveMatchFee = MAX_MATCH_FEE + ethers.parseEther("0.001");
 
       await expect(
-        feeHandler
-          .connect(owner)
-          .setMatchFeeInfo(excessiveMatchFee, ethers.parseEther("0.3"))
+        feeHandler.connect(owner).setMatchFee(excessiveMatchFee)
       ).to.be.revertedWithCustomError(feeHandler, "InvalidMatchFee");
     });
 
@@ -988,11 +987,11 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         feeHandler
           .connect(owner)
-          .setMatchFeeInfo(
-            ethers.parseEther("0.1"),
-            excessiveDistPartnerFeeShare
+          .setDistPartnerFeeShares(
+            [user1.address],
+            [excessiveDistPartnerFeeShare]
           )
-      ).to.be.revertedWithCustomError(feeHandler, "InvalidPartnerFeeShare");
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidDistPartnerFeeShare");
     });
 
     it("Should revert setExerciseFee when exerciseFee exceeds MAX_EXERCISE_FEE", async function () {
@@ -1006,36 +1005,35 @@ describe("Router Contract Fee Tests", function () {
 
     it("Should revert setDistPartners with unequal array lengths", async function () {
       const accounts = [user1.address, user2.address];
-      const statuses = [true]; // Unequal length
+      const feeShares = [BASE]; // Unequal length
 
       await expect(
-        feeHandler.connect(owner).setDistPartners(accounts, statuses)
-      ).to.be.reverted;
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares)
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
     });
 
     it("Should revert setDistPartners with zero-length arrays", async function () {
       const accounts: string[] = [];
-      const statuses: boolean[] = [];
+      const feeShares: bigint[] = [];
 
       await expect(
-        feeHandler.connect(owner).setDistPartners(accounts, statuses)
-      ).to.be.reverted;
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares)
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
     });
 
     it("Should revert setDistPartners when setting a distPartner to the same value", async function () {
       const accounts = [user1.address];
-      const statuses = [true];
+      const feeShares = [BASE];
 
       // First set to true
-      await feeHandler.connect(owner).setDistPartners(accounts, statuses);
+      await feeHandler
+        .connect(owner)
+        .setDistPartnerFeeShares(accounts, feeShares);
 
       // Attempt to set to true again
       await expect(
-        feeHandler.connect(owner).setDistPartners(accounts, statuses)
-      ).to.be.revertedWithCustomError(
-        feeHandler,
-        "DistributionPartnerAlreadySet"
-      );
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares)
+      ).to.be.revertedWithCustomError(feeHandler, "DistPartnerFeeAlreadySet");
     });
   });
 
@@ -1047,7 +1045,9 @@ describe("Router Contract Fee Tests", function () {
       expect(info._matchFeeDistPartnerShare).to.equal(0);
 
       // Set user1 as a distPartner
-      await feeHandler.connect(owner).setDistPartners([user1.address], [true]);
+      await feeHandler
+        .connect(owner)
+        .setDistPartnerFeeShares([user1.address], [ethers.parseEther("0.05")]);
 
       // Now, user1 should have a distPartner share
       info = await feeHandler.getMatchFeeInfo(user1.address);

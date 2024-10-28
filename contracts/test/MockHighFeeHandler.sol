@@ -8,29 +8,26 @@ contract MockHighFeeHandler is FeeHandler {
         address initOwner,
         address _router,
         uint96 _matchFee,
-        uint96 _distPartnerFeeShare,
         uint96 _exerciseFee
-    )
-        FeeHandler(
-            initOwner,
-            _router,
-            _matchFee,
-            _distPartnerFeeShare,
-            _exerciseFee
-        )
-    {}
+    ) FeeHandler(initOwner, _router, _matchFee, _exerciseFee) {}
 
-    function setMatchFeeInfo(
-        uint96 _matchFee,
-        uint96 _distPartnerFeeShare
-    ) public override onlyOwner {
+    function setMatchFee(uint96 _matchFee) public override onlyOwner {
         matchFee = _matchFee;
-        matchFeeDistPartnerShare = _distPartnerFeeShare;
-        emit SetMatchFeeInfo(_matchFee, _distPartnerFeeShare);
+        emit SetMatchFee(_matchFee);
     }
 
     function setExerciseFee(uint96 _exerciseFee) public override onlyOwner {
         exerciseFee = _exerciseFee;
         emit SetExerciseFee(_exerciseFee);
+    }
+
+    function setDistPartnerFeeShares(
+        address[] calldata accounts,
+        uint256[] calldata feeShares
+    ) external override onlyOwner {
+        for (uint256 i = 0; i < accounts.length; ++i) {
+            distPartnerFeeShare[accounts[i]] = feeShares[i];
+        }
+        emit SetDistPartnerFeeShares(accounts, feeShares);
     }
 }

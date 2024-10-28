@@ -17,10 +17,9 @@ interface IFeeHandler {
     /// @param amount The amount of tokens withdrawn.
     event Withdraw(address indexed to, address indexed token, uint256 amount);
 
-    /// @notice Emitted when match fee information is set.
+    /// @notice Emitted when match fee is set.
     /// @param matchFee The match fee set as a percentage.
-    /// @param distPartnerFeeShare The share of the match fee for distribution partners.
-    event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
+    event SetMatchFee(uint256 matchFee);
 
     /// @notice Emitted when the exercise fee is set.
     /// @param exerciseFee The exercise fee set as a percentage.
@@ -28,8 +27,8 @@ interface IFeeHandler {
 
     /// @notice Emitted when distribution partners are set.
     /// @param accounts The addresses of the distribution partners.
-    /// @param isDistPartner Boolean array indicating the distribution partner status.
-    event SetDistributionPartners(address[] accounts, bool[] isDistPartner);
+    /// @param feeShares The fee shares for given distribution partners.
+    event SetDistPartnerFeeShares(address[] accounts, uint256[] feeShares);
 
     /// @notice Provisions fees in a specified token.
     /// @param token The address of the token in which fees are provisioned.
@@ -51,23 +50,19 @@ interface IFeeHandler {
     )
         external
         view
-        returns (uint96 _matchFee, uint96 _matchFeeDistPartnerShare);
+        returns (uint96 _matchFee, uint256 _matchFeeDistPartnerShare);
 
     /// @notice Sets distribution partners and their status.
     /// @param accounts The addresses of the distribution partners.
-    /// @param _isDistPartner Boolean array indicating the distribution partner status.
-    function setDistPartners(
+    /// @param feeShares The fee shares for given distribution partners.
+    function setDistPartnerFeeShares(
         address[] calldata accounts,
-        bool[] calldata _isDistPartner
+        uint256[] calldata feeShares
     ) external;
 
     /// @notice Sets the match fee and distribution partner share.
     /// @param _matchFee The match fee as a percentage.
-    /// @param _distPartnerFeeShare The share of the match fee for distribution partners.
-    function setMatchFeeInfo(
-        uint96 _matchFee,
-        uint96 _distPartnerFeeShare
-    ) external;
+    function setMatchFee(uint96 _matchFee) external;
 
     /// @notice Sets the exercise fee.
     /// @param _exerciseFee The exercise fee as a percentage.
@@ -81,16 +76,13 @@ interface IFeeHandler {
     /// @return The match fee as a percentage.
     function matchFee() external view returns (uint96);
 
-    /// @notice Returns the share of the match fee for distribution partners.
-    /// @return The share of the match fee for distribution partners.
-    function matchFeeDistPartnerShare() external view returns (uint96);
+    /// @notice Returns the distribution fee share for a given account.
+    /// @return The fee share for the given distribution partner.
+    function distPartnerFeeShare(
+        address account
+    ) external view returns (uint256);
 
     /// @notice Returns the exercise fee set in the FeeHandler.
     /// @return The exercise fee as a percentage.
     function exerciseFee() external view returns (uint96);
-
-    /// @notice Checks if an address is a distribution partner.
-    /// @param account The address to check.
-    /// @return Boolean indicating if the address is a distribution partner.
-    function isDistPartner(address account) external view returns (bool);
 }

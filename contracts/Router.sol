@@ -147,12 +147,13 @@ contract Router is Ownable, IRouter {
             );
         }
         if (preview.matchFeeProtocol > 0) {
+            address _feeHandler = feeHandler;
             IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 msg.sender,
-                feeHandler,
+                _feeHandler,
                 preview.matchFeeProtocol
             );
-            FeeHandler(feeHandler).provisionFees(
+            FeeHandler(_feeHandler).provisionFees(
                 preview.premiumToken,
                 preview.matchFeeProtocol
             );
@@ -335,12 +336,13 @@ contract Router is Ownable, IRouter {
             );
         }
         if (preview.matchFeeProtocol > 0) {
+            address _feeHandler = feeHandler;
             IERC20Metadata(preview.premiumToken).safeTransferFrom(
                 preview.quoter,
-                feeHandler,
+                _feeHandler,
                 preview.matchFeeProtocol
             );
-            FeeHandler(feeHandler).provisionFees(
+            FeeHandler(_feeHandler).provisionFees(
                 preview.premiumToken,
                 preview.matchFeeProtocol
             );
@@ -466,10 +468,11 @@ contract Router is Ownable, IRouter {
     }
 
     function getExerciseFee() public view returns (uint96 exerciseFee) {
-        if (feeHandler == address(0)) {
+        address _feeHandler = feeHandler;
+        if (_feeHandler == address(0)) {
             return 0;
         }
-        exerciseFee = FeeHandler(feeHandler).exerciseFee();
+        exerciseFee = FeeHandler(_feeHandler).exerciseFee();
         exerciseFee = exerciseFee > MAX_EXERCISE_FEE
             ? MAX_EXERCISE_FEE
             : exerciseFee;
@@ -483,15 +486,16 @@ contract Router is Ownable, IRouter {
         view
         returns (uint128 matchFeeProtocol, uint128 matchFeeDistPartner)
     {
-        if (feeHandler != address(0)) {
-            (uint96 matchFee, uint96 matchFeeDistPartnerShare) = FeeHandler(
-                feeHandler
+        address _feeHandler = feeHandler;
+        if (_feeHandler != address(0)) {
+            (uint96 matchFee, uint256 matchFeeDistPartnerShare) = FeeHandler(
+                _feeHandler
             ).getMatchFeeInfo(distPartner);
 
             uint96 cappedMatchFee = matchFee > MAX_MATCH_FEE
                 ? MAX_MATCH_FEE
                 : matchFee;
-            uint96 cappedMatchFeeDistPartnerShare = matchFeeDistPartnerShare >
+            uint256 cappedMatchFeeDistPartnerShare = matchFeeDistPartnerShare >
                 BASE
                 ? BASE
                 : matchFeeDistPartnerShare;

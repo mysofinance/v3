@@ -777,7 +777,6 @@ describe("Router Contract", function () {
         owner.address,
         router.target,
         ethers.parseEther("1.1"), // 110% match fee
-        ethers.parseEther("1.1"), // 110% distribution partner share
         ethers.parseEther("0")
       );
 
@@ -787,7 +786,7 @@ describe("Router Contract", function () {
       // Set 0x as fee distributor to check fee share cap
       await mockFeeHandler
         .connect(owner)
-        .setDistPartners([ethers.ZeroAddress], [true]);
+        .setDistPartnerFeeShares([ethers.ZeroAddress], [BASE]);
 
       const preview = await escrow.previewBid(
         relBid,

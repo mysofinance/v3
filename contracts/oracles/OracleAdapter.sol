@@ -6,6 +6,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Errors} from "../errors/Errors.sol";
 import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
 /// @title OracleAdapter
@@ -25,14 +26,6 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         address oracleAddr;
         uint8 decimals;
     }
-
-    error InvalidAddress();
-    error InvalidArrayLength();
-    error InvalidMaxTimeSinceLastUpdate();
-    error InvalidOracleAnswer();
-    error InvalidOracleDecimals();
-    error NoOracle();
-    error OracleAlreadySet(address oracleAddr);
 
     // Mapping from token address to its OracleInfo
     mapping(address => OracleInfo) public oracleInfos;
@@ -57,7 +50,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
     ) Ownable(_owner) {
         uint256 tokenAddrsLength = _tokenAddrs.length;
         if (tokenAddrsLength != _oracleAddrs.length) {
-            revert InvalidArrayLength();
+            revert Errors.InvalidArrayLength();
         }
 
         if (
@@ -65,11 +58,11 @@ contract OracleAdapter is IOracleAdapter, Ownable {
             _weth == address(0) ||
             _ethUsdOracle == _weth
         ) {
-            revert InvalidAddress();
+            revert Errors.InvalidAddress();
         }
 
         if (_maxTimeSinceLastUpdate == 0) {
-            revert InvalidMaxTimeSinceLastUpdate();
+            revert Errors.InvalidMaxTimeSinceLastUpdate();
         }
 
         ETH_USD_ORACLE = _ethUsdOracle;
@@ -92,7 +85,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
     ) external onlyOwner {
         uint256 length = _tokenAddrs.length;
         if (length != _oracleAddrs.length) {
-            revert InvalidArrayLength();
+            revert Errors.InvalidArrayLength();
         }
 
         for (uint256 i = 0; i < length; ++i) {
@@ -101,7 +94,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
                 ORACLE_MAPPING_IS_APPEND_ONLY &&
                 existingInfo.oracleAddr != address(0)
             ) {
-                revert OracleAlreadySet(existingInfo.oracleAddr);
+                revert Errors.OracleAlreadySet(existingInfo.oracleAddr);
             }
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
             emit AddOracleMapping(_tokenAddrs[i], _oracleAddrs[i]);
@@ -141,7 +134,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         }
         OracleInfo memory info = oracleInfos[token];
         if (info.oracleAddr == address(0)) {
-            revert NoOracle();
+            revert Errors.NoOracle();
         }
 
         // Fetch the raw price from the token's oracle
@@ -182,7 +175,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
             updatedAt > block.timestamp ||
             updatedAt + MAX_TIME_SINCE_LAST_UPDATE < block.timestamp
         ) {
-            revert InvalidOracleAnswer();
+            revert Errors.InvalidOracleAnswer();
         }
 
         tokenPriceRaw = uint256(answer);
@@ -195,7 +188,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
             token == WETH ||
             oracle == ETH_USD_ORACLE
         ) {
-            revert InvalidAddress();
+            revert Errors.InvalidAddress();
         }
 
         // Fetch decimals from the oracle
@@ -203,7 +196,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
 
         // Ensure oracle decimals are either 8 or 18
         if (decimals != 8 && decimals != 18) {
-            revert InvalidOracleDecimals();
+            revert Errors.InvalidOracleDecimals();
         }
 
         // Store oracle information
