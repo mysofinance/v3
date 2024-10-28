@@ -14,19 +14,20 @@ Upon a match, the option position is represented as an ERC20 option token, which
 ```
 contracts/
 ┣ errors/
-┃ ┗ Errors.sol                     # Defines error codes for revert messages
+┃ ┗ Errors.sol
 ┣ feehandler/
-┃ ┗ FeeHandler.sol                 # Handles fee management for Router actions
-┣ interfaces/                      # Interfaces for modularity and testing
+┃ ┗ FeeHandler.sol
+┣ interfaces/
 ┃ ┣ IDelegation.sol
 ┃ ┣ IEIP1271.sol
 ┃ ┣ IEscrow.sol
-┃ ┣ IOracle.sol
+┃ ┣ IOracleAdapter.sol
 ┃ ┗ IRouter.sol
 ┣ oracles/
-┃ ┗ ChainlinkOracle.sol            # Integration with Chainlink Oracle for pricing
-┣ test/                            # Mock contracts for testing functionality
+┃ ┗ OracleAdapter.sol
+┣ test/
 ┃ ┣ EIP1271Maker.sol
+┃ ┣ MockAggregatorV3.sol
 ┃ ┣ MockDelegateRegistry.sol
 ┃ ┣ MockERC20.sol
 ┃ ┣ MockERC20Votes.sol
@@ -34,10 +35,10 @@ contracts/
 ┃ ┣ MockOracle.sol
 ┃ ┗ TestRecover.sol
 ┣ utils/
-┃ ┗ InitializableERC20.sol         # Customizable ERC20 implementation for initializing tokens
-┣ DataTypes.sol                    # Contains data structures and types for contracts
-┣ Escrow.sol                       # Escrow contract for managing funds and collateral
-┗ Router.sol                       # Core Router contract for auction and option operations
+┃ ┗ InitializableERC20.sol
+┣ DataTypes.sol
+┣ Escrow.sol
+┗ Router.sol
 ```
 
 ## Test Files
@@ -45,18 +46,17 @@ contracts/
 ```
 test/
 ┣ DataTypes.ts
-┣ helpers.ts                       # Helper functions for setting up tests
-┣ TestChainlinkOracle.ts           # Tests for ChainlinkOracle integration
-┣ TestRouter.ts                    # Core tests for Router functionalities
-┣ TestRouterWithEIP1271Maker.ts    # Tests with EIP1271 signature validation
-┣ TestRouterWithEscrow.ts          # Tests Router with Escrow operations
-┗ TestRouterWithFees.ts            # Tests fee management and distribution in Router
+┣ helpers.ts
+┣ TestOracleAdapter.ts
+┣ TestRouter.ts
+┣ TestRouterWithEIP1271Maker.ts
+┣ TestRouterWithEscrow.ts
+┗ TestRouterWithFees.ts
 ```
 
 ## Test Coverage
 
 ```
------------------------|----------|----------|----------|----------|----------------|
 -----------------------|----------|----------|----------|----------|----------------|
 File                   |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
 -----------------------|----------|----------|----------|----------|----------------|
@@ -67,6 +67,8 @@ File                   |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Li
   Errors.sol           |      100 |      100 |      100 |      100 |                |
  contracts\feehandler\ |      100 |      100 |      100 |      100 |                |
   FeeHandler.sol       |      100 |      100 |      100 |      100 |                |
+ contracts\oracles\    |      100 |      100 |      100 |      100 |                |
+  OracleAdapter.sol    |      100 |      100 |      100 |      100 |                |
 -----------------------|----------|----------|----------|----------|----------------|
 All files              |      100 |      100 |      100 |      100 |                |
 -----------------------|----------|----------|----------|----------|----------------|

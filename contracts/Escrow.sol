@@ -9,7 +9,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {InitializableERC20} from "./utils/InitializableERC20.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "./errors/Errors.sol";
-import {IOracle} from "./interfaces/IOracle.sol";
+import {IOracleAdapter} from "./interfaces/IOracleAdapter.sol";
 import {IDelegation} from "./interfaces/IDelegation.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
 import {IRouter} from "./interfaces/IRouter.sol";
@@ -228,7 +228,7 @@ contract Escrow is InitializableERC20, IEscrow {
         if (!payInSettlementToken) {
             exerciseCostInUnderlying =
                 ((strike * underlyingExerciseAmount) *
-                    IOracle(optionInfo.advancedSettings.oracle).getPrice(
+                    IOracleAdapter(optionInfo.advancedSettings.oracle).getPrice(
                         settlementToken,
                         underlyingToken,
                         oracleData
@@ -447,8 +447,9 @@ contract Escrow is InitializableERC20, IEscrow {
             optionInfo.settlementToken
         );
 
-        uint256 oracleSpotPrice = IOracle(optionInfo.advancedSettings.oracle)
-            .getPrice(underlyingToken, settlementToken, _oracleData);
+        uint256 oracleSpotPrice = IOracleAdapter(
+            optionInfo.advancedSettings.oracle
+        ).getPrice(underlyingToken, settlementToken, _oracleData);
 
         if (_refSpot < oracleSpotPrice) {
             return _createBidPreview(DataTypes.BidStatus.SpotPriceTooLow);

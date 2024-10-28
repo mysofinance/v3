@@ -4,8 +4,10 @@ pragma solidity 0.8.24;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Errors} from "../errors/Errors.sol";
+import {IFeeHandler} from "../interfaces/IFeeHandler.sol";
 
-contract FeeHandler is Ownable {
+contract FeeHandler is Ownable, IFeeHandler {
     using SafeERC20 for IERC20Metadata;
 
     uint256 internal constant BASE = 1 ether;
@@ -18,16 +20,6 @@ contract FeeHandler is Ownable {
     uint96 public exerciseFee;
 
     mapping(address => bool) public isDistPartner;
-
-    event ProvisionFees(address indexed token, uint256 amount);
-    event Withdraw(address indexed to, address indexed token, uint256 amount);
-    event SetMatchFeeInfo(uint256 matchFee, uint256 distPartnerFeeShare);
-    event SetExerciseFee(uint96 exerciseFee);
-    event SetDistributionPartners(address[] accounts, bool[] isDistPartner);
-
-    error InvalidMatchFee();
-    error InvalidPartnerFeeShare();
-    error InvalidExerciseFee();
 
     constructor(
         address initOwner,
@@ -43,9 +35,9 @@ contract FeeHandler is Ownable {
 
     function provisionFees(address token, uint256 amount) external virtual {
         if (msg.sender != router) {
-            revert();
+            revert Errors.InvalidSender();
         }
-        // @dev: placeholder for distribution logic
+        // @dev: add distribution logic in derived contracts
         emit ProvisionFees(token, amount);
     }
 
@@ -81,7 +73,7 @@ contract FeeHandler is Ownable {
         }
         for (uint256 i = 0; i < accounts.length; ++i) {
             if (isDistPartner[accounts[i]] == _isDistPartner[i]) {
-                revert();
+                revert Errors.DistributionPartnerAlreadySet();
             }
             isDistPartner[accounts[i]] = _isDistPartner[i];
         }
@@ -94,10 +86,10 @@ contract FeeHandler is Ownable {
         uint96 _distPartnerFeeShare
     ) public virtual onlyOwner {
         if (_matchFee > MAX_MATCH_FEE) {
-            revert InvalidMatchFee();
+            revert Errors.InvalidMatchFee();
         }
         if (_distPartnerFeeShare > BASE) {
-            revert InvalidPartnerFeeShare();
+            revert Errors.InvalidPartnerFeeShare();
         }
         matchFee = _matchFee;
         matchFeeDistPartnerShare = _distPartnerFeeShare;
@@ -106,7 +98,7 @@ contract FeeHandler is Ownable {
 
     function setExerciseFee(uint96 _exerciseFee) public virtual onlyOwner {
         if (_exerciseFee > MAX_EXERCISE_FEE) {
-            revert InvalidExerciseFee();
+            revert Errors.InvalidExerciseFee();
         }
         exerciseFee = _exerciseFee;
         emit SetExerciseFee(_exerciseFee);

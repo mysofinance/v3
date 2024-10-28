@@ -103,14 +103,10 @@ export const getAuctionInitialization = async ({
   premiumTokenIsUnderlying = false, // Default false
   oracleAddress,
 }: AuctionInitializationParams): Promise<DataTypes.AuctionInitialization> => {
-  // Fetch the latest block to ensure we have the correct block timestamp
-  const latestBlock = await ethers.provider.getBlock("latest");
-  if (!latestBlock) {
-    throw new Error("Failed to retrieve the latest block.");
-  }
+  const latestTimestamp = await getLatestTimestamp();
 
   // Handle optional decayStartTime, defaulting to block timestamp + 100 seconds
-  decayStartTime = decayStartTime || latestBlock.timestamp + 100;
+  decayStartTime = decayStartTime || latestTimestamp + 100;
 
   // Return the auction initialization struct with defaults and custom values
   return {
@@ -309,14 +305,9 @@ export const getRFQInitialization = async ({
   premiumTokenIsUnderlying = false, // Default false
   oracleAddress = ethers.ZeroAddress,
 }: RFQInitializationParams): Promise<DataTypes.RFQInitialization> => {
-  // Fetch the latest block to ensure we have the correct block timestamp
-  const latestBlock = await ethers.provider.getBlock("latest");
-  if (!latestBlock) {
-    throw new Error("Failed to retrieve the latest block.");
-  }
-
   // Handle optional validUntil, defaulting to block timestamp + 1 day
-  validUntil = validUntil || latestBlock.timestamp + 86400;
+  const latestTimestamp = await getLatestTimestamp();
+  validUntil = validUntil ? validUntil : latestTimestamp + 86400;
 
   // Return the RFQ initialization struct with defaults and custom values
   const rfqInitialization: DataTypes.RFQInitialization = {
@@ -325,8 +316,8 @@ export const getRFQInitialization = async ({
       settlementToken: settlementTokenAddress,
       notional: notionalAmount,
       strike,
-      earliestExercise: latestBlock.timestamp + earliestExerciseTenor, // Set based on earliestExerciseTenor
-      expiry: latestBlock.timestamp + tenor, // Set based on tenor
+      earliestExercise: latestTimestamp + earliestExerciseTenor, // Set based on earliestExerciseTenor
+      expiry: latestTimestamp + tenor, // Set based on tenor
       advancedSettings: {
         borrowCap,
         oracle: oracleAddress,
