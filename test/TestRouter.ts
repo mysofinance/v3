@@ -60,6 +60,19 @@ describe("Router Contract", function () {
       const escrow = await createAuction(auctionInitialization, router, owner);
 
       expect(escrow).to.exist; // Ensure the escrow was created
+
+      const name = await escrow.name();
+      const symbol = await escrow.symbol();
+      const decimals = await escrow.decimals();
+
+      const numEscrows = await router.numEscrows();
+      const expectedName = `${await underlyingToken.name()} O${numEscrows}`;
+      const expectedSymbol = `${await underlyingToken.symbol()} O${numEscrows}`;
+      const expectedDecimals = await underlyingToken.decimals();
+
+      expect(name).to.be.equal(expectedName);
+      expect(symbol).to.be.equal(expectedSymbol);
+      expect(decimals).to.be.equal(expectedDecimals);
     });
 
     it("should calculate current ask correctly across different premium values", async function () {
@@ -612,6 +625,7 @@ describe("Router Contract", function () {
           ethers.ZeroAddress
         )
       ).to.emit(router, "MintOption");
+
       const postUnderlyingUserBal = await underlyingToken.balanceOf(
         user1.address
       );
@@ -620,6 +634,23 @@ describe("Router Contract", function () {
       const escrowAddrs = await router.getEscrows(0, 1);
       const EscrowImpl = await ethers.getContractFactory("Escrow");
       const escrow = EscrowImpl.attach(escrowAddrs[0]) as Escrow;
+
+      // Check option token name, symbol and decimals
+      expect(await escrow.name()).to.be.equal("Option Name");
+      expect(await escrow.symbol()).to.be.equal("Option Symbol");
+      expect(await escrow.decimals()).to.be.equal(
+        await underlyingToken.decimals()
+      );
+
+      // Check option is minted, linked router, owner and exercise fee
+      expect(await escrow.optionMinted()).to.be.true;
+      expect(await escrow.router()).to.be.equal(router.target);
+      expect(await escrow.owner()).to.be.equal(escrowOwner);
+      expect(await escrow.exerciseFee()).to.be.equal(
+        await router.getExerciseFee()
+      );
+
+      // Check option info
       const escrowOptionInfo = await escrow.optionInfo();
       expect(escrowOptionInfo.underlyingToken).to.be.equal(
         optionInfo.underlyingToken
