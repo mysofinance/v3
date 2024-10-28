@@ -16,20 +16,18 @@ contract FeeHandler is Ownable, IFeeHandler {
 
     address public router;
     uint96 public matchFee;
-    uint96 public matchFeeDistPartnerShare;
     uint96 public exerciseFee;
 
-    mapping(address => bool) public isDistPartner;
+    mapping(address => uint256) public distPartnerFeeShare;
 
     constructor(
         address initOwner,
         address _router,
         uint96 _matchFee,
-        uint96 _distPartnerFeeShare,
         uint96 _exerciseFee
     ) Ownable(initOwner) {
         router = _router;
-        setMatchFeeInfo(_matchFee, _distPartnerFeeShare);
+        setMatchFee(_matchFee);
         setExerciseFee(_exerciseFee);
     }
 
@@ -56,44 +54,38 @@ contract FeeHandler is Ownable, IFeeHandler {
         external
         view
         virtual
-        returns (uint96 _matchFee, uint96 _matchFeeDistPartnerShare)
+        returns (uint256 _matchFee, uint256 _matchFeeDistPartnerShare)
     {
         _matchFee = matchFee;
-        _matchFeeDistPartnerShare = isDistPartner[distPartner]
-            ? matchFeeDistPartnerShare
-            : 0;
+        _matchFeeDistPartnerShare = distPartnerFeeShare[distPartner];
     }
 
-    function setDistPartners(
+    function setDistPartnerFeeShares(
         address[] calldata accounts,
-        bool[] calldata _isDistPartner
+        uint256[] calldata feeShares
     ) external virtual onlyOwner {
-        if (accounts.length == 0 || accounts.length != _isDistPartner.length) {
-            revert();
+        if (accounts.length == 0 || accounts.length != feeShares.length) {
+            revert Errors.InvalidArrayLength();
         }
         for (uint256 i = 0; i < accounts.length; ++i) {
-            if (isDistPartner[accounts[i]] == _isDistPartner[i]) {
-                revert Errors.DistributionPartnerAlreadySet();
+            if (feeShares[i] > BASE) {
+                revert Errors.InvalidDistPartnerFeeShare();
             }
-            isDistPartner[accounts[i]] = _isDistPartner[i];
+            if (distPartnerFeeShare[accounts[i]] == feeShares[i]) {
+                revert Errors.DistPartnerFeeAlreadySet();
+            }
+            distPartnerFeeShare[accounts[i]] = feeShares[i];
         }
 
-        emit SetDistributionPartners(accounts, _isDistPartner);
+        emit SetDistPartnerFeeShares(accounts, feeShares);
     }
 
-    function setMatchFeeInfo(
-        uint96 _matchFee,
-        uint96 _distPartnerFeeShare
-    ) public virtual onlyOwner {
+    function setMatchFee(uint96 _matchFee) public virtual onlyOwner {
         if (_matchFee > MAX_MATCH_FEE) {
             revert Errors.InvalidMatchFee();
         }
-        if (_distPartnerFeeShare > BASE) {
-            revert Errors.InvalidPartnerFeeShare();
-        }
         matchFee = _matchFee;
-        matchFeeDistPartnerShare = _distPartnerFeeShare;
-        emit SetMatchFeeInfo(_matchFee, _distPartnerFeeShare);
+        emit SetMatchFee(_matchFee);
     }
 
     function setExerciseFee(uint96 _exerciseFee) public virtual onlyOwner {

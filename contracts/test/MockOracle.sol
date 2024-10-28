@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import "../interfaces/IOracleAdapter.sol";
-
-contract MockOracle is IOracleAdapter {
+contract MockOracle {
     mapping(address => mapping(address => uint256)) public prices;
 
     function setPrice(
@@ -18,7 +16,7 @@ contract MockOracle is IOracleAdapter {
         address token,
         address quoteToken,
         bytes[] memory /*oracleData*/
-    ) external view override returns (uint256) {
+    ) external view returns (uint256) {
         uint256 price = prices[token][quoteToken];
         require(price != 0, "Price not available for this token pair");
 

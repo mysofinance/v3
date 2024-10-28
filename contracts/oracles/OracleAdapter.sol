@@ -6,12 +6,9 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Errors} from "../errors/Errors.sol";
 import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
-/// @title OracleAdapter
-/// @dev Abstract contract supporting Chainlink and similar oracles with flexible decimal handling.
-///      Allows oracles with 18 (ETH) or 8 (USD) decimals. If an oracle has 8 decimals,
-///      it uses the ETH/USD oracle to convert the price to ETH.
 contract OracleAdapter is IOracleAdapter, Ownable {
     uint256 public immutable MAX_TIME_SINCE_LAST_UPDATE;
     address public immutable ETH_USD_ORACLE;
@@ -26,26 +23,9 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         uint8 decimals;
     }
 
-    error InvalidAddress();
-    error InvalidArrayLength();
-    error InvalidMaxTimeSinceLastUpdate();
-    error InvalidOracleAnswer();
-    error InvalidOracleDecimals();
-    error NoOracle();
-    error OracleAlreadySet(address oracleAddr);
-
     // Mapping from token address to its OracleInfo
     mapping(address => OracleInfo) public oracleInfos;
 
-    event AddOracleMapping(address indexed tokenAddress, address oracleAddress);
-
-    /// @dev Constructor initializes oracle mappings and sets the ETH/USD oracle.
-    /// @param _tokenAddrs Array of token addresses.
-    /// @param _oracleAddrs Array of corresponding oracle addresses.
-    /// @param _ethUsdOracle Address of the ETH/USD Chainlink oracle.
-    /// @param _owner Address of the owner.
-    /// @param _maxTimeSinceLastUpdate Maximum time since last update.
-    /// @param _oracleMappingIsAppendOnly Flag if oracle mapping is append only.
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
@@ -57,7 +37,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
     ) Ownable(_owner) {
         uint256 tokenAddrsLength = _tokenAddrs.length;
         if (tokenAddrsLength != _oracleAddrs.length) {
-            revert InvalidArrayLength();
+            revert Errors.InvalidArrayLength();
         }
 
         if (
@@ -65,11 +45,11 @@ contract OracleAdapter is IOracleAdapter, Ownable {
             _weth == address(0) ||
             _ethUsdOracle == _weth
         ) {
-            revert InvalidAddress();
+            revert Errors.InvalidAddress();
         }
 
         if (_maxTimeSinceLastUpdate == 0) {
-            revert InvalidMaxTimeSinceLastUpdate();
+            revert Errors.InvalidMaxTimeSinceLastUpdate();
         }
 
         ETH_USD_ORACLE = _ethUsdOracle;
@@ -82,17 +62,13 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         }
     }
 
-    /// @dev Allows setting new oracles for tokens that do not already have an oracle set.
-    ///      Reverts if an oracle is already set for a token.
-    /// @param _tokenAddrs Array of token addresses.
-    /// @param _oracleAddrs Array of corresponding new oracle addresses.
     function addOracleMapping(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
     ) external onlyOwner {
         uint256 length = _tokenAddrs.length;
         if (length != _oracleAddrs.length) {
-            revert InvalidArrayLength();
+            revert Errors.InvalidArrayLength();
         }
 
         for (uint256 i = 0; i < length; ++i) {
@@ -101,17 +77,13 @@ contract OracleAdapter is IOracleAdapter, Ownable {
                 ORACLE_MAPPING_IS_APPEND_ONLY &&
                 existingInfo.oracleAddr != address(0)
             ) {
-                revert OracleAlreadySet(existingInfo.oracleAddr);
+                revert Errors.OracleAlreadySet(existingInfo.oracleAddr);
             }
             _checkAndStoreOracleInfo(_tokenAddrs[i], _oracleAddrs[i]);
             emit AddOracleMapping(_tokenAddrs[i], _oracleAddrs[i]);
         }
     }
 
-    /// @notice Retrieves the price of a specified token quoted in another token.
-    /// @param token The address of the token for which the price is to be retrieved.
-    /// @param quoteToken The address of the token in which the price is to be quoted.
-    /// @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
     function getPrice(
         address token,
         address quoteToken,
@@ -129,10 +101,6 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         );
     }
 
-    /// @dev Public function to get the price of a single token in ETH.
-    /// @dev Converts USD prices to ETH if necessary.
-    /// @param token Address of the token.
-    /// @return tokenPriceRaw Price of the token in ETH.
     function getPriceOfToken(
         address token
     ) public view virtual returns (uint256 tokenPriceRaw) {
@@ -141,7 +109,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         }
         OracleInfo memory info = oracleInfos[token];
         if (info.oracleAddr == address(0)) {
-            revert NoOracle();
+            revert Errors.NoOracle();
         }
 
         // Fetch the raw price from the token's oracle
@@ -182,7 +150,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
             updatedAt > block.timestamp ||
             updatedAt + MAX_TIME_SINCE_LAST_UPDATE < block.timestamp
         ) {
-            revert InvalidOracleAnswer();
+            revert Errors.InvalidOracleAnswer();
         }
 
         tokenPriceRaw = uint256(answer);
@@ -195,7 +163,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
             token == WETH ||
             oracle == ETH_USD_ORACLE
         ) {
-            revert InvalidAddress();
+            revert Errors.InvalidAddress();
         }
 
         // Fetch decimals from the oracle
@@ -203,7 +171,7 @@ contract OracleAdapter is IOracleAdapter, Ownable {
 
         // Ensure oracle decimals are either 8 or 18
         if (decimals != 8 && decimals != 18) {
-            revert InvalidOracleDecimals();
+            revert Errors.InvalidOracleDecimals();
         }
 
         // Store oracle information

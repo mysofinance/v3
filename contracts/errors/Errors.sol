@@ -2,12 +2,15 @@
 pragma solidity 0.8.24;
 
 library Errors {
-    error DistributionPartnerAlreadySet();
+    error DistPartnerFeeAlreadySet();
     error FeeHandlerAlreadySet();
+    error InvalidAddress();
+    error InvalidArrayLength();
     error InvalidBid();
     error InvalidBorrowAmount();
     error InvalidBorrowCap();
     error InvalidBorrowTime();
+    error InvalidDistPartnerFeeShare();
     error InvalidEarliestExercise();
     error InvalidEarliestExerciseTenor();
     error InvalidEIP1271Signature();
@@ -17,16 +20,18 @@ library Errors {
     error InvalidExerciseFee();
     error InvalidExerciseTime();
     error InvalidGetEscrowsQuery();
+    error InvalidMatchFee();
+    error InvalidMaxTimeSinceLastUpdate();
+    error InvalidMinMaxSpot();
     error InvalidNotional();
     error InvalidOracle();
+    error InvalidOracleAnswer();
+    error InvalidOracleDecimals();
+    error InvalidRedeem();
     error InvalidRelPremiums();
     error InvalidRepayAmount();
     error InvalidRepayTime();
     error InvalidSender();
-    error InvalidMatchFee();
-    error InvalidMinMaxSpot();
-    error InvalidPartnerFeeShare();
-    error InvalidRedeem();
     error InvalidStrike();
     error InvalidTakeQuote();
     error InvalidTenor();
@@ -34,9 +39,11 @@ library Errors {
     error InvalidWithdraw();
     error NoAllowedDelegateRegistry();
     error NoOptionMinted();
+    error NoOracle();
     error NotAnEscrow();
     error NothingToRedeem();
     error NothingToRepay();
+    error OracleAlreadySet(address oracleAddr);
     error OwnerAlreadySet();
     error SwapQuoteAlreadyUsed();
     error SwapQuoteExpired();
