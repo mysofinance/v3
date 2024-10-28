@@ -22,6 +22,7 @@ library Errors {
     error InvalidGetEscrowsQuery();
     error InvalidMatchFee();
     error InvalidMaxTimeSinceLastUpdate();
+    error InvalidMintFee();
     error InvalidMinMaxSpot();
     error InvalidNotional();
     error InvalidOracle();

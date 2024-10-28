@@ -130,21 +130,25 @@ contract Escrow is InitializableERC20, IEscrow {
         address optionReceiver,
         uint96 _exerciseFee,
         DataTypes.OptionInfo calldata _optionInfo,
-        uint256 oTokenIndex
+        DataTypes.OptionNaming calldata _optionNaming
     ) external initializer {
         optionInfo = _optionInfo;
         optionMinted = true;
+        router = _router;
+        owner = _owner;
+        exerciseFee = _exerciseFee;
+
+        // @dev: initialize with custom name and symbol
+        _name = _optionNaming.name;
+        _symbol = _optionNaming.symbol;
+
         _mint(optionReceiver, _optionInfo.notional);
+
         // @dev: automatically set max. allowance to minimize
         // overhead for follow-on option token swapping via router
         _approve(optionReceiver, _router, type(uint256).max);
-        _initialize(
-            _router,
-            _owner,
-            _exerciseFee,
-            optionInfo.underlyingToken,
-            oTokenIndex
-        );
+
+        _decimals = IERC20Metadata(_optionInfo.underlyingToken).decimals();
     }
 
     function handleAuctionBid(

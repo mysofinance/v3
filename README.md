@@ -21,6 +21,7 @@ contracts/
 ┃ ┣ IDelegation.sol
 ┃ ┣ IEIP1271.sol
 ┃ ┣ IEscrow.sol
+┃ ┣ IFeeHandler.sol
 ┃ ┣ IOracleAdapter.sol
 ┃ ┗ IRouter.sol
 ┣ oracles/

@@ -1,6 +1,12 @@
 const { expect } = require("chai");
 import { ethers } from "hardhat";
-import { Router, Escrow, MockERC20, MockOracle } from "../typechain-types";
+import {
+  Router,
+  Escrow,
+  MockERC20,
+  MockOracle,
+  FeeHandler,
+} from "../typechain-types";
 import {
   setupTestContracts,
   getAuctionInitialization,
@@ -54,6 +60,19 @@ describe("Router Contract", function () {
       const escrow = await createAuction(auctionInitialization, router, owner);
 
       expect(escrow).to.exist; // Ensure the escrow was created
+
+      const name = await escrow.name();
+      const symbol = await escrow.symbol();
+      const decimals = await escrow.decimals();
+
+      const numEscrows = await router.numEscrows();
+      const expectedName = `${await underlyingToken.name()} O${numEscrows}`;
+      const expectedSymbol = `${await underlyingToken.symbol()} O${numEscrows}`;
+      const expectedDecimals = await underlyingToken.decimals();
+
+      expect(name).to.be.equal(expectedName);
+      expect(symbol).to.be.equal(expectedSymbol);
+      expect(decimals).to.be.equal(expectedDecimals);
     });
 
     it("should calculate current ask correctly across different premium values", async function () {
@@ -472,6 +491,7 @@ describe("Router Contract", function () {
     let optionInfo: DataTypes.OptionInfo;
     let optionReceiver: string;
     let escrowOwner: string;
+    let feeHandler: FeeHandler;
 
     beforeEach(async function () {
       // Initialize the necessary variables
@@ -489,9 +509,16 @@ describe("Router Contract", function () {
       optionInfo.underlyingToken = optionInfo.settlementToken;
 
       await expect(
-        router
-          .connect(user1)
-          .mintOption(optionReceiver, escrowOwner, optionInfo)
+        router.connect(user1).mintOption(
+          optionReceiver,
+          escrowOwner,
+          optionInfo,
+          {
+            name: "Option Name",
+            symbol: "Option Symbol",
+          } as DataTypes.OptionNaming,
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(router, "InvalidTokenPair");
     });
 
@@ -500,9 +527,16 @@ describe("Router Contract", function () {
       optionInfo.notional = 0n;
 
       await expect(
-        router
-          .connect(user1)
-          .mintOption(optionReceiver, escrowOwner, optionInfo)
+        router.connect(user1).mintOption(
+          optionReceiver,
+          escrowOwner,
+          optionInfo,
+          {
+            name: "Option Name",
+            symbol: "Option Symbol",
+          } as DataTypes.OptionNaming,
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(router, "InvalidNotional");
     });
 
@@ -511,9 +545,16 @@ describe("Router Contract", function () {
       optionInfo.expiry = (await getLatestTimestamp()) - 100;
 
       await expect(
-        router
-          .connect(user1)
-          .mintOption(optionReceiver, escrowOwner, optionInfo)
+        router.connect(user1).mintOption(
+          optionReceiver,
+          escrowOwner,
+          optionInfo,
+          {
+            name: "Option Name",
+            symbol: "Option Symbol",
+          } as DataTypes.OptionNaming,
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(router, "InvalidExpiry");
     });
 
@@ -522,9 +563,16 @@ describe("Router Contract", function () {
       optionInfo.expiry = optionInfo.earliestExercise + 60 * 60 * 12; // 12 hours later
 
       await expect(
-        router
-          .connect(user1)
-          .mintOption(optionReceiver, escrowOwner, optionInfo)
+        router.connect(user1).mintOption(
+          optionReceiver,
+          escrowOwner,
+          optionInfo,
+          {
+            name: "Option Name",
+            symbol: "Option Symbol",
+          } as DataTypes.OptionNaming,
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(router, "InvalidEarliestExercise");
     });
 
@@ -533,9 +581,16 @@ describe("Router Contract", function () {
       optionInfo.advancedSettings.borrowCap = BASE + 1n;
 
       await expect(
-        router
-          .connect(user1)
-          .mintOption(optionReceiver, escrowOwner, optionInfo)
+        router.connect(user1).mintOption(
+          optionReceiver,
+          escrowOwner,
+          optionInfo,
+          {
+            name: "Option Name",
+            symbol: "Option Symbol",
+          } as DataTypes.OptionNaming,
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(router, "InvalidBorrowCap");
     });
 
@@ -559,10 +614,18 @@ describe("Router Contract", function () {
         user1.address
       );
       await expect(
-        router
-          .connect(user1)
-          .mintOption(optionReceiver, escrowOwner, optionInfo)
+        router.connect(user1).mintOption(
+          optionReceiver,
+          escrowOwner,
+          optionInfo,
+          {
+            name: "Option Name",
+            symbol: "Option Symbol",
+          } as DataTypes.OptionNaming,
+          ethers.ZeroAddress
+        )
       ).to.emit(router, "MintOption");
+
       const postUnderlyingUserBal = await underlyingToken.balanceOf(
         user1.address
       );
@@ -571,6 +634,23 @@ describe("Router Contract", function () {
       const escrowAddrs = await router.getEscrows(0, 1);
       const EscrowImpl = await ethers.getContractFactory("Escrow");
       const escrow = EscrowImpl.attach(escrowAddrs[0]) as Escrow;
+
+      // Check option token name, symbol and decimals
+      expect(await escrow.name()).to.be.equal("Option Name");
+      expect(await escrow.symbol()).to.be.equal("Option Symbol");
+      expect(await escrow.decimals()).to.be.equal(
+        await underlyingToken.decimals()
+      );
+
+      // Check option is minted, linked router, owner and exercise fee
+      expect(await escrow.optionMinted()).to.be.true;
+      expect(await escrow.router()).to.be.equal(router.target);
+      expect(await escrow.owner()).to.be.equal(escrowOwner);
+      expect(await escrow.exerciseFee()).to.be.equal(
+        await router.getExerciseFee()
+      );
+
+      // Check option info
       const escrowOptionInfo = await escrow.optionInfo();
       expect(escrowOptionInfo.underlyingToken).to.be.equal(
         optionInfo.underlyingToken
@@ -599,9 +679,197 @@ describe("Router Contract", function () {
           owner.address,
           0,
           optionInfo,
-          0
+          {
+            name: "Option Name",
+            symbol: "Option Symbol",
+          } as DataTypes.OptionNaming
         )
       ).to.be.reverted;
+    });
+
+    describe("Option Token Minting with Fees", function () {
+      beforeEach(async function () {
+        const FeeHandler = await ethers.getContractFactory("FeeHandler");
+        feeHandler = await FeeHandler.deploy(owner.address, 0n, 0n, 0n);
+        await router.connect(owner).setFeeHandler(feeHandler.target);
+      });
+
+      it("should correctly apply protocol mint fee", async function () {
+        const mintFee = ethers.parseUnits("0.01", 18); // 1% mint fee
+        await feeHandler.setMintFee(mintFee);
+
+        await underlyingToken
+          .connect(user1)
+          .approve(router.target, optionInfo.notional);
+        const expectedFee = (optionInfo.notional * mintFee) / BASE;
+
+        await expect(
+          router.connect(user1).mintOption(
+            optionReceiver,
+            escrowOwner,
+            optionInfo,
+            {
+              name: "Option Name",
+              symbol: "Option Symbol",
+            } as DataTypes.OptionNaming,
+            ethers.ZeroAddress
+          )
+        ).to.emit(router, "MintOption");
+
+        const numEscrows = await router.numEscrows();
+        const optionTokenAddress = await router.getEscrows(numEscrows - 1n, 1);
+        const EscrowImpl = await ethers.getContractFactory("Escrow");
+        const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
+
+        const feeHandlerBalance = await optionToken.balanceOf(
+          feeHandler.target
+        );
+        expect(feeHandlerBalance).to.be.equal(expectedFee);
+      });
+
+      it("should correctly apply distribution partner fee share", async function () {
+        const distPartner = user2;
+        const mintFee = ethers.parseUnits("0.01", 18); // 1% mint fee
+        const partnerFeeShare = ethers.parseUnits("0.5", 18); // 50% of mint fee goes to distribution partner
+        await feeHandler.setMintFee(mintFee);
+        await feeHandler.setDistPartnerFeeShares(
+          [distPartner],
+          [partnerFeeShare]
+        );
+
+        await underlyingToken
+          .connect(user1)
+          .approve(router.target, optionInfo.notional);
+        const expectedFee = (optionInfo.notional * mintFee) / BASE;
+        const expectedDistFee = (expectedFee * partnerFeeShare) / BASE;
+        const expectedProtocolFee = expectedFee - expectedDistFee;
+
+        await expect(
+          router.connect(user1).mintOption(
+            optionReceiver,
+            escrowOwner,
+            optionInfo,
+            {
+              name: "Option Name",
+              symbol: "Option Symbol",
+            } as DataTypes.OptionNaming,
+            distPartner
+          )
+        ).to.emit(router, "MintOption");
+
+        const numEscrows = await router.numEscrows();
+        const optionTokenAddress = await router.getEscrows(numEscrows - 1n, 1);
+        const EscrowImpl = await ethers.getContractFactory("Escrow");
+        const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
+
+        const feeHandlerBalance = await optionToken.balanceOf(
+          feeHandler.target
+        );
+        const distPartnerBalance = await optionToken.balanceOf(distPartner);
+        expect(feeHandlerBalance).to.be.equal(expectedProtocolFee);
+        expect(distPartnerBalance).to.be.equal(expectedDistFee);
+      });
+
+      it("should correctly apply 100% distribution partner fee share", async function () {
+        const distPartner = user2;
+        const mintFee = ethers.parseUnits("0.01", 18); // 1% mint fee
+        const partnerFeeShare = ethers.parseUnits("1", 18); // 100% of mint fee goes to distribution partner
+        await feeHandler.setMintFee(mintFee);
+        await feeHandler.setDistPartnerFeeShares(
+          [distPartner],
+          [partnerFeeShare]
+        );
+
+        await underlyingToken
+          .connect(user1)
+          .approve(router.target, optionInfo.notional);
+        const expectedFee = (optionInfo.notional * mintFee) / BASE;
+        const expectedDistFee = (expectedFee * partnerFeeShare) / BASE;
+        const expectedProtocolFee = expectedFee - expectedDistFee;
+
+        await expect(
+          router.connect(user1).mintOption(
+            optionReceiver,
+            escrowOwner,
+            optionInfo,
+            {
+              name: "Option Name",
+              symbol: "Option Symbol",
+            } as DataTypes.OptionNaming,
+            distPartner
+          )
+        ).to.emit(router, "MintOption");
+
+        const numEscrows = await router.numEscrows();
+        const optionTokenAddress = await router.getEscrows(numEscrows - 1n, 1);
+        const EscrowImpl = await ethers.getContractFactory("Escrow");
+        const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
+
+        const feeHandlerBalance = await optionToken.balanceOf(
+          feeHandler.target
+        );
+        const distPartnerBalance = await optionToken.balanceOf(distPartner);
+        expect(feeHandlerBalance).to.be.equal(expectedProtocolFee);
+        expect(distPartnerBalance).to.be.equal(expectedDistFee);
+      });
+
+      it("should correctly apply both protocol and distribution partner fees", async function () {
+        const distPartner = user2;
+        const mintFee = ethers.parseUnits("0.02", 18); // 2% mint fee
+        const partnerFeeShare = ethers.parseUnits("0.4", 18); // 40% of mint fee goes to distribution partner
+        await feeHandler.setMintFee(mintFee);
+        await feeHandler.setDistPartnerFeeShares(
+          [distPartner],
+          [partnerFeeShare]
+        );
+
+        await underlyingToken
+          .connect(user1)
+          .approve(router.target, optionInfo.notional);
+        const expectedFee = (optionInfo.notional * mintFee) / BASE;
+        const expectedDistFee = (expectedFee * partnerFeeShare) / BASE;
+        const expectedProtocolFee = expectedFee - expectedDistFee;
+
+        await expect(
+          router.connect(user1).mintOption(
+            optionReceiver,
+            escrowOwner,
+            optionInfo,
+            {
+              name: "Option Name",
+              symbol: "Option Symbol",
+            } as DataTypes.OptionNaming,
+            distPartner
+          )
+        ).to.emit(router, "MintOption");
+
+        const numEscrows = await router.numEscrows();
+        const optionTokenAddress = await router.getEscrows(numEscrows - 1n, 1);
+        const EscrowImpl = await ethers.getContractFactory("Escrow");
+        const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
+
+        const feeHandlerBalance = await optionToken.balanceOf(
+          feeHandler.target
+        );
+        const distPartnerBalance = await optionToken.balanceOf(distPartner);
+        expect(feeHandlerBalance).to.be.equal(expectedProtocolFee);
+        expect(distPartnerBalance).to.be.equal(expectedDistFee);
+      });
+
+      it("should revert in case mint fee exceeds cap", async function () {
+        await expect(
+          feeHandler.setMintFee(ethers.parseUnits(".200000001", 18))
+        ).to.be.revertedWithCustomError(feeHandler, "InvalidMintFee");
+        await expect(
+          feeHandler.setMintFee(ethers.parseUnits("1.01", 18))
+        ).to.be.revertedWithCustomError(feeHandler, "InvalidMintFee");
+      });
+
+      it("should revert in case non-owner tries to set mint fee", async function () {
+        await expect(
+          feeHandler.connect(user2).setMintFee(ethers.parseUnits(".1", 18))
+        ).to.be.reverted;
+      });
     });
   });
 
@@ -775,9 +1043,9 @@ describe("Router Contract", function () {
         await ethers.getContractFactory("MockHighFeeHandler");
       const mockFeeHandler = await MockFeeHandler.deploy(
         owner.address,
-        router.target,
         ethers.parseEther("1.1"), // 110% match fee
-        ethers.parseEther("0")
+        ethers.parseEther("0"),
+        0n
       );
 
       // Set new fee handler

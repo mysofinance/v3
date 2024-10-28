@@ -103,4 +103,9 @@ library DataTypes {
         bytes signature;
         address eip1271Maker;
     }
+
+    struct OptionNaming {
+        string name;
+        string symbol;
+    }
 }

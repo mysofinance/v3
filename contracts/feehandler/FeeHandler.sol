@@ -14,29 +14,29 @@ contract FeeHandler is Ownable, IFeeHandler {
     uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
     uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
-    address public router;
     uint96 public matchFee;
     uint96 public exerciseFee;
+    uint96 public mintFee;
 
     mapping(address => uint256) public distPartnerFeeShare;
 
     constructor(
         address initOwner,
-        address _router,
         uint96 _matchFee,
-        uint96 _exerciseFee
+        uint96 _exerciseFee,
+        uint96 _mintFee
     ) Ownable(initOwner) {
-        router = _router;
         setMatchFee(_matchFee);
         setExerciseFee(_exerciseFee);
+        setMintFee(_mintFee);
     }
 
-    function provisionFees(address token, uint256 amount) external virtual {
-        if (msg.sender != router) {
-            revert Errors.InvalidSender();
-        }
-        // @dev: add distribution logic in derived contracts
-        emit ProvisionFees(token, amount);
+    function provisionFees(
+        address /*token*/,
+        uint256 /*amount*/
+    ) external virtual {
+        // @dev: placeholder to add fee distribution
+        // logic in derived contracts
     }
 
     function withdraw(
@@ -58,6 +58,18 @@ contract FeeHandler is Ownable, IFeeHandler {
     {
         _matchFee = matchFee;
         _matchFeeDistPartnerShare = distPartnerFeeShare[distPartner];
+    }
+
+    function getMintFeeInfo(
+        address distPartner
+    )
+        external
+        view
+        virtual
+        returns (uint256 _mintFee, uint256 _mintFeeDistPartnerShare)
+    {
+        _mintFee = mintFee;
+        _mintFeeDistPartnerShare = distPartnerFeeShare[distPartner];
     }
 
     function setDistPartnerFeeShares(
@@ -94,5 +106,14 @@ contract FeeHandler is Ownable, IFeeHandler {
         }
         exerciseFee = _exerciseFee;
         emit SetExerciseFee(_exerciseFee);
+    }
+
+    function setMintFee(uint96 _mintFee) public virtual onlyOwner {
+        // @dev: use same fee cap as match fee
+        if (_mintFee > MAX_MATCH_FEE) {
+            revert Errors.InvalidMintFee();
+        }
+        mintFee = _mintFee;
+        emit SetMintFee(_mintFee);
     }
 }

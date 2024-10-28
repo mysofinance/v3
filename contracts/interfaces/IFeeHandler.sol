@@ -21,6 +21,10 @@ interface IFeeHandler {
     /// @param matchFee The match fee set as a percentage.
     event SetMatchFee(uint256 matchFee);
 
+    /// @notice Emitted when mint fee is set.
+    /// @param mintFee The mint fee set as a percentage.
+    event SetMintFee(uint256 mintFee);
+
     /// @notice Emitted when the exercise fee is set.
     /// @param exerciseFee The exercise fee set as a percentage.
     event SetExerciseFee(uint96 exerciseFee);
@@ -41,7 +45,7 @@ interface IFeeHandler {
     /// @param amount The amount of tokens to withdraw.
     function withdraw(address to, address token, uint256 amount) external;
 
-    /// @notice Returns the match fee and the share for distribution partners.
+    /// @notice Returns the match fee and fee share for given distribution partner.
     /// @param distPartner The address of the distribution partner.
     /// @return _matchFee The match fee as a percentage.
     /// @return _matchFeeDistPartnerShare The share of the match fee for the distribution partner.
@@ -51,6 +55,17 @@ interface IFeeHandler {
         external
         view
         returns (uint256 _matchFee, uint256 _matchFeeDistPartnerShare);
+
+    /// @notice Returns the mint fee and fee share for given distribution partner.
+    /// @param distPartner The address of the distribution partner.
+    /// @return _mintFee The mint fee as a percentage.
+    /// @return _mintFeeDistPartnerShare The share of the mint fee for the distribution partner.
+    function getMintFeeInfo(
+        address distPartner
+    )
+        external
+        view
+        returns (uint256 _mintFee, uint256 _mintFeeDistPartnerShare);
 
     /// @notice Sets distribution partners and their status.
     /// @param accounts The addresses of the distribution partners.
@@ -67,10 +82,6 @@ interface IFeeHandler {
     /// @notice Sets the exercise fee.
     /// @param _exerciseFee The exercise fee as a percentage.
     function setExerciseFee(uint96 _exerciseFee) external;
-
-    /// @notice Returns the address of the router linked to the FeeHandler.
-    /// @return The address of the router.
-    function router() external view returns (address);
 
     /// @notice Returns the match fee set in the FeeHandler.
     /// @return The match fee as a percentage.

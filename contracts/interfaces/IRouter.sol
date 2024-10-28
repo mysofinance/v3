@@ -141,11 +141,17 @@ interface IRouter {
     /// @param optionReceiver The address receiving the minted option
     /// @param escrowOwner The owner of the escrow minting the option
     /// @param optionInfo The details of the option being minted
+    /// @param mintFeeProtocol The mint fee amount for the protocol
+    /// @param mintFeeDistPartner The mint fee amount for the distribution partner
+    /// @param distPartner The distribution partner
     event MintOption(
         address indexed sender,
         address indexed optionReceiver,
-        address indexed escrowOwner,
-        DataTypes.OptionInfo optionInfo
+        address escrowOwner,
+        DataTypes.OptionInfo optionInfo,
+        uint256 mintFeeProtocol,
+        uint256 mintFeeDistPartner,
+        address indexed distPartner
     );
 
     /// @notice Emitted when a new fee handler is set
@@ -297,10 +303,14 @@ interface IRouter {
     /// @param optionReceiver The address to receive the minted option
     /// @param escrowOwner The owner of the escrow minting the option
     /// @param optionInfo The details of the option being minted
+    /// @param optionNaming The name and symbol of the option being minted
+    /// @param distPartner The distribution partner's address
     function mintOption(
         address optionReceiver,
         address escrowOwner,
-        DataTypes.OptionInfo calldata optionInfo
+        DataTypes.OptionInfo calldata optionInfo,
+        DataTypes.OptionNaming calldata optionNaming,
+        address distPartner
     ) external;
 
     /// @notice Sets a new fee handler address
@@ -323,6 +333,19 @@ interface IRouter {
         external
         view
         returns (uint128 matchFeeProtocol, uint128 matchFeeDistPartner);
+
+    /// @notice Calculates mint fees for a given distribution partner and notional
+    /// @param distPartner The distribution partner's address
+    /// @param notional The notional of the option in underlying token units
+    /// @return mintFeeProtocol The protocol's mint fee in option tokens
+    /// @return mintFeeDistPartner The distribution partner's mint fee in option tokens
+    function getMintFees(
+        address distPartner,
+        uint128 notional
+    )
+        external
+        view
+        returns (uint256 mintFeeProtocol, uint256 mintFeeDistPartner);
 
     /// @notice Previews the result of taking a quote
     /// @param rfqInitialization The initialization data for the RFQ

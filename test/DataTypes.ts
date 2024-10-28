@@ -100,4 +100,9 @@ export namespace DataTypes {
     signature: string;
     eip1271Maker: string;
   }
+
+  export interface OptionNaming {
+    name: string;
+    symbol: string;
+  }
 }

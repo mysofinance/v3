@@ -424,7 +424,9 @@ contract Router is Ownable, IRouter {
     function mintOption(
         address optionReceiver,
         address escrowOwner,
-        DataTypes.OptionInfo calldata optionInfo
+        DataTypes.OptionInfo calldata optionInfo,
+        DataTypes.OptionNaming calldata optionNaming,
+        address distPartner
     ) external {
         if (optionInfo.underlyingToken == optionInfo.settlementToken) {
             revert Errors.InvalidTokenPair();
@@ -441,21 +443,56 @@ contract Router is Ownable, IRouter {
         if (optionInfo.advancedSettings.borrowCap > BASE) {
             revert Errors.InvalidBorrowCap();
         }
-        (address escrow, uint256 oTokenIndex) = _createEscrow();
+        (address escrow, ) = _createEscrow();
+        (uint256 mintFeeProtocol, uint256 mintFeeDistPartner) = getMintFees(
+            distPartner,
+            optionInfo.notional
+        );
+        address mintOptionTokensTo = (mintFeeProtocol > 0 ||
+            mintFeeDistPartner > 0)
+            ? address(this)
+            : optionReceiver;
         IEscrow(escrow).initializeMintOption(
             address(this),
             escrowOwner,
-            optionReceiver,
+            mintOptionTokensTo,
             getExerciseFee(),
             optionInfo,
-            oTokenIndex
+            optionNaming
         );
         IERC20Metadata(optionInfo.underlyingToken).safeTransferFrom(
             msg.sender,
             escrow,
             optionInfo.notional
         );
-        emit MintOption(msg.sender, optionReceiver, escrowOwner, optionInfo);
+        if (mintOptionTokensTo == address(this)) {
+            IERC20Metadata(escrow).safeTransfer(
+                optionReceiver,
+                optionInfo.notional - mintFeeProtocol - mintFeeDistPartner
+            );
+            if (mintFeeDistPartner > 0) {
+                IERC20Metadata(escrow).safeTransfer(
+                    distPartner,
+                    mintFeeDistPartner
+                );
+            }
+            if (mintFeeProtocol > 0) {
+                IERC20Metadata(escrow).safeTransfer(
+                    feeHandler,
+                    mintFeeProtocol
+                );
+                IFeeHandler(feeHandler).provisionFees(escrow, mintFeeProtocol);
+            }
+        }
+        emit MintOption(
+            msg.sender,
+            optionReceiver,
+            escrowOwner,
+            optionInfo,
+            mintFeeProtocol,
+            mintFeeDistPartner,
+            distPartner
+        );
     }
 
     function setFeeHandler(address newFeeHandler) external onlyOwner {
@@ -506,6 +543,36 @@ contract Router is Ownable, IRouter {
             matchFeeProtocol = SafeCast.toUint128(
                 totalMatchFee - matchFeeDistPartner
             );
+        }
+    }
+
+    function getMintFees(
+        address distPartner,
+        uint128 notional
+    )
+        public
+        view
+        returns (uint256 mintFeeProtocol, uint256 mintFeeDistPartner)
+    {
+        address _feeHandler = feeHandler;
+        if (_feeHandler != address(0)) {
+            (uint256 mintFee, uint256 mintFeeDistPartnerShare) = IFeeHandler(
+                _feeHandler
+            ).getMintFeeInfo(distPartner);
+
+            // @dev: use same cap as for match fee
+            uint256 cappedMintFee = mintFee > MAX_MATCH_FEE
+                ? MAX_MATCH_FEE
+                : mintFee;
+            uint256 cappedMintFeeDistPartnerShare = mintFeeDistPartnerShare >
+                BASE
+                ? BASE
+                : mintFeeDistPartnerShare;
+            uint256 totalMintFee = (notional * cappedMintFee) / BASE;
+            mintFeeDistPartner =
+                (totalMintFee * cappedMintFeeDistPartnerShare) /
+                BASE;
+            mintFeeProtocol = totalMintFee - mintFeeDistPartner;
         }
     }
 
