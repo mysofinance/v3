@@ -54,7 +54,7 @@ contract FeeHandler is Ownable, IFeeHandler {
         external
         view
         virtual
-        returns (uint96 _matchFee, uint256 _matchFeeDistPartnerShare)
+        returns (uint256 _matchFee, uint256 _matchFeeDistPartnerShare)
     {
         _matchFee = matchFee;
         _matchFeeDistPartnerShare = distPartnerFeeShare[distPartner];

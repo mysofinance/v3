@@ -50,7 +50,7 @@ interface IFeeHandler {
     )
         external
         view
-        returns (uint96 _matchFee, uint256 _matchFeeDistPartnerShare);
+        returns (uint256 _matchFee, uint256 _matchFeeDistPartnerShare);
 
     /// @notice Sets distribution partners and their status.
     /// @param accounts The addresses of the distribution partners.

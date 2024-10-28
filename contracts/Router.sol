@@ -488,11 +488,11 @@ contract Router is Ownable, IRouter {
     {
         address _feeHandler = feeHandler;
         if (_feeHandler != address(0)) {
-            (uint96 matchFee, uint256 matchFeeDistPartnerShare) = IFeeHandler(
+            (uint256 matchFee, uint256 matchFeeDistPartnerShare) = IFeeHandler(
                 _feeHandler
             ).getMatchFeeInfo(distPartner);
 
-            uint96 cappedMatchFee = matchFee > MAX_MATCH_FEE
+            uint256 cappedMatchFee = matchFee > MAX_MATCH_FEE
                 ? MAX_MATCH_FEE
                 : matchFee;
             uint256 cappedMatchFeeDistPartnerShare = matchFeeDistPartnerShare >
