@@ -334,6 +334,19 @@ interface IRouter {
         view
         returns (uint128 matchFeeProtocol, uint128 matchFeeDistPartner);
 
+    /// @notice Calculates mint fees for a given distribution partner and notional
+    /// @param distPartner The distribution partner's address
+    /// @param notional The notional of the option in underlying token units
+    /// @return mintFeeProtocol The protocol's mint fee in option tokens
+    /// @return mintFeeDistPartner The distribution partner's mint fee in option tokens
+    function getMintFees(
+        address distPartner,
+        uint128 notional
+    )
+        external
+        view
+        returns (uint256 mintFeeProtocol, uint256 mintFeeDistPartner);
+
     /// @notice Previews the result of taking a quote
     /// @param rfqInitialization The initialization data for the RFQ
     /// @param distPartner The distribution partner's address
