@@ -202,8 +202,10 @@ describe("Router And Escrow Interaction", function () {
       const rfqInitialization = await getRFQInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
-        validUntil: (await provider.getBlock("latest")).timestamp - 1,
       });
+
+      // Set valid until to be in the past
+      rfqInitialization.rfqQuote.validUntil = (await getLatestTimestamp()) - 1;
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));

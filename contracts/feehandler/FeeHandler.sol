@@ -37,7 +37,7 @@ contract FeeHandler is Ownable, IFeeHandler {
         if (msg.sender != router) {
             revert Errors.InvalidSender();
         }
-        // @dev: can add distribution logic in derived contracts
+        // @dev: add distribution logic in derived contracts
         emit ProvisionFees(token, amount);
     }
 

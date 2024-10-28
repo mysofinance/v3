@@ -3,6 +3,8 @@ import { chainlink } from "../typechain-types";
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+import { getLatestTimestamp } from "./helpers";
+
 describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Comparison", function () {
   let chainlinkOracle: any;
   let owner: any;
@@ -554,12 +556,106 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         ).to.be.revertedWithCustomError(oracleAdapter, "NoOracle");
       });
 
-      it("should revert if latest round is zero", async function () {
-        await mockAggregatorUsdcUsd.setLatestRoundData(0, 0, 0, 0, 0);
+      it("should revert if roundId == zero", async function () {
+        const latestTimestamp = await getLatestTimestamp();
+        const roundId = 0; // invalid round id
+        const answer = 1;
+        const startedAt = latestTimestamp;
+        const updatedAt = latestTimestamp;
+        const answeredInRound = 1;
+
+        await mockAggregatorUsdcUsd.setLatestRoundData(
+          roundId,
+          answer,
+          startedAt,
+          updatedAt,
+          answeredInRound
+        );
         await expect(
           oracleAdapter.getPrice(USDC, WETH, [])
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
-        await mockAggregatorUsdcUsd.setLatestRoundData(1, 0, 0, 0, 0);
+      });
+
+      it("should revert if answer < 1", async function () {
+        const latestTimestamp = await getLatestTimestamp();
+        const roundId = 1;
+        const answer = 0; // invalid answer
+        const startedAt = latestTimestamp;
+        const updatedAt = latestTimestamp;
+        const answeredInRound = 1;
+
+        await mockAggregatorUsdcUsd.setLatestRoundData(
+          roundId,
+          answer,
+          startedAt,
+          updatedAt,
+          answeredInRound
+        );
+        const latestRoundData = await mockAggregatorUsdcUsd.latestRoundData();
+        console.log(latestRoundData);
+        await expect(
+          oracleAdapter.getPrice(USDC, WETH, [])
+        ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
+      });
+
+      it("should revert if answeredInRound < roundId", async function () {
+        const latestTimestamp = await getLatestTimestamp();
+        const roundId = 2;
+        const answer = 1000;
+        const startedAt = latestTimestamp;
+        const updatedAt = latestTimestamp;
+        const answeredInRound = 1; // less than roundId
+
+        await mockAggregatorUsdcUsd.setLatestRoundData(
+          roundId,
+          answer,
+          startedAt,
+          updatedAt,
+          answeredInRound
+        );
+        await expect(
+          oracleAdapter.getPrice(USDC, WETH, [])
+        ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
+      });
+
+      it("should revert if updatedAt > block.timestamp", async function () {
+        const latestTimestamp = await getLatestTimestamp();
+        const roundId = 1;
+        const answer = 1000;
+        const startedAt = latestTimestamp;
+        const updatedAt = latestTimestamp + 1000; // future timestamp
+        const answeredInRound = 1;
+
+        await mockAggregatorUsdcUsd.setLatestRoundData(
+          roundId,
+          answer,
+          startedAt,
+          updatedAt,
+          answeredInRound
+        );
+        await expect(
+          oracleAdapter.getPrice(USDC, WETH, [])
+        ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
+      });
+
+      it("should revert if updatedAt + MAX_TIME_SINCE_LAST_UPDATE < block.timestamp", async function () {
+        const MAX_TIME_SINCE_LAST_UPDATE =
+          await oracleAdapter.MAX_TIME_SINCE_LAST_UPDATE();
+        const latestTimestamp = await getLatestTimestamp();
+        const roundId = 1;
+        const answer = 1000;
+        const startedAt = latestTimestamp;
+        const updatedAt =
+          BigInt(latestTimestamp) - 2n * MAX_TIME_SINCE_LAST_UPDATE; // outdated timestamp
+        const answeredInRound = 1;
+
+        await mockAggregatorUsdcUsd.setLatestRoundData(
+          roundId,
+          answer,
+          startedAt,
+          updatedAt,
+          answeredInRound
+        );
         await expect(
           oracleAdapter.getPrice(USDC, WETH, [])
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
