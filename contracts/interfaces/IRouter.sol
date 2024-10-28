@@ -141,11 +141,17 @@ interface IRouter {
     /// @param optionReceiver The address receiving the minted option
     /// @param escrowOwner The owner of the escrow minting the option
     /// @param optionInfo The details of the option being minted
+    /// @param mintFeeProtocol The mint fee amount for the protocol
+    /// @param mintFeeDistPartner The mint fee amount for the distribution partner
+    /// @param distPartner The distribution partner
     event MintOption(
         address indexed sender,
         address indexed optionReceiver,
-        address indexed escrowOwner,
-        DataTypes.OptionInfo optionInfo
+        address escrowOwner,
+        DataTypes.OptionInfo optionInfo,
+        uint256 mintFeeProtocol,
+        uint256 mintFeeDistPartner,
+        address indexed distPartner
     );
 
     /// @notice Emitted when a new fee handler is set
@@ -297,10 +303,12 @@ interface IRouter {
     /// @param optionReceiver The address to receive the minted option
     /// @param escrowOwner The owner of the escrow minting the option
     /// @param optionInfo The details of the option being minted
+    /// @param distPartner The distribution partner's address
     function mintOption(
         address optionReceiver,
         address escrowOwner,
-        DataTypes.OptionInfo calldata optionInfo
+        DataTypes.OptionInfo calldata optionInfo,
+        address distPartner
     ) external;
 
     /// @notice Sets a new fee handler address

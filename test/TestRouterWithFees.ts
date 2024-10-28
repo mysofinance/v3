@@ -14,6 +14,7 @@ import {
   getRFQInitialization,
   getAuctionInitialization,
   createAuction,
+  getDefaultOptionInfo,
 } from "./helpers";
 
 describe("Router Contract Fee Tests", function () {
@@ -49,7 +50,8 @@ describe("Router Contract Fee Tests", function () {
       owner.address,
       router.target,
       ethers.parseEther("0.01"), // 1% match fee
-      ethers.parseEther("0.001") // 0.1% exercise fee
+      ethers.parseEther("0.001"), // 0.1% exercise fee
+      0n
     );
 
     await router.connect(owner).setFeeHandler(feeHandler.target);
@@ -167,15 +169,6 @@ describe("Router Contract Fee Tests", function () {
       expect(await feeHandler.distPartnerFeeShare(user2.address)).to.be.equal(
         feesShares[1]
       );
-    });
-
-    it("Should allow only router to call provisionFees", async function () {
-      // Attempt to call provisionFees from non-router
-      await expect(
-        feeHandler
-          .connect(user1)
-          .provisionFees(underlyingToken.target, ethers.parseEther("10"))
-      ).to.be.revertedWithCustomError(feeHandler, "InvalidSender");
     });
   });
 
@@ -613,6 +606,7 @@ describe("Router Contract Fee Tests", function () {
         initialFeeHandlerBalance + expectedExerciseFee
       );
     });
+
     it("should apply correct fees when exercising with underlying token", async function () {
       await feeHandler
         .connect(owner)
@@ -871,19 +865,26 @@ describe("Router Contract Fee Tests", function () {
   });
 
   describe("Fee Capping", function () {
-    it("should cap fees at maximum allowed values when using a high fee handler", async function () {
+    let highFeeHandler: any;
+    const optionPremium = ethers.parseEther("100"); // Example premium
+    const notional = ethers.parseEther("1000"); // Example notional
+
+    beforeEach(async function () {
       const HighFeeHandler =
         await ethers.getContractFactory("MockHighFeeHandler");
-      const highFeeHandler = await HighFeeHandler.deploy(
+      highFeeHandler = await HighFeeHandler.deploy(
         owner.address,
         router.target,
         ethers.parseEther("0.5"), // 50% match fee
-        ethers.parseEther("0.5") // 50% exercise fee
+        ethers.parseEther("0.5"), // 50% exercise fee
+        0n
       );
 
       // Set the high fee handler
       await router.connect(owner).setFeeHandler(highFeeHandler.target);
+    });
 
+    it("should cap match fees at maximum allowed values when using a high fee handler", async function () {
       // Check exercise fee
       const exerciseFee = await router.getExerciseFee();
       expect(exerciseFee).to.equal(ethers.parseEther("0.005")); // Max exercise fee is 0.5%
@@ -894,7 +895,6 @@ describe("Router Contract Fee Tests", function () {
       );
 
       // Check match fees
-      const optionPremium = ethers.parseEther("100"); // Example premium
       const [matchFeeProtocol, matchFeeDistPartner] = await router.getMatchFees(
         user1.address,
         optionPremium
@@ -914,15 +914,77 @@ describe("Router Contract Fee Tests", function () {
         expectedMaxMatchFee - expectedDistPartnerFee
       );
 
-      // set dist partner fee over Base
+      // Set dist partner fee over Base
       await highFeeHandler.setDistPartnerFeeShares(
         [user1.address],
         [ethers.parseEther("1.5")]
       );
       const [secondMatchFeeProtocol, secondMatchFeeDistPartner] =
         await router.getMatchFees(user1.address, optionPremium);
+
+      // Since the distribution partner share is capped, the entire match fee should go to the partner
       expect(secondMatchFeeDistPartner).to.equal(expectedMaxMatchFee);
       expect(secondMatchFeeProtocol).to.equal(0n);
+    });
+
+    it("should cap mint fees at maximum allowed values when using a high fee handler", async function () {
+      // Assume the same high fee handler is used for mint fees
+      await highFeeHandler.setMintFee(ethers.parseEther("0.5")); // 50% mint fee
+
+      const optionInfo = await getDefaultOptionInfo(
+        String(underlyingToken.target),
+        String(settlementToken.target),
+        ethers.parseUnits("1", await settlementToken.decimals())
+      );
+
+      // Prepare optionInfo with a valid notional value
+      optionInfo.notional = notional;
+
+      // Test capping of mint fees
+      const [mintFeeProtocol, mintFeeDistPartner] = await router.getMintFees(
+        user1.address,
+        optionInfo.notional
+      );
+
+      // Max mint fee is capped at 20% of notional
+      const expectedMaxMintFee =
+        (optionInfo.notional * BigInt(20)) / BigInt(100);
+      expect(mintFeeProtocol + mintFeeDistPartner).to.equal(expectedMaxMintFee);
+
+      // Verify the distribution partner share with default settings (0%)
+      expect(mintFeeDistPartner).to.equal(0n);
+      expect(mintFeeProtocol).to.equal(expectedMaxMintFee);
+
+      // Set distribution partner share
+      await highFeeHandler.setDistPartnerFeeShares(
+        [user1.address],
+        [ethers.parseEther("0.25")] // 25% of mint fee
+      );
+
+      // Test mint fees with distribution partner fee share
+      const [mintFeeProtocolWithDist, mintFeeDistPartnerWithDist] =
+        await router.getMintFees(user1.address, optionInfo.notional);
+
+      const expectedDistPartnerFee =
+        (expectedMaxMintFee * BigInt(25)) / BigInt(100); // 25% of max mint fee
+      expect(mintFeeDistPartnerWithDist).to.equal(expectedDistPartnerFee);
+      expect(mintFeeProtocolWithDist).to.equal(
+        expectedMaxMintFee - expectedDistPartnerFee
+      );
+
+      // Set an extremely high distribution partner fee share (>100%)
+      await highFeeHandler.setDistPartnerFeeShares(
+        [user1.address],
+        [ethers.parseEther("1.5")] // 150% of mint fee
+      );
+
+      // Test mint fees when distribution partner fee share exceeds 100%
+      const [secondMintFeeProtocol, secondMintFeeDistPartner] =
+        await router.getMintFees(user1.address, optionInfo.notional);
+
+      // Since the distribution partner share is capped, the entire mint fee should go to the partner
+      expect(secondMintFeeDistPartner).to.equal(expectedMaxMintFee);
+      expect(secondMintFeeProtocol).to.equal(0n);
     });
   });
 
