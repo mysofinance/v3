@@ -9,10 +9,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Errors} from "../errors/Errors.sol";
 import {IOracleAdapter} from "../interfaces/IOracleAdapter.sol";
 
-/// @title OracleAdapter
-/// @dev Abstract contract supporting Chainlink and similar oracles with flexible decimal handling.
-///      Allows oracles with 18 (ETH) or 8 (USD) decimals. If an oracle has 8 decimals,
-///      it uses the ETH/USD oracle to convert the price to ETH.
 contract OracleAdapter is IOracleAdapter, Ownable {
     uint256 public immutable MAX_TIME_SINCE_LAST_UPDATE;
     address public immutable ETH_USD_ORACLE;
@@ -30,15 +26,6 @@ contract OracleAdapter is IOracleAdapter, Ownable {
     // Mapping from token address to its OracleInfo
     mapping(address => OracleInfo) public oracleInfos;
 
-    event AddOracleMapping(address indexed tokenAddress, address oracleAddress);
-
-    /// @dev Constructor initializes oracle mappings and sets the ETH/USD oracle.
-    /// @param _tokenAddrs Array of token addresses.
-    /// @param _oracleAddrs Array of corresponding oracle addresses.
-    /// @param _ethUsdOracle Address of the ETH/USD Chainlink oracle.
-    /// @param _owner Address of the owner.
-    /// @param _maxTimeSinceLastUpdate Maximum time since last update.
-    /// @param _oracleMappingIsAppendOnly Flag if oracle mapping is append only.
     constructor(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs,
@@ -75,10 +62,6 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         }
     }
 
-    /// @dev Allows setting new oracles for tokens that do not already have an oracle set.
-    ///      Reverts if an oracle is already set for a token.
-    /// @param _tokenAddrs Array of token addresses.
-    /// @param _oracleAddrs Array of corresponding new oracle addresses.
     function addOracleMapping(
         address[] memory _tokenAddrs,
         address[] memory _oracleAddrs
@@ -101,10 +84,6 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         }
     }
 
-    /// @notice Retrieves the price of a specified token quoted in another token.
-    /// @param token The address of the token for which the price is to be retrieved.
-    /// @param quoteToken The address of the token in which the price is to be quoted.
-    /// @return tokenPriceInQuoteToken The price of 1 unit of token (=10**token_decimal) quoted in the quoteToken.
     function getPrice(
         address token,
         address quoteToken,
@@ -122,10 +101,6 @@ contract OracleAdapter is IOracleAdapter, Ownable {
         );
     }
 
-    /// @dev Public function to get the price of a single token in ETH.
-    /// @dev Converts USD prices to ETH if necessary.
-    /// @param token Address of the token.
-    /// @return tokenPriceRaw Price of the token in ETH.
     function getPriceOfToken(
         address token
     ) public view virtual returns (uint256 tokenPriceRaw) {

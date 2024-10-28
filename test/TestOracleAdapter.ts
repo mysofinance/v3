@@ -591,8 +591,6 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           updatedAt,
           answeredInRound
         );
-        const latestRoundData = await mockAggregatorUsdcUsd.latestRoundData();
-        console.log(latestRoundData);
         await expect(
           oracleAdapter.getPrice(USDC, WETH, [])
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");

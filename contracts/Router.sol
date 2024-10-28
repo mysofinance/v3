@@ -8,11 +8,11 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
-import {FeeHandler} from "./feehandler/FeeHandler.sol";
 import {DataTypes} from "./DataTypes.sol";
 import {Errors} from "./errors/Errors.sol";
-import {IRouter} from "./interfaces/IRouter.sol";
 import {IEscrow} from "./interfaces/IEscrow.sol";
+import {IFeeHandler} from "./interfaces/IFeeHandler.sol";
+import {IRouter} from "./interfaces/IRouter.sol";
 
 contract Router is Ownable, IRouter {
     using SafeERC20 for IERC20Metadata;
@@ -153,7 +153,7 @@ contract Router is Ownable, IRouter {
                 _feeHandler,
                 preview.matchFeeProtocol
             );
-            FeeHandler(_feeHandler).provisionFees(
+            IFeeHandler(_feeHandler).provisionFees(
                 preview.premiumToken,
                 preview.matchFeeProtocol
             );
@@ -206,7 +206,7 @@ contract Router is Ownable, IRouter {
                 feeHandler,
                 exerciseFeeAmount
             );
-            FeeHandler(_feeHandler).provisionFees(
+            IFeeHandler(_feeHandler).provisionFees(
                 settlementToken,
                 exerciseFeeAmount
             );
@@ -249,7 +249,7 @@ contract Router is Ownable, IRouter {
                 feeHandler,
                 collateralFeeAmount
             );
-            FeeHandler(_feeHandler).provisionFees(
+            IFeeHandler(_feeHandler).provisionFees(
                 settlementToken,
                 collateralFeeAmount
             );
@@ -342,7 +342,7 @@ contract Router is Ownable, IRouter {
                 _feeHandler,
                 preview.matchFeeProtocol
             );
-            FeeHandler(_feeHandler).provisionFees(
+            IFeeHandler(_feeHandler).provisionFees(
                 preview.premiumToken,
                 preview.matchFeeProtocol
             );
@@ -472,7 +472,7 @@ contract Router is Ownable, IRouter {
         if (_feeHandler == address(0)) {
             return 0;
         }
-        exerciseFee = FeeHandler(_feeHandler).exerciseFee();
+        exerciseFee = IFeeHandler(_feeHandler).exerciseFee();
         exerciseFee = exerciseFee > MAX_EXERCISE_FEE
             ? MAX_EXERCISE_FEE
             : exerciseFee;
@@ -488,7 +488,7 @@ contract Router is Ownable, IRouter {
     {
         address _feeHandler = feeHandler;
         if (_feeHandler != address(0)) {
-            (uint96 matchFee, uint256 matchFeeDistPartnerShare) = FeeHandler(
+            (uint96 matchFee, uint256 matchFeeDistPartnerShare) = IFeeHandler(
                 _feeHandler
             ).getMatchFeeInfo(distPartner);
 
