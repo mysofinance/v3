@@ -22,7 +22,6 @@ contract FeeHandler is Ownable, IFeeHandler {
 
     constructor(
         address initOwner,
-        address _router,
         uint96 _matchFee,
         uint96 _exerciseFee,
         uint96 _mintFee

@@ -121,14 +121,14 @@ interface IEscrow {
     /// @param optionReceiver Address receiving the minted option tokens.
     /// @param _exerciseFee The exercise fee to be applied in case of exercise.
     /// @param _optionInfo Struct containing option information.
-    /// @param oTokenIndex Index for identifying the option token.
+    /// @param _optionNaming Struct containing the name and symbol of the option token.
     function initializeMintOption(
         address _router,
         address _owner,
         address optionReceiver,
         uint96 _exerciseFee,
         DataTypes.OptionInfo calldata _optionInfo,
-        uint256 oTokenIndex
+        DataTypes.OptionNaming calldata _optionNaming
     ) external;
 
     /// @notice Handles bidding on an auction.

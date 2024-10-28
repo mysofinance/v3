@@ -48,7 +48,6 @@ describe("Router Contract Fee Tests", function () {
     const FeeHandler = await ethers.getContractFactory("FeeHandler");
     feeHandler = await FeeHandler.deploy(
       owner.address,
-      router.target,
       ethers.parseEther("0.01"), // 1% match fee
       ethers.parseEther("0.001"), // 0.1% exercise fee
       0n
@@ -874,7 +873,6 @@ describe("Router Contract Fee Tests", function () {
         await ethers.getContractFactory("MockHighFeeHandler");
       highFeeHandler = await HighFeeHandler.deploy(
         owner.address,
-        router.target,
         ethers.parseEther("0.5"), // 50% match fee
         ethers.parseEther("0.5"), // 50% exercise fee
         0n

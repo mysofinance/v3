@@ -425,6 +425,7 @@ contract Router is Ownable, IRouter {
         address optionReceiver,
         address escrowOwner,
         DataTypes.OptionInfo calldata optionInfo,
+        DataTypes.OptionNaming calldata optionNaming,
         address distPartner
     ) external {
         if (optionInfo.underlyingToken == optionInfo.settlementToken) {
@@ -442,7 +443,7 @@ contract Router is Ownable, IRouter {
         if (optionInfo.advancedSettings.borrowCap > BASE) {
             revert Errors.InvalidBorrowCap();
         }
-        (address escrow, uint256 oTokenIndex) = _createEscrow();
+        (address escrow, ) = _createEscrow();
         (uint256 mintFeeProtocol, uint256 mintFeeDistPartner) = getMintFees(
             distPartner,
             optionInfo.notional
@@ -457,7 +458,7 @@ contract Router is Ownable, IRouter {
             mintOptionTokensTo,
             getExerciseFee(),
             optionInfo,
-            oTokenIndex
+            optionNaming
         );
         IERC20Metadata(optionInfo.underlyingToken).safeTransferFrom(
             msg.sender,

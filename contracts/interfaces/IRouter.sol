@@ -303,11 +303,13 @@ interface IRouter {
     /// @param optionReceiver The address to receive the minted option
     /// @param escrowOwner The owner of the escrow minting the option
     /// @param optionInfo The details of the option being minted
+    /// @param optionNaming The name and symbol of the option being minted
     /// @param distPartner The distribution partner's address
     function mintOption(
         address optionReceiver,
         address escrowOwner,
         DataTypes.OptionInfo calldata optionInfo,
+        DataTypes.OptionNaming calldata optionNaming,
         address distPartner
     ) external;
 
