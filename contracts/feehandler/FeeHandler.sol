@@ -36,13 +36,8 @@ contract FeeHandler is Ownable, IFeeHandler {
         address /*token*/,
         uint256 /*amount*/
     ) external virtual {
-        // @dev: placeholder to add distribution hooks in derived
-        // for example:
-        // if (msg.sender != ROUTER) {
-        //    revert Errors.InvalidSender();
-        // }
-        // distribution logic here...
-        // emit ProvisionFees(token, amount);
+        // @dev: placeholder to add fee distribution
+        // logic in derived contracts
     }
 
     function withdraw(
