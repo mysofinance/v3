@@ -21,6 +21,11 @@ const config: HardhatUserConfig = {
       url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_SEPOLIA_API_KEY}`,
       accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
     },
+    baseSepolia: {
+      chainId: 84532,
+      url: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_SEPOLIA_API_KEY}`,
+      accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
+    },
     hardhat: {
       /*
       forking: {
@@ -39,6 +44,7 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: {
       sepolia: process.env.SEPOLIA_ETHERSCAN_API_KEY || "",
+      baseSepolia: process.env.BASESEPOLIA_ETHERSCAN_API_KEY || "",
     },
   },
 };

@@ -406,7 +406,7 @@ contract Escrow is InitializableERC20, IEscrow {
         }
         address underlyingToken = optionInfo.underlyingToken;
         _burn(msg.sender, bal);
-        IERC20Metadata(underlyingToken).transfer(to, bal);
+        IERC20Metadata(underlyingToken).safeTransfer(to, bal);
         emit Redeem(msg.sender, to, underlyingToken, bal);
     }
 

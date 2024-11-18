@@ -1093,7 +1093,7 @@ describe("Router Contract Fee Tests", function () {
       // Attempt to set to true again
       await expect(
         feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares)
-      ).to.be.revertedWithCustomError(feeHandler, "DistPartnerFeeAlreadySet");
+      ).to.be.revertedWithCustomError(feeHandler, "DistPartnerFeeUnchanged");
     });
   });
 
