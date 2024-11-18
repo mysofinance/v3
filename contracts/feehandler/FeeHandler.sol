@@ -84,7 +84,7 @@ contract FeeHandler is Ownable, IFeeHandler {
                 revert Errors.InvalidDistPartnerFeeShare();
             }
             if (distPartnerFeeShare[accounts[i]] == feeShares[i]) {
-                revert Errors.DistPartnerUnchanged();
+                revert Errors.DistPartnerFeeUnchanged();
             }
             distPartnerFeeShare[accounts[i]] = feeShares[i];
         }
