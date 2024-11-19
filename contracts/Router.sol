@@ -44,7 +44,8 @@ contract Router is Ownable, IRouter {
 
     function createAuction(
         address escrowOwner,
-        DataTypes.AuctionInitialization calldata auctionInitialization
+        DataTypes.AuctionInitialization calldata auctionInitialization,
+        address distPartner
     ) external {
         (address escrow, uint256 oTokenIndex) = _createEscrow();
         uint96 exerciseFee = getExerciseFee();
@@ -53,7 +54,8 @@ contract Router is Ownable, IRouter {
             escrowOwner,
             exerciseFee,
             auctionInitialization,
-            oTokenIndex
+            oTokenIndex,
+            distPartner
         );
         IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
@@ -71,7 +73,8 @@ contract Router is Ownable, IRouter {
     function withdrawFromEscrowAndCreateAuction(
         address oldEscrow,
         address escrowOwner,
-        DataTypes.AuctionInitialization calldata auctionInitialization
+        DataTypes.AuctionInitialization calldata auctionInitialization,
+        address distPartner
     ) external {
         if (!isEscrow[oldEscrow]) {
             revert Errors.NotAnEscrow();
@@ -85,7 +88,8 @@ contract Router is Ownable, IRouter {
             escrowOwner,
             getExerciseFee(),
             auctionInitialization,
-            oTokenIndex
+            oTokenIndex,
+            distPartner
         );
 
         uint256 oldEscrowBal = IERC20Metadata(
@@ -148,18 +152,19 @@ contract Router is Ownable, IRouter {
         address optionReceiver,
         uint256 relBid,
         uint256 _refSpot,
-        bytes[] memory _oracleData,
-        address distPartner
-    ) external returns (DataTypes.BidPreview memory preview) {
+        bytes[] memory _oracleData
+    )
+        external
+        returns (DataTypes.BidPreview memory preview, address distPartner)
+    {
         if (!isEscrow[escrow]) {
             revert Errors.NotAnEscrow();
         }
-        preview = IEscrow(escrow).handleAuctionBid(
+        (preview, distPartner) = IEscrow(escrow).handleAuctionBid(
             relBid,
             optionReceiver,
             _refSpot,
-            _oracleData,
-            distPartner
+            _oracleData
         );
         IERC20Metadata(preview.premiumToken).safeTransferFrom(
             msg.sender,

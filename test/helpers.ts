@@ -137,7 +137,8 @@ export const getAuctionInitialization = async ({
 export const createAuction = async (
   auctionInitialization: DataTypes.AuctionInitialization,
   router: any,
-  owner: any
+  owner: any,
+  distPartner?: any
 ): Promise<Escrow> => {
   // Attach the underlying token to its contract instance
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
@@ -152,7 +153,13 @@ export const createAuction = async (
 
   // Create the auction via the Router contract
   await expect(
-    router.connect(owner).createAuction(owner.address, auctionInitialization)
+    router
+      .connect(owner)
+      .createAuction(
+        owner.address,
+        auctionInitialization,
+        distPartner || ethers.ZeroAddress
+      )
   ).to.emit(router, "CreateAuction");
 
   // Retrieve and return the created escrow instance
