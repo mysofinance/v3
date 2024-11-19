@@ -630,7 +630,7 @@ describe("Router And Escrow Interaction", function () {
       ).to.be.reverted;
     });
 
-    it("should allow withdrawing from expired auction and creating a new one", async function () {
+    it("should allow withdrawing from expired auction and creating a new one (1/3)", async function () {
       const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
@@ -720,6 +720,114 @@ describe("Router And Escrow Interaction", function () {
             ethers.ZeroAddress
           )
       ).to.emit(router, "BidOnAuction");
+    });
+
+    it("should allow withdrawing from expired auction and creating a new one (2/3)", async function () {
+      let auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+      });
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const oldEscrowAddress = escrow.target;
+
+      // Fast forward time to after auction expiry (30 days + 1 hour)
+      await ethers.provider.send("evm_increaseTime", [86400 * 30 + 3600]);
+      await ethers.provider.send("evm_mine", []);
+
+      const preBalUser = await underlyingToken.balanceOf(owner.address);
+      const preBalOldEscrow = await underlyingToken.balanceOf(oldEscrowAddress);
+
+      // Withdraw from expired auction and create a new one with larger notional amount
+      const oldNotional = auctionInitialization.notional;
+      const newLargerNotional = oldNotional * 3n;
+      auctionInitialization.notional = newLargerNotional;
+      await expect(
+        router
+          .connect(owner)
+          .withdrawFromEscrowAndCreateAuction(
+            oldEscrowAddress,
+            owner.address,
+            auctionInitialization
+          )
+      ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
+
+      const postBalUser = await underlyingToken.balanceOf(owner.address);
+      const postBalOldEscrow =
+        await underlyingToken.balanceOf(oldEscrowAddress);
+
+      // Check balance changes
+      expect(preBalUser - postBalUser).to.be.equal(
+        newLargerNotional - oldNotional
+      );
+      expect(preBalOldEscrow).to.be.gt(0);
+      expect(postBalOldEscrow).to.be.equal(0);
+
+      // Get the new escrow address
+      const newEscrows = await router.getEscrows(1, 1);
+      const newEscrowAddress = newEscrows[0];
+      const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
+      const postBalNewEscrow = await underlyingToken.balanceOf(newEscrow);
+
+      // Check balance changes
+      expect(postBalNewEscrow).to.be.equal(newLargerNotional);
+
+      // Verify that the new escrow is different from the old one
+      expect(newEscrowAddress).to.not.equal(oldEscrowAddress);
+    });
+
+    it("should allow withdrawing from expired auction and creating a new one (3/3)", async function () {
+      let auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+      });
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const oldEscrowAddress = escrow.target;
+
+      // Fast forward time to after auction expiry (30 days + 1 hour)
+      await ethers.provider.send("evm_increaseTime", [86400 * 30 + 3600]);
+      await ethers.provider.send("evm_mine", []);
+
+      const preBalUser = await underlyingToken.balanceOf(owner.address);
+      const preBalOldEscrow = await underlyingToken.balanceOf(oldEscrowAddress);
+
+      // Withdraw from expired auction and create a new one with smaller notional amount
+      const oldNotional = auctionInitialization.notional;
+      const newSmallerNotional = oldNotional / 3n;
+      auctionInitialization.notional = newSmallerNotional;
+      await expect(
+        router
+          .connect(owner)
+          .withdrawFromEscrowAndCreateAuction(
+            oldEscrowAddress,
+            owner.address,
+            auctionInitialization
+          )
+      ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
+
+      const postBalUser = await underlyingToken.balanceOf(owner.address);
+      const postBalOldEscrow =
+        await underlyingToken.balanceOf(oldEscrowAddress);
+
+      // Check balance changes
+      expect(postBalUser - preBalUser).to.be.equal(
+        oldNotional - newSmallerNotional
+      );
+      expect(preBalOldEscrow).to.be.gt(0);
+      expect(postBalOldEscrow).to.be.equal(0);
+
+      // Get the new escrow address
+      const newEscrows = await router.getEscrows(1, 1);
+      const newEscrowAddress = newEscrows[0];
+      const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
+      const postBalNewEscrow = await underlyingToken.balanceOf(newEscrow);
+
+      // Check balance changes
+      expect(postBalNewEscrow).to.be.equal(newSmallerNotional);
+
+      // Verify that the new escrow is different from the old one
+      expect(newEscrowAddress).to.not.equal(oldEscrowAddress);
     });
   });
 
