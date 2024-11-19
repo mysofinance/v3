@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 library Errors {
+    error AlreadyInitialized();
     error DistPartnerFeeUnchanged();
     error FeeHandlerAlreadySet();
     error InvalidAddress();

@@ -109,12 +109,12 @@ contract Escrow is InitializableERC20, IEscrow {
         uint256 oTokenIndex
     ) external initializer {
         optionInfo = _rfqInitialization.optionInfo;
-        optionMinted = true;
         premiumPaid = _rfqInitialization.rfqQuote.premium;
-        _mint(optionReceiver, _rfqInitialization.optionInfo.notional);
-        // @dev: automatically set max. allowance to minimize
-        // overhead for follow-on option token swapping via router
-        _approve(optionReceiver, _router, type(uint256).max);
+        _mintAndApprove(
+            optionReceiver,
+            _rfqInitialization.optionInfo.notional,
+            _router
+        );
         _initialize(
             _router,
             _owner,
@@ -133,22 +133,18 @@ contract Escrow is InitializableERC20, IEscrow {
         DataTypes.OptionNaming calldata _optionNaming
     ) external initializer {
         optionInfo = _optionInfo;
-        optionMinted = true;
         router = _router;
         owner = _owner;
         exerciseFee = _exerciseFee;
 
+        _mintAndApprove(optionReceiver, _optionInfo.notional, _router);
+
         // @dev: initialize with custom name and symbol
-        _name = _optionNaming.name;
-        _symbol = _optionNaming.symbol;
-
-        _mint(optionReceiver, _optionInfo.notional);
-
-        // @dev: automatically set max. allowance to minimize
-        // overhead for follow-on option token swapping via router
-        _approve(optionReceiver, _router, type(uint256).max);
-
-        _decimals = IERC20Metadata(_optionInfo.underlyingToken).decimals();
+        _initializeERC20(
+            _optionNaming.name,
+            _optionNaming.symbol,
+            IERC20Metadata(_optionInfo.underlyingToken).decimals()
+        );
     }
 
     function handleAuctionBid(
@@ -172,12 +168,8 @@ contract Escrow is InitializableERC20, IEscrow {
         optionInfo.expiry = preview.expiry;
         optionInfo.earliestExercise = preview.earliestExercise;
 
-        optionMinted = true;
         premiumPaid = preview.premium;
-        _mint(optionReceiver, optionInfo.notional);
-        // @dev: automatically set max. allowance to minimize
-        // overhead for follow-on option token swapping via router
-        _approve(optionReceiver, _router, type(uint256).max);
+        _mintAndApprove(optionReceiver, optionInfo.notional, _router);
     }
 
     function handleExercise(
@@ -535,13 +527,27 @@ contract Escrow is InitializableERC20, IEscrow {
         exerciseFee = _exerciseFee;
         string memory __name = IERC20Metadata(underlyingToken).name();
         string memory __symbol = IERC20Metadata(underlyingToken).symbol();
-        _name = string(
-            abi.encodePacked(__name, " O", Strings.toString(oTokenIndex))
+        _initializeERC20(
+            string(
+                abi.encodePacked(__name, " O", Strings.toString(oTokenIndex))
+            ),
+            string(
+                abi.encodePacked(__symbol, " O", Strings.toString(oTokenIndex))
+            ),
+            IERC20Metadata(underlyingToken).decimals()
         );
-        _symbol = string(
-            abi.encodePacked(__symbol, " O", Strings.toString(oTokenIndex))
-        );
-        _decimals = IERC20Metadata(underlyingToken).decimals();
+    }
+
+    function _mintAndApprove(
+        address optionReceiver,
+        uint256 notional,
+        address _router
+    ) internal {
+        optionMinted = true;
+        _mint(optionReceiver, notional);
+        // @dev: automatically set max. allowance to minimize
+        // overhead for follow-on option token swapping via router
+        _approve(optionReceiver, _router, type(uint256).max);
     }
 
     function _createBidPreview(
