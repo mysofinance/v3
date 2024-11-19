@@ -792,7 +792,7 @@ describe("Router And Escrow Interaction", function () {
       const preBalUser = await underlyingToken.balanceOf(owner.address);
       const preBalOldEscrow = await underlyingToken.balanceOf(oldEscrowAddress);
 
-      // Withdraw from expired auction and create a new one with larger notional amount
+      // Withdraw from expired auction and create a new one with smaller notional amount
       const oldNotional = auctionInitialization.notional;
       const newSmallerNotional = oldNotional / 3n;
       auctionInitialization.notional = newSmallerNotional;
