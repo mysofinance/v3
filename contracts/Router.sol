@@ -73,13 +73,6 @@ contract Router is Ownable, IRouter {
         if (msg.sender != IEscrow(oldEscrow).owner()) {
             revert Errors.InvalidSender();
         }
-        IEscrow(oldEscrow).handleWithdraw(
-            msg.sender,
-            auctionInitialization.underlyingToken,
-            IERC20Metadata(auctionInitialization.underlyingToken).balanceOf(
-                oldEscrow
-            )
-        );
         (address newEscrow, uint256 oTokenIndex) = _createEscrow();
         IEscrow(newEscrow).initializeAuction(
             address(this),
@@ -88,11 +81,34 @@ contract Router is Ownable, IRouter {
             auctionInitialization,
             oTokenIndex
         );
-        IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
-            msg.sender,
-            newEscrow,
-            auctionInitialization.notional
+
+        uint256 oldEscrowBal = IERC20Metadata(
+            auctionInitialization.underlyingToken
+        ).balanceOf(oldEscrow);
+
+        // @dev: if new notional gte old escrow balance
+        // then we can rollover funds
+        address withdrawTo = auctionInitialization.notional >= oldEscrowBal
+            ? newEscrow
+            : msg.sender;
+        uint256 netTransferAmount = auctionInitialization.notional >=
+            oldEscrowBal
+            ? auctionInitialization.notional - oldEscrowBal
+            : auctionInitialization.notional;
+
+        IEscrow(oldEscrow).handleWithdraw(
+            withdrawTo,
+            auctionInitialization.underlyingToken,
+            oldEscrowBal
         );
+
+        // @dev: iff new notional equal old escrow balance
+        // then no transfer needed
+        if (netTransferAmount > 0) {
+            IERC20Metadata(auctionInitialization.underlyingToken)
+                .safeTransferFrom(msg.sender, newEscrow, netTransferAmount);
+        }
+
         emit WithdrawFromEscrowAndCreateAuction(
             escrowOwner,
             oldEscrow,
