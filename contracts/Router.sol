@@ -21,8 +21,8 @@ contract Router is Ownable, IRouter {
     uint96 internal constant MAX_MATCH_FEE = 0.2 ether;
     uint96 internal constant MAX_EXERCISE_FEE = 0.005 ether;
 
-    bytes4 internal constant EIP1271_IS_VALID_SELECTOR =
-        bytes4(keccak256("isValidSignature(bytes32,bytes)"));
+    // @dev: EIP-1271 with bytes4(keccak256("isValidSignature(bytes32,bytes)")
+    bytes4 internal constant EIP1271_SIG_AND_MAGIC_VALUE = 0x1626ba7e;
 
     address public immutable escrowImpl;
     address public feeHandler;
@@ -731,16 +731,18 @@ contract Router is Ownable, IRouter {
         bytes32 msgHash,
         bytes calldata signature
     ) internal view returns (bool isValid) {
+        // @dev: legacy EIP1271 wallets using bytes4(keccak256("isValidSignature(bytes,bytes)")
+        // are not supported
         (bool success, bytes memory returnData) = erc1271Wallet.staticcall(
             abi.encodeWithSelector(
-                EIP1271_IS_VALID_SELECTOR,
+                EIP1271_SIG_AND_MAGIC_VALUE,
                 msgHash,
                 signature
             )
         );
         if (success && returnData.length == 32) {
             bytes4 result = abi.decode(returnData, (bytes4));
-            return result == 0x1626ba7e;
+            return result == EIP1271_SIG_AND_MAGIC_VALUE;
         }
         return false;
     }
