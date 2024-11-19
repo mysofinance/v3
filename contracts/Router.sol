@@ -91,7 +91,7 @@ contract Router is Ownable, IRouter {
         address withdrawTo = auctionInitialization.notional >= oldEscrowBal
             ? newEscrow
             : msg.sender;
-        uint256 netTransferAmount = auctionInitialization.notional >=
+        uint256 netTransferAmountNeeded = auctionInitialization.notional >=
             oldEscrowBal
             ? auctionInitialization.notional - oldEscrowBal
             : auctionInitialization.notional;
@@ -104,9 +104,13 @@ contract Router is Ownable, IRouter {
 
         // @dev: iff new notional equal old escrow balance
         // then no transfer needed
-        if (netTransferAmount > 0) {
+        if (netTransferAmountNeeded > 0) {
             IERC20Metadata(auctionInitialization.underlyingToken)
-                .safeTransferFrom(msg.sender, newEscrow, netTransferAmount);
+                .safeTransferFrom(
+                    msg.sender,
+                    newEscrow,
+                    netTransferAmountNeeded
+                );
         }
 
         emit WithdrawFromEscrowAndCreateAuction(
