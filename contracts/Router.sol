@@ -36,6 +36,9 @@ contract Router is Ownable, IRouter {
     address[] internal _escrows;
 
     constructor(address initOwner, address _escrowImpl) Ownable(initOwner) {
+        if (_escrowImpl == address(0)) {
+            revert Errors.InvalidAddress();
+        }
         escrowImpl = _escrowImpl;
     }
 
