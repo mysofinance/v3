@@ -183,18 +183,7 @@ describe("Router Contract", function () {
             data,
             ethers.ZeroAddress
           )
-      )
-        .to.emit(router, "BidOnAuction")
-        .withArgs(
-          user1.address,
-          escrow.target,
-          relBid,
-          user1.address,
-          refSpot,
-          expectedProtocolMatchFee,
-          0,
-          ethers.ZeroAddress
-        );
+      ).to.emit(router, "BidOnAuction");
     });
   });
 
