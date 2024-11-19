@@ -49,6 +49,16 @@ describe("Router Contract", function () {
     } = contracts);
   });
 
+  describe("Deployment", function () {
+    it("should revert if escrow implementation is zero address", async function () {
+      // Check revert if trying to deploy with escrow implementation contract being zero address
+      const Router = await ethers.getContractFactory("Router");
+      await expect(
+        Router.deploy(owner.address, ethers.ZeroAddress)
+      ).to.be.revertedWithCustomError(Router, "InvalidAddress");
+    });
+  });
+
   describe("Start Auction", function () {
     it("should allow starting an auction", async function () {
       // Use the createAuction helper method
