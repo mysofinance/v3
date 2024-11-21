@@ -23,11 +23,11 @@ interface IFeeHandler {
     /// @param matchFee The match fee set as a percentage.
     event SetMatchFee(uint256 matchFee);
 
-    /// @notice Emitted when match fees for specific pairs are updated or removed.
-    /// @param underlyingTokens The underlying tokens defining each pair.
-    /// @param settlementTokens The settlement tokens defining each pair.
-    /// @param matchFeesPerPair The match fee structs of given pairs.
-    event SetMatchFeePerPair(
+    /// @notice Emitted when match fees for token pairs are set or removed.
+    /// @param underlyingTokens The underlying tokens per pair.
+    /// @param settlementTokens The settlement tokens per pair.
+    /// @param matchFeesPerPair The match fee structs per pair.
+    event SetMatchFeesPerPair(
         address[] underlyingTokens,
         address[] settlementTokens,
         DataTypes.MatchFeePerPair[] matchFeesPerPair
@@ -57,7 +57,7 @@ interface IFeeHandler {
     /// @param amount The amount of tokens to withdraw.
     function withdraw(address to, address token, uint256 amount) external;
 
-    /// @notice Returns the match fee and distribution partner fee share for a given option trade.
+    /// @notice Returns the match fee and distribution partner fee share for a given matched option.
     /// @param distPartner The address of the distribution partner.
     /// @param optionInfo The details of the option, including underlying and settlement tokens.
     /// @return _matchFee The applicable match fee for the given option.
@@ -94,11 +94,11 @@ interface IFeeHandler {
     /// @param _matchFee The match fee as a percentage.
     function setMatchFee(uint96 _matchFee) external;
 
-    /// @notice Sets or removes match fees for specific token pairs.
-    /// @param underlyingTokens The list of underlying tokens for the pairs.
-    /// @param settlementTokens The list of settlement tokens for the pairs.
-    /// @param _matchFeePerPair The list of match fee structs per pair.
-    function setMatchFeePerPair(
+    /// @notice Sets or removes a token pair-specific match fee.
+    /// @param underlyingTokens The underlying tokens per pair.
+    /// @param settlementTokens The settlement tokens per pair.
+    /// @param _matchFeePerPair The match fee structs per pair.
+    function setMatchFeesPerPair(
         address[] calldata underlyingTokens,
         address[] calldata settlementTokens,
         DataTypes.MatchFeePerPair[] calldata _matchFeePerPair

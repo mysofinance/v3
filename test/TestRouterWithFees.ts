@@ -136,11 +136,11 @@ describe("Router Contract Fee Tests", function () {
     });
 
     it("Should revert if non-owner tries to set pair specific match fees", async function () {
-      // Attempt to setMatchFeePerPair from non-owner
+      // Attempt to setMatchFeesPerPair from non-owner
       await expect(
         feeHandler
           .connect(user1)
-          .setMatchFeePerPair(
+          .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
             [{ isSet: true, matchFee: 0 }]
@@ -1137,7 +1137,7 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         feeHandler
           .connect(owner)
-          .setMatchFeePerPair(
+          .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
             [{ isSet: true, matchFee: invalidFee }]
@@ -1146,7 +1146,7 @@ describe("Router Contract Fee Tests", function () {
 
       // Attempt to set with invalid/mismatched array lengths
       await expect(
-        feeHandler.connect(owner).setMatchFeePerPair(
+        feeHandler.connect(owner).setMatchFeesPerPair(
           [],
           [settlementToken.target],
           [
@@ -1158,7 +1158,7 @@ describe("Router Contract Fee Tests", function () {
         )
       ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
       await expect(
-        feeHandler.connect(owner).setMatchFeePerPair(
+        feeHandler.connect(owner).setMatchFeesPerPair(
           [underlyingToken.target],
           [],
           [
@@ -1172,7 +1172,7 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         feeHandler
           .connect(owner)
-          .setMatchFeePerPair(
+          .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
             []
@@ -1188,13 +1188,13 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         feeHandler
           .connect(owner)
-          .setMatchFeePerPair(
+          .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
             [{ isSet: true, matchFee: ethers.parseEther("0.02") }]
           )
       )
-        .to.emit(feeHandler, "SetMatchFeePerPair")
+        .to.emit(feeHandler, "SetMatchFeesPerPair")
         .withArgs(
           [underlyingToken.target],
           [settlementToken.target],
@@ -1223,7 +1223,7 @@ describe("Router Contract Fee Tests", function () {
       // Set pair-dependent fees
       await feeHandler
         .connect(owner)
-        .setMatchFeePerPair(
+        .setMatchFeesPerPair(
           [underlyingToken.target],
           [settlementToken.target],
           [{ isSet: true, matchFee: ethers.parseEther("0.02") }]
@@ -1233,13 +1233,13 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         feeHandler
           .connect(owner)
-          .setMatchFeePerPair(
+          .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
             [{ isSet: false, matchFee: 0 }]
           )
       )
-        .to.emit(feeHandler, "SetMatchFeePerPair")
+        .to.emit(feeHandler, "SetMatchFeesPerPair")
         .withArgs(
           [underlyingToken.target],
           [settlementToken.target],

@@ -112,7 +112,7 @@ contract FeeHandler is Ownable, IFeeHandler {
         emit SetMatchFee(_matchFee);
     }
 
-    function setMatchFeePerPair(
+    function setMatchFeesPerPair(
         address[] calldata underlyingTokens,
         address[] calldata settlementTokens,
         DataTypes.MatchFeePerPair[] calldata _matchFeesPerPair
@@ -148,7 +148,7 @@ contract FeeHandler is Ownable, IFeeHandler {
             }
         }
 
-        emit SetMatchFeePerPair(
+        emit SetMatchFeesPerPair(
             underlyingTokens,
             settlementTokens,
             _matchFeesPerPair

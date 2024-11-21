@@ -34,6 +34,7 @@ contracts/
 ┃ ┣ MockERC20Votes.sol
 ┃ ┣ MockHighFeeHandler.sol
 ┃ ┣ MockOracle.sol
+┃ ┣ TestInitializableERC20.sol
 ┃ ┗ TestRecover.sol
 ┣ utils/
 ┃ ┗ InitializableERC20.sol
@@ -48,6 +49,7 @@ contracts/
 test/
 ┣ DataTypes.ts
 ┣ helpers.ts
+┣ TestInitializableERC20.ts
 ┣ TestOracleAdapter.ts
 ┣ TestRouter.ts
 ┣ TestRouterWithEIP1271Maker.ts
