@@ -136,15 +136,14 @@ contract FeeHandler is Ownable, IFeeHandler {
                 revert Errors.InvalidMatchFee();
             }
 
-            address underlyingToken = underlyingTokens[i];
-            address settlementToken = settlementTokens[i];
-
             if (currentMatchFeePerPair.isSet) {
-                matchFeePerPair[underlyingToken][
-                    settlementToken
+                matchFeePerPair[underlyingTokens[i]][
+                    settlementTokens[i]
                 ] = currentMatchFeePerPair;
             } else {
-                delete matchFeePerPair[underlyingToken][settlementToken];
+                delete matchFeePerPair[underlyingTokens[i]][
+                    settlementTokens[i]
+                ];
             }
         }
 

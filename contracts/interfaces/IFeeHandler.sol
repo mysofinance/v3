@@ -23,7 +23,7 @@ interface IFeeHandler {
     /// @param matchFee The match fee set as a percentage.
     event SetMatchFee(uint256 matchFee);
 
-    /// @notice Emitted when match fees for token pairs are set or removed.
+    /// @notice Emitted when token pair-specific match fees are set or removed.
     /// @param underlyingTokens The underlying tokens per pair.
     /// @param settlementTokens The settlement tokens per pair.
     /// @param matchFeesPerPair The match fee structs per pair.
