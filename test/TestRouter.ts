@@ -85,6 +85,47 @@ describe("Router Contract", function () {
       expect(decimals).to.be.equal(expectedDecimals);
     });
 
+    it("should set distribution partner at auction creation", async function () {
+      // Use the createAuction helper method
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+      });
+
+      const escrow1 = await createAuction(
+        auctionInitialization,
+        router,
+        owner,
+        ethers.ZeroAddress
+      );
+      expect(await escrow1.distPartner()).to.be.equal(ethers.ZeroAddress);
+      let currentAsk = await escrow1.currAsk();
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+      let relBid = currentAsk;
+      let refSpot = ethers.parseUnits("1", 6);
+      let data: any = [];
+      const previewBid1 = await escrow1.previewBid(relBid, refSpot, data);
+      expect(previewBid1[1]).to.be.equal(ethers.ZeroAddress);
+
+      const escrow2 = await createAuction(
+        auctionInitialization,
+        router,
+        owner,
+        user1.address
+      );
+      expect(await escrow2.distPartner()).to.be.equal(user1.address);
+      currentAsk = await escrow1.currAsk();
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+      relBid = currentAsk;
+      const previewBid2 = await escrow2.previewBid(relBid, refSpot, data);
+      expect(previewBid2[1]).to.be.equal(user1.address);
+    });
+
     it("should calculate current ask correctly across different premium values", async function () {
       const relPremiumStart = ethers.parseEther("0.01");
       const relPremiumFloor = ethers.parseEther("0.005");

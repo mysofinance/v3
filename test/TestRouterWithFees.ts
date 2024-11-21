@@ -121,9 +121,31 @@ describe("Router Contract Fee Tests", function () {
         .withArgs(ethers.parseEther("0.05"));
 
       // Verify changes
-      const matchFeeInfo = await feeHandler.getMatchFeeInfo(user1.address);
+      const defaulOptionInfo = await getDefaultOptionInfo(
+        String(underlyingToken.target),
+        String(settlementToken.target),
+        ethers.parseUnits("1", await settlementToken.decimals())
+      );
+      const matchFeeInfo = await feeHandler.getMatchFeeInfo(
+        user1.address,
+        0,
+        defaulOptionInfo
+      );
       expect(matchFeeInfo._matchFee).to.equal(ethers.parseEther("0.05"));
       expect(matchFeeInfo._matchFeeDistPartnerShare).to.equal(0); // addr1 is not a distPartner
+    });
+
+    it("Should revert if non-owner tries to set pair specific match fees", async function () {
+      // Attempt to setMatchFeesPerPair from non-owner
+      await expect(
+        feeHandler
+          .connect(user1)
+          .setMatchFeesPerPair(
+            [underlyingToken.target],
+            [settlementToken.target],
+            [{ isSet: true, matchFee: 0 }]
+          )
+      ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
     });
 
     it("Should allow only owner to setExerciseFee", async function () {
@@ -859,9 +881,15 @@ describe("Router Contract Fee Tests", function () {
       );
 
       // Check match fees
+      const defaulOptionInfo = await getDefaultOptionInfo(
+        String(underlyingToken.target),
+        String(settlementToken.target),
+        ethers.parseUnits("1", await settlementToken.decimals())
+      );
       const [matchFeeProtocol, matchFeeDistPartner] = await router.getMatchFees(
         user1.address,
-        optionPremium
+        optionPremium,
+        defaulOptionInfo
       );
 
       // Max match fee is 20%
@@ -884,7 +912,11 @@ describe("Router Contract Fee Tests", function () {
         [ethers.parseEther("1.5")]
       );
       const [secondMatchFeeProtocol, secondMatchFeeDistPartner] =
-        await router.getMatchFees(user1.address, optionPremium);
+        await router.getMatchFees(
+          user1.address,
+          optionPremium,
+          defaulOptionInfo
+        );
 
       // Since the distribution partner share is capped, the entire match fee should go to the partner
       expect(secondMatchFeeDistPartner).to.equal(expectedMaxMatchFee);
@@ -1066,7 +1098,16 @@ describe("Router Contract Fee Tests", function () {
   describe("Extra Cases", function () {
     it("Should correctly handle getMatchFeeInfo for dist and non-dist partners", async function () {
       // Initially, user1 is not a distPartner
-      let info = await feeHandler.getMatchFeeInfo(user1.address);
+      const defaulOptionInfo = await getDefaultOptionInfo(
+        String(underlyingToken.target),
+        String(settlementToken.target),
+        ethers.parseUnits("1", await settlementToken.decimals())
+      );
+      let info = await feeHandler.getMatchFeeInfo(
+        user1.address,
+        0,
+        defaulOptionInfo
+      );
       expect(info._matchFee).to.equal(ethers.parseEther("0.01"));
       expect(info._matchFeeDistPartnerShare).to.equal(0);
 
@@ -1076,11 +1117,148 @@ describe("Router Contract Fee Tests", function () {
         .setDistPartnerFeeShares([user1.address], [ethers.parseEther("0.05")]);
 
       // Now, user1 should have a distPartner share
-      info = await feeHandler.getMatchFeeInfo(user1.address);
+      info = await feeHandler.getMatchFeeInfo(
+        user1.address,
+        0,
+        defaulOptionInfo
+      );
       expect(info._matchFee).to.equal(ethers.parseEther("0.01"));
       expect(info._matchFeeDistPartnerShare).to.equal(
         ethers.parseEther("0.05")
       );
+    });
+  });
+
+  describe("Pair-Dependent Match Fee Tests", function () {
+    it("Should revert when setting invalid pair-dependent fees", async function () {
+      const invalidFee = MAX_MATCH_FEE + ethers.parseEther("0.001");
+
+      // Attempt to set an excessive pair specific match fee
+      await expect(
+        feeHandler
+          .connect(owner)
+          .setMatchFeesPerPair(
+            [underlyingToken.target],
+            [settlementToken.target],
+            [{ isSet: true, matchFee: invalidFee }]
+          )
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidMatchFee");
+
+      // Attempt to set with invalid/mismatched array lengths
+      await expect(
+        feeHandler.connect(owner).setMatchFeesPerPair(
+          [],
+          [settlementToken.target],
+          [
+            {
+              isSet: true,
+              matchFee: ethers.parseEther("0.01"),
+            },
+          ]
+        )
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
+      await expect(
+        feeHandler.connect(owner).setMatchFeesPerPair(
+          [underlyingToken.target],
+          [],
+          [
+            {
+              isSet: true,
+              matchFee: ethers.parseEther("0.01"),
+            },
+          ]
+        )
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
+      await expect(
+        feeHandler
+          .connect(owner)
+          .setMatchFeesPerPair(
+            [underlyingToken.target],
+            [settlementToken.target],
+            []
+          )
+      ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
+    });
+
+    it("Should overwrite general fee with pair-dependent fees", async function () {
+      // Set a general match fee
+      await feeHandler.connect(owner).setMatchFee(ethers.parseEther("0.01"));
+
+      // Set pair-dependent fees
+      await expect(
+        feeHandler
+          .connect(owner)
+          .setMatchFeesPerPair(
+            [underlyingToken.target],
+            [settlementToken.target],
+            [{ isSet: true, matchFee: ethers.parseEther("0.02") }]
+          )
+      )
+        .to.emit(feeHandler, "SetMatchFeesPerPair")
+        .withArgs(
+          [underlyingToken.target],
+          [settlementToken.target],
+          [[true, ethers.parseEther("0.02")]]
+        );
+
+      // Verify the pair-dependent fee is applied
+      const defaulOptionInfo = await getDefaultOptionInfo(
+        String(underlyingToken.target),
+        String(settlementToken.target),
+        ethers.parseUnits("1", await settlementToken.decimals())
+      );
+      const matchFeeInfo = await feeHandler.getMatchFeeInfo(
+        ethers.ZeroAddress,
+        0,
+        defaulOptionInfo
+      );
+
+      expect(matchFeeInfo._matchFee).to.equal(ethers.parseEther("0.02"));
+    });
+
+    it("Should delete pair-dependent fees and fallback to general fee", async function () {
+      // Set a general match fee
+      await feeHandler.connect(owner).setMatchFee(ethers.parseEther("0.01"));
+
+      // Set pair-dependent fees
+      await feeHandler
+        .connect(owner)
+        .setMatchFeesPerPair(
+          [underlyingToken.target],
+          [settlementToken.target],
+          [{ isSet: true, matchFee: ethers.parseEther("0.02") }]
+        );
+
+      // Delete pair-dependent fees
+      await expect(
+        feeHandler
+          .connect(owner)
+          .setMatchFeesPerPair(
+            [underlyingToken.target],
+            [settlementToken.target],
+            [{ isSet: false, matchFee: 0 }]
+          )
+      )
+        .to.emit(feeHandler, "SetMatchFeesPerPair")
+        .withArgs(
+          [underlyingToken.target],
+          [settlementToken.target],
+          [[false, 0]]
+        );
+
+      // Verify the general fee is now applied
+      const defaulOptionInfo = await getDefaultOptionInfo(
+        String(underlyingToken.target),
+        String(settlementToken.target),
+        ethers.parseUnits("1", await settlementToken.decimals())
+      );
+      const matchFeeInfo = await feeHandler.getMatchFeeInfo(
+        ethers.ZeroAddress,
+        0,
+        defaulOptionInfo
+      );
+
+      expect(matchFeeInfo._matchFee).to.equal(ethers.parseEther("0.01"));
     });
   });
 });

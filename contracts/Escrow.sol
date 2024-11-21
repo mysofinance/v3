@@ -493,7 +493,7 @@ contract Escrow is InitializableERC20, IEscrow {
         );
         (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = IRouter(
             router
-        ).getMatchFees(distPartner, premium);
+        ).getMatchFees(distPartner, premium, optionInfo);
 
         return (
             DataTypes.BidPreview({

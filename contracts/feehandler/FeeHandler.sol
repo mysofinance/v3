@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {DataTypes} from "../DataTypes.sol";
 import {Errors} from "../errors/Errors.sol";
 import {IFeeHandler} from "../interfaces/IFeeHandler.sol";
 
@@ -18,6 +19,8 @@ contract FeeHandler is Ownable, IFeeHandler {
     uint96 public exerciseFee;
     uint96 public mintFee;
 
+    mapping(address => mapping(address => DataTypes.MatchFeePerPair))
+        public matchFeePerPair;
     mapping(address => uint256) public distPartnerFeeShare;
 
     constructor(
@@ -49,14 +52,23 @@ contract FeeHandler is Ownable, IFeeHandler {
     }
 
     function getMatchFeeInfo(
-        address distPartner
+        address distPartner,
+        uint128 /*optionPremium*/,
+        DataTypes.OptionInfo calldata optionInfo
     )
         external
         view
         virtual
         returns (uint256 _matchFee, uint256 _matchFeeDistPartnerShare)
     {
-        _matchFee = matchFee;
+        DataTypes.MatchFeePerPair memory _matchFeePerPair = matchFeePerPair[
+            optionInfo.underlyingToken
+        ][optionInfo.settlementToken];
+        // @dev: use pair specific match fee if set; else use general match fee;
+        // additional match fee rules can be added in derived contracts
+        _matchFee = _matchFeePerPair.isSet
+            ? _matchFeePerPair.matchFee
+            : matchFee;
         _matchFeeDistPartnerShare = distPartnerFeeShare[distPartner];
     }
 
@@ -98,6 +110,44 @@ contract FeeHandler is Ownable, IFeeHandler {
         }
         matchFee = _matchFee;
         emit SetMatchFee(_matchFee);
+    }
+
+    function setMatchFeesPerPair(
+        address[] calldata underlyingTokens,
+        address[] calldata settlementTokens,
+        DataTypes.MatchFeePerPair[] calldata _matchFeesPerPair
+    ) public virtual onlyOwner {
+        uint256 length = underlyingTokens.length;
+        if (
+            length == 0 ||
+            length != settlementTokens.length ||
+            length != _matchFeesPerPair.length
+        ) {
+            revert Errors.InvalidArrayLength();
+        }
+
+        for (uint256 i = 0; i < length; ++i) {
+            DataTypes.MatchFeePerPair memory feePerPair = _matchFeesPerPair[i];
+
+            if (feePerPair.isSet) {
+                if (feePerPair.matchFee > MAX_MATCH_FEE) {
+                    revert Errors.InvalidMatchFee();
+                }
+                matchFeePerPair[underlyingTokens[i]][
+                    settlementTokens[i]
+                ] = feePerPair;
+            } else {
+                delete matchFeePerPair[underlyingTokens[i]][
+                    settlementTokens[i]
+                ];
+            }
+        }
+
+        emit SetMatchFeesPerPair(
+            underlyingTokens,
+            settlementTokens,
+            _matchFeesPerPair
+        );
     }
 
     function setExerciseFee(uint96 _exerciseFee) public virtual onlyOwner {
