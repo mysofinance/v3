@@ -23,9 +23,10 @@ contract Escrow is InitializableERC20, IEscrow {
     uint128 public totalBorrowed;
 
     address public router;
-    uint96 public exerciseFee;
     address public owner;
+    address public distPartner;
 
+    uint96 public exerciseFee;
     bool public isAuction;
     bool public optionMinted;
 
@@ -39,7 +40,8 @@ contract Escrow is InitializableERC20, IEscrow {
         address _owner,
         uint96 _exerciseFee,
         DataTypes.AuctionInitialization calldata _auctionInitialization,
-        uint256 oTokenIndex
+        uint256 oTokenIndex,
+        address _distPartner
     ) external initializer {
         if (
             _auctionInitialization.underlyingToken ==
@@ -91,6 +93,9 @@ contract Escrow is InitializableERC20, IEscrow {
         auctionParams = _auctionInitialization.auctionParams;
 
         isAuction = true;
+
+        distPartner = _distPartner;
+
         _initialize(
             _router,
             _owner,
@@ -151,14 +156,16 @@ contract Escrow is InitializableERC20, IEscrow {
         uint256 relBid,
         address optionReceiver,
         uint256 _refSpot,
-        bytes[] memory _oracleData,
-        address distPartner
-    ) external returns (DataTypes.BidPreview memory preview) {
+        bytes[] memory _oracleData
+    )
+        external
+        returns (DataTypes.BidPreview memory preview, address _distPartner)
+    {
         address _router = router;
         if (msg.sender != _router) {
             revert Errors.InvalidSender();
         }
-        preview = previewBid(relBid, _refSpot, _oracleData, distPartner);
+        (preview, _distPartner) = previewBid(relBid, _refSpot, _oracleData);
 
         if (preview.status != DataTypes.BidStatus.Success) {
             revert Errors.InvalidBid();
@@ -417,15 +424,25 @@ contract Escrow is InitializableERC20, IEscrow {
     function previewBid(
         uint256 relBid,
         uint256 _refSpot,
-        bytes[] memory _oracleData,
-        address distPartner
-    ) public view returns (DataTypes.BidPreview memory preview) {
+        bytes[] memory _oracleData
+    )
+        public
+        view
+        returns (DataTypes.BidPreview memory preview, address _distPartner)
+    {
         uint64 _currAsk = currAsk();
+        _distPartner = distPartner;
         if (optionMinted) {
-            return _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted);
+            return (
+                _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted),
+                _distPartner
+            );
         }
         if (relBid < _currAsk) {
-            return _createBidPreview(DataTypes.BidStatus.PremiumTooLow);
+            return (
+                _createBidPreview(DataTypes.BidStatus.PremiumTooLow),
+                _distPartner
+            );
         }
         // @dev: caching
         (address underlyingToken, address settlementToken) = (
@@ -438,14 +455,20 @@ contract Escrow is InitializableERC20, IEscrow {
         ).getPrice(underlyingToken, settlementToken, _oracleData);
 
         if (_refSpot < oracleSpotPrice) {
-            return _createBidPreview(DataTypes.BidStatus.SpotPriceTooLow);
+            return (
+                _createBidPreview(DataTypes.BidStatus.SpotPriceTooLow),
+                _distPartner
+            );
         }
 
         if (
             oracleSpotPrice < auctionParams.minSpot ||
             oracleSpotPrice > auctionParams.maxSpot
         ) {
-            return _createBidPreview(DataTypes.BidStatus.OutOfRangeSpotPrice);
+            return (
+                _createBidPreview(DataTypes.BidStatus.OutOfRangeSpotPrice),
+                _distPartner
+            );
         }
 
         bool premiumTokenIsUnderlying = optionInfo
@@ -472,7 +495,7 @@ contract Escrow is InitializableERC20, IEscrow {
             router
         ).getMatchFees(distPartner, premium);
 
-        return
+        return (
             DataTypes.BidPreview({
                 status: DataTypes.BidStatus.Success,
                 settlementToken: settlementToken,
@@ -488,7 +511,9 @@ contract Escrow is InitializableERC20, IEscrow {
                 currAsk: _currAsk,
                 matchFeeProtocol: matchFeeProtocol,
                 matchFeeDistPartner: matchFeeDistPartner
-            });
+            }),
+            _distPartner
+        );
     }
 
     function currAsk() public view returns (uint64) {

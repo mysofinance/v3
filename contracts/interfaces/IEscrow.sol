@@ -91,12 +91,14 @@ interface IEscrow {
     /// @param _exerciseFee The exercise fee to be applied in case of exercise.
     /// @param _auctionInitialization Struct containing auction parameters.
     /// @param oTokenIndex Index for identifying the option token.
+    /// @param distPartner The distribution partner address.
     function initializeAuction(
         address _router,
         address _owner,
         uint96 _exerciseFee,
         DataTypes.AuctionInitialization calldata _auctionInitialization,
-        uint256 oTokenIndex
+        uint256 oTokenIndex,
+        address distPartner
     ) external;
 
     /// @notice Initializes the Escrow for a matched RFQ.
@@ -138,13 +140,15 @@ interface IEscrow {
     /// @param _oracleData Additional optional oracle data.
     /// @param distPartner Address of the distribution partner.
     /// @return preview Returns a BidPreview struct with the bid's outcome.
+    /// @return distPartner Returns the address of the distribution partner.
     function handleAuctionBid(
         uint256 relBid,
         address optionReceiver,
         uint256 _refSpot,
-        bytes[] memory _oracleData,
-        address distPartner
-    ) external returns (DataTypes.BidPreview memory preview);
+        bytes[] memory _oracleData
+    )
+        external
+        returns (DataTypes.BidPreview memory preview, address distPartner);
 
     /// @notice Executes option exercise.
     /// @param exerciser The address exercising the option.
@@ -229,14 +233,16 @@ interface IEscrow {
     /// @param relBid Relative bid in percentage of notional.
     /// @param _refSpot Reference spot price.
     /// @param _oracleData Additional optional oracle data.
-    /// @param distPartner Address of the distribution partner.
     /// @return preview Returns a BidPreview struct with the bid's outcome.
+    /// @return distPartner Returns the address of the distribution partner.
     function previewBid(
         uint256 relBid,
         uint256 _refSpot,
-        bytes[] memory _oracleData,
-        address distPartner
-    ) external view returns (DataTypes.BidPreview memory preview);
+        bytes[] memory _oracleData
+    )
+        external
+        view
+        returns (DataTypes.BidPreview memory preview, address distPartner);
 
     /// @notice Returns the current ask of the auction in percentage of notional.
     /// @return Current ask percentage.

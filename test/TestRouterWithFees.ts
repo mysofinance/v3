@@ -206,14 +206,7 @@ describe("Router Contract Fee Tests", function () {
       // Bid on auction
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Get final balances
       const finalOwnerBalance = await settlementToken.balanceOf(owner.address);
@@ -259,14 +252,7 @@ describe("Router Contract Fee Tests", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Fast forward time to after earliest exercise tenor
       await ethers.provider.send("evm_increaseTime", [86400 * 7]);
@@ -533,14 +519,7 @@ describe("Router Contract Fee Tests", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Fast forward time to after earliest exercise tenor
       await ethers.provider.send("evm_increaseTime", [86400 * 7]);
@@ -631,14 +610,7 @@ describe("Router Contract Fee Tests", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Fast forward time to after earliest exercise tenor
       await ethers.provider.send("evm_increaseTime", [86400 * 7]);
@@ -732,14 +704,7 @@ describe("Router Contract Fee Tests", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
         feeHandler.target
@@ -795,11 +760,12 @@ describe("Router Contract Fee Tests", function () {
     it("should handle fee distribution to distribution partners correctly", async function () {
       // Set fees and distribution partner
       const matchFee = ethers.parseEther("0.01"); // 1%
+      const distPartner = user2.address;
       const distPartnerShare = ethers.parseEther("0.05"); // 5%
       await feeHandler.connect(owner).setMatchFee(matchFee);
       await feeHandler
         .connect(owner)
-        .setDistPartnerFeeShares([user2.address], [ethers.parseEther("0.05")]);
+        .setDistPartnerFeeShares([distPartner], [distPartnerShare]);
 
       const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -809,7 +775,12 @@ describe("Router Contract Fee Tests", function () {
         oracleAddress: String(mockOracle.target),
       });
 
-      const escrow = await createAuction(auctionInitialization, router, owner);
+      const escrow = await createAuction(
+        auctionInitialization,
+        router,
+        owner,
+        distPartner
+      );
       const escrowAddress = escrow.target;
 
       // Bid on auction
@@ -828,14 +799,9 @@ describe("Router Contract Fee Tests", function () {
         user2.address
       );
 
-      await router.connect(user1).bidOnAuction(
-        escrowAddress,
-        user1.address,
-        relBid,
-        refSpot,
-        data,
-        user2.address // Use distribution partner
-      );
+      await router
+        .connect(user1)
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
         feeHandler.target

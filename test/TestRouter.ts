@@ -162,12 +162,7 @@ describe("Router Contract", function () {
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
       const data: any = [];
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        ethers.ZeroAddress
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
 
       const optionReceiver = user1.address;
       const expectedProtocolMatchFee = preview[10];
@@ -175,14 +170,7 @@ describe("Router Contract", function () {
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(
-            escrow.target,
-            optionReceiver,
-            relBid,
-            refSpot,
-            data,
-            ethers.ZeroAddress
-          )
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
       ).to.emit(router, "BidOnAuction");
     });
   });
@@ -354,26 +342,14 @@ describe("Router Contract", function () {
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
       const data: any = [];
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        ethers.ZeroAddress
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
       const expectedProtocolMatchFee = preview[10];
 
       const optionReceiver = user1.address;
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(
-            escrow.target,
-            optionReceiver,
-            relBid,
-            refSpot,
-            data,
-            ethers.ZeroAddress
-          )
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
       ).to.emit(router, "BidOnAuction");
 
       const optionInfo = await escrow.optionInfo();
@@ -475,14 +451,7 @@ describe("Router Contract", function () {
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(
-            escrow.target,
-            optionReceiver,
-            relBid,
-            refSpot,
-            data,
-            ethers.ZeroAddress
-          )
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
       ).to.emit(router, "BidOnAuction");
 
       const preBal = await settlementToken.balanceOf(user1.address);
@@ -1031,21 +1000,9 @@ describe("Router Contract", function () {
       const optionReceiver = user1.address;
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrow.target,
-          optionReceiver,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data);
 
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        distPartner
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
       expect(preview.status).to.equal(DataTypes.BidStatus.OptionAlreadyMinted);
     });
 
@@ -1053,12 +1010,7 @@ describe("Router Contract", function () {
       // Adjust relBid to be lower than currentAsk
       relBid = currentAsk - 1n;
 
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        distPartner
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
       expect(preview.status).to.equal(DataTypes.BidStatus.PremiumTooLow);
     });
 
@@ -1070,12 +1022,7 @@ describe("Router Contract", function () {
         ethers.parseUnits("1.5", 6)
       );
 
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        distPartner
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
       expect(preview.status).to.equal(DataTypes.BidStatus.SpotPriceTooLow);
     });
 
@@ -1104,11 +1051,10 @@ describe("Router Contract", function () {
       expect(price1).to.be.equal(auctionParams.minSpot - 1n);
       expect(price1).to.be.gt(0); // Price shouldn't be zero
 
-      const previewBelow = await escrow.previewBid(
+      const [previewBelow, distPartner1] = await escrow.previewBid(
         relBid,
         price1,
-        data,
-        distPartner
+        data
       );
       expect(previewBelow.status).to.equal(
         DataTypes.BidStatus.OutOfRangeSpotPrice
@@ -1128,11 +1074,10 @@ describe("Router Contract", function () {
       );
       expect(price3).to.be.equal(auctionParams.maxSpot + 1n);
 
-      const previewAbove = await escrow.previewBid(
+      const [previewAbove, distPartner2] = await escrow.previewBid(
         relBid,
         price3,
-        data,
-        distPartner
+        data
       );
       expect(previewAbove.status).to.equal(
         DataTypes.BidStatus.OutOfRangeSpotPrice
@@ -1146,12 +1091,7 @@ describe("Router Contract", function () {
         .connect(owner)
         .withdraw(escrow.target, owner.address, underlyingToken.target, bal);
 
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        distPartner
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
       expect(preview.status).to.equal(DataTypes.BidStatus.Success);
     });
 
@@ -1176,12 +1116,7 @@ describe("Router Contract", function () {
           [ethers.parseEther("1.1")]
         );
 
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        distPartner
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
       const expectedMaxMatchFeePct = 20n;
       const expectedMaxDistFeePct = 20n;
       const matchFeePct =
@@ -1223,8 +1158,7 @@ describe("Router Contract", function () {
           user1.address,
           currentAsk,
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
     });
 

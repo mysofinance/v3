@@ -197,19 +197,23 @@ interface IRouter {
     /// @notice Creates a new Dutch auction
     /// @param escrowOwner The address of the escrow owner
     /// @param auctionInitialization The initialization data for the auction
+    /// @param distPartner The address of the distribution partner
     function createAuction(
         address escrowOwner,
-        DataTypes.AuctionInitialization calldata auctionInitialization
+        DataTypes.AuctionInitialization calldata auctionInitialization,
+        address distPartner
     ) external;
 
     /// @notice Withdraws from an existing escrow and creates a new auction
     /// @param oldEscrow The address of the old escrow
     /// @param escrowOwner The address of the escrow owner
     /// @param auctionInitialization The initialization data for the auction
+    /// @param distPartner The address of the distribution partner
     function withdrawFromEscrowAndCreateAuction(
         address oldEscrow,
         address escrowOwner,
-        DataTypes.AuctionInitialization calldata auctionInitialization
+        DataTypes.AuctionInitialization calldata auctionInitialization,
+        address distPartner
     ) external;
 
     /// @notice Withdraws tokens from a specified escrow
@@ -230,15 +234,17 @@ interface IRouter {
     /// @param relBid The relative bid in percentage of notional
     /// @param refSpot The reference spot price
     /// @param oracleData Additional optional oracle data for validation
-    /// @param distPartner The address of the distribution partner
+    /// @return preview The bid preview data
+    /// @return distPartner The distribution partner
     function bidOnAuction(
         address escrow,
         address optionReceiver,
         uint256 relBid,
         uint256 refSpot,
-        bytes[] memory oracleData,
-        address distPartner
-    ) external returns (DataTypes.BidPreview memory preview);
+        bytes[] memory oracleData
+    )
+        external
+        returns (DataTypes.BidPreview memory preview, address distPartner);
 
     /// @notice Exercises an option in an escrow
     /// @param escrow The escrow address holding the option

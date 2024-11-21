@@ -94,24 +94,12 @@ describe("Router And Escrow Interaction", function () {
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
       const data: any[] = [];
-      const preview = await escrow.previewBid(
-        relBid,
-        refSpot,
-        data,
-        ethers.ZeroAddress
-      );
+      const { preview } = await escrow.previewBid(relBid, refSpot, data);
 
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(
-            escrowAddress,
-            user1.address,
-            relBid,
-            refSpot,
-            data,
-            ethers.ZeroAddress
-          )
+          .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data)
       ).to.emit(router, "BidOnAuction");
     });
 
@@ -154,14 +142,7 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(
-            escrowAddress,
-            user1.address,
-            lowRelBid,
-            refSpot,
-            data,
-            ethers.ZeroAddress
-          )
+          .bidOnAuction(escrowAddress, user1.address, lowRelBid, refSpot, data)
       ).to.be.reverted;
     });
   });
@@ -390,14 +371,7 @@ describe("Router And Escrow Interaction", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Fast forward time to after earliest exercise tenor
       await ethers.provider.send("evm_increaseTime", [86400 * 7]);
@@ -458,14 +432,7 @@ describe("Router And Escrow Interaction", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Attempt to exercise before earliest exercise tenor
       await settlementToken
@@ -523,14 +490,7 @@ describe("Router And Escrow Interaction", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Fast forward time to after earliest exercise tenor
       await ethers.provider.send("evm_increaseTime", [86400 * 7]);
@@ -604,14 +564,7 @@ describe("Router And Escrow Interaction", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Fast forward time to after earliest exercise tenor
       await ethers.provider.send("evm_increaseTime", [86400 * 7]);
@@ -645,7 +598,8 @@ describe("Router And Escrow Interaction", function () {
           .withdrawFromEscrowAndCreateAuction(
             user2.address,
             owner.address,
-            auctionInitialization
+            auctionInitialization,
+            ethers.ZeroAddress
           )
       ).to.be.reverted;
 
@@ -656,7 +610,8 @@ describe("Router And Escrow Interaction", function () {
           .withdrawFromEscrowAndCreateAuction(
             oldEscrowAddress,
             owner.address,
-            auctionInitialization
+            auctionInitialization,
+            ethers.ZeroAddress
           )
       ).to.be.reverted;
 
@@ -670,7 +625,8 @@ describe("Router And Escrow Interaction", function () {
           .withdrawFromEscrowAndCreateAuction(
             oldEscrowAddress,
             owner.address,
-            auctionInitialization
+            auctionInitialization,
+            ethers.ZeroAddress
           )
       ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
 
@@ -706,14 +662,7 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(
-            newEscrowAddress,
-            user1.address,
-            relBid,
-            refSpot,
-            data,
-            ethers.ZeroAddress
-          )
+          .bidOnAuction(newEscrowAddress, user1.address, relBid, refSpot, data)
       ).to.emit(router, "BidOnAuction");
     });
 
@@ -743,7 +692,8 @@ describe("Router And Escrow Interaction", function () {
           .withdrawFromEscrowAndCreateAuction(
             oldEscrowAddress,
             owner.address,
-            auctionInitialization
+            auctionInitialization,
+            ethers.ZeroAddress
           )
       ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
 
@@ -797,7 +747,8 @@ describe("Router And Escrow Interaction", function () {
           .withdrawFromEscrowAndCreateAuction(
             oldEscrowAddress,
             owner.address,
-            auctionInitialization
+            auctionInitialization,
+            ethers.ZeroAddress
           )
       ).to.emit(router, "WithdrawFromEscrowAndCreateAuction");
 
@@ -849,14 +800,7 @@ describe("Router And Escrow Interaction", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Delegate voting
       const delegate = user2.address;
@@ -891,14 +835,7 @@ describe("Router And Escrow Interaction", function () {
 
       await router
         .connect(user1)
-        .bidOnAuction(
-          escrowAddress,
-          user1.address,
-          relBid,
-          refSpot,
-          data,
-          ethers.ZeroAddress
-        );
+        .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       // Attempt to delegate voting when not allowed
       const delegate = user2.address;
@@ -950,7 +887,8 @@ describe("Router And Escrow Interaction", function () {
           owner.address,
           0,
           auctionInitialization,
-          1
+          1,
+          ethers.ZeroAddress
         )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidInitialization");
     });
@@ -965,7 +903,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidTokenPair");
     });
 
@@ -980,7 +922,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidNotional");
     });
 
@@ -995,7 +941,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidStrike");
     });
 
@@ -1010,7 +960,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidTenor");
     });
 
@@ -1026,7 +980,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(
         escrowImpl,
         "InvalidEarliestExerciseTenor"
@@ -1046,30 +1004,42 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
 
       // rel premium floor == 0
       await expect(
-        router.connect(owner).createAuction(owner.address, {
-          ...auctionInitialization,
-          auctionParams: {
-            ...auctionInitialization.auctionParams,
-            relPremiumStart: 1n,
+        router.connect(owner).createAuction(
+          owner.address,
+          {
+            ...auctionInitialization,
+            auctionParams: {
+              ...auctionInitialization.auctionParams,
+              relPremiumStart: 1n,
+            },
           },
-        })
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
 
       // rel premium floor > start premium
       await expect(
-        router.connect(owner).createAuction(owner.address, {
-          ...auctionInitialization,
-          auctionParams: {
-            ...auctionInitialization.auctionParams,
-            relPremiumStart: 1n,
-            relPremiumFloor: 2n,
+        router.connect(owner).createAuction(
+          owner.address,
+          {
+            ...auctionInitialization,
+            auctionParams: {
+              ...auctionInitialization.auctionParams,
+              relPremiumStart: 1n,
+              relPremiumFloor: 2n,
+            },
           },
-        })
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidRelPremiums");
     });
 
@@ -1086,19 +1056,27 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
 
       // max spot = 0
       await expect(
-        router.connect(owner).createAuction(owner.address, {
-          ...auctionInitialization,
-          auctionParams: {
-            ...auctionInitialization.auctionParams,
-            maxSpot: 0n,
-            minSpot: 0n,
+        router.connect(owner).createAuction(
+          owner.address,
+          {
+            ...auctionInitialization,
+            auctionParams: {
+              ...auctionInitialization.auctionParams,
+              maxSpot: 0n,
+              minSpot: 0n,
+            },
           },
-        })
+          ethers.ZeroAddress
+        )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidMinMaxSpot");
     });
 
@@ -1112,7 +1090,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidOracle");
     });
 
@@ -1127,7 +1109,11 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         router
           .connect(owner)
-          .createAuction(owner.address, auctionInitialization)
+          .createAuction(
+            owner.address,
+            auctionInitialization,
+            ethers.ZeroAddress
+          )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidBorrowCap");
     });
 
@@ -1146,8 +1132,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           0, // Invalid relBid
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         )
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidBid");
     });
@@ -1402,8 +1387,7 @@ describe("Router And Escrow Interaction", function () {
               ethers.parseEther("0.1"),
               user1.address,
               ethers.parseUnits("1", 6),
-              [],
-              ethers.ZeroAddress
+              []
             )
         ).to.be.revertedWithCustomError(escrow, "InvalidSender");
       });
@@ -1416,8 +1400,7 @@ describe("Router And Escrow Interaction", function () {
             user1.address,
             ethers.parseEther("0.000001"), // Very low bid
             ethers.parseUnits("1", 6),
-            [],
-            ethers.ZeroAddress
+            []
           )
         ).to.be.revertedWithCustomError(escrow, "InvalidBid");
       });
@@ -1434,8 +1417,7 @@ describe("Router And Escrow Interaction", function () {
             user1.address,
             ethers.parseEther("0.1"), // Valid bid
             ethers.parseUnits("1", 6),
-            [],
-            ethers.ZeroAddress
+            []
           )
         ).to.emit(router, "BidOnAuction");
 
@@ -1472,8 +1454,7 @@ describe("Router And Escrow Interaction", function () {
             user1.address,
             ethers.parseEther("0.1"),
             ethers.parseUnits("1", 6),
-            [],
-            ethers.ZeroAddress
+            []
           );
       });
 
@@ -1683,8 +1664,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           ethers.parseEther("0.1"),
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
     });
 
@@ -1827,8 +1807,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           ethers.parseEther("0.1"),
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
 
       // Setup a successful borrow
@@ -1935,8 +1914,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           auctionInitialization.auctionParams.relPremiumStart,
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
 
       // Ensure the option is minted
@@ -2003,8 +1981,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           ethers.parseEther("0.1"),
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
     });
 
@@ -2056,8 +2033,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           ethers.parseEther("0.1"),
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
     });
 
@@ -2156,8 +2132,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           ethers.parseEther("0.1"),
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
     });
 
@@ -2208,8 +2183,7 @@ describe("Router And Escrow Interaction", function () {
           user1.address,
           ethers.parseEther("0.1"),
           ethers.parseUnits("1", 6),
-          [],
-          ethers.ZeroAddress
+          []
         );
 
       const spaceId = ethers.encodeBytes32String("space1");
@@ -2271,8 +2245,7 @@ describe("Router And Escrow Interaction", function () {
             user1.address,
             ethers.parseEther("0.1"),
             ethers.parseUnits("1", 6),
-            [],
-            ethers.ZeroAddress
+            []
           )
       ).to.be.reverted;
     });
