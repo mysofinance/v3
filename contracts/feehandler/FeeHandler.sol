@@ -64,8 +64,8 @@ contract FeeHandler is Ownable, IFeeHandler {
         DataTypes.MatchFeePerPair memory _matchFeePerPair = matchFeePerPair[
             optionInfo.underlyingToken
         ][optionInfo.settlementToken];
-        // @dev: use pair specific match fee if set; else use general match fee
-        // note: match fee rules can be extended in derived contracts
+        // @dev: use pair specific match fee if set; else use general match fee;
+        // additional match fee rules can be added in derived contracts
         _matchFee = _matchFeePerPair.isSet
             ? _matchFeePerPair.matchFee
             : matchFee;
