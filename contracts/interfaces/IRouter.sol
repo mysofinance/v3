@@ -323,10 +323,10 @@ interface IRouter {
     /// @return exerciseFee The current exercise fee as a `uint96`
     function getExerciseFee() external view returns (uint96 exerciseFee);
 
-    /// @notice Calculates match fees for a given distribution partner and premium
-    /// @param distPartner The distribution partner's address
-    /// @param optionPremium The option premium
-    /// @param optionInfo The given option info
+    /// @notice Returns the match fee and distribution partner fee share for a given option match.
+    /// @param distPartner The address of the distribution partner.
+    /// @param optionPremium The given option premium.
+    /// @param optionInfo The given option info.
     /// @return matchFeeProtocol The protocol's match fee
     /// @return matchFeeDistPartner The distribution partner's match fee
     function getMatchFees(
