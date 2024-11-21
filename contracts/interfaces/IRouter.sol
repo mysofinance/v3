@@ -10,10 +10,12 @@ interface IRouter {
     /// @param escrowOwner The address of the escrow owner
     /// @param escrow The address of the created escrow contract
     /// @param auctionInitialization The initialization data for the auction
+    /// @param exerciseFee The applicable exercise fee
     event CreateAuction(
         address indexed escrowOwner,
         address indexed escrow,
-        DataTypes.AuctionInitialization auctionInitialization
+        DataTypes.AuctionInitialization auctionInitialization,
+        uint96 exerciseFee
     );
 
     /// @notice Emitted when a withdrawal from escrow occurs and a new auction is created
@@ -45,20 +47,14 @@ interface IRouter {
     /// @notice Emitted when a bid is placed on an auction
     /// @param sender The address initiating the bid
     /// @param escrow The address of the escrow on which the bid is placed
-    /// @param relBid The relative bid amount
     /// @param optionReceiver The address receiving the option
-    /// @param refSpot The reference spot price
-    /// @param matchFeeProtocol The protocol fee for the match
-    /// @param matchFeeDistPartner The distribution partner's fee
+    /// @param bidPreview The bid preview
     /// @param distPartner The distribution partner's address
     event BidOnAuction(
         address indexed sender,
         address indexed escrow,
-        uint256 relBid,
         address optionReceiver,
-        uint256 refSpot,
-        uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner,
+        DataTypes.BidPreview bidPreview,
         address indexed distPartner
     );
 
@@ -111,16 +107,16 @@ interface IRouter {
     /// @param escrowOwner The owner of the escrow
     /// @param escrow The escrow address
     /// @param rfqInitialization The initialization data for the RFQ
-    /// @param matchFeeProtocol The protocol fee for the match
-    /// @param matchFeeDistPartner The distribution partner's fee
+    /// @param takeQuotePreview The take quote preview
+    /// @param exerciseFee The applicable exercise fee
     /// @param distPartner The distribution partner's address
     event TakeQuote(
         address indexed sender,
         address escrowOwner,
         address indexed escrow,
         DataTypes.RFQInitialization rfqInitialization,
-        uint256 matchFeeProtocol,
-        uint256 matchFeeDistPartner,
+        DataTypes.TakeQuotePreview takeQuotePreview,
+        uint96 exerciseFee,
         address indexed distPartner
     );
 

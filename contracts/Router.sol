@@ -47,10 +47,11 @@ contract Router is Ownable, IRouter {
         DataTypes.AuctionInitialization calldata auctionInitialization
     ) external {
         (address escrow, uint256 oTokenIndex) = _createEscrow();
+        uint96 exerciseFee = getExerciseFee();
         IEscrow(escrow).initializeAuction(
             address(this),
             escrowOwner,
-            getExerciseFee(),
+            exerciseFee,
             auctionInitialization,
             oTokenIndex
         );
@@ -59,7 +60,12 @@ contract Router is Ownable, IRouter {
             escrow,
             auctionInitialization.notional
         );
-        emit CreateAuction(escrowOwner, escrow, auctionInitialization);
+        emit CreateAuction(
+            escrowOwner,
+            escrow,
+            auctionInitialization,
+            exerciseFee
+        );
     }
 
     function withdrawFromEscrowAndCreateAuction(
@@ -185,11 +191,8 @@ contract Router is Ownable, IRouter {
         emit BidOnAuction(
             msg.sender,
             escrow,
-            relBid,
             optionReceiver,
-            _refSpot,
-            preview.matchFeeProtocol,
-            preview.matchFeeDistPartner,
+            preview,
             distPartner
         );
     }
@@ -329,11 +332,12 @@ contract Router is Ownable, IRouter {
         isQuoteUsed[preview.msgHash] = true;
 
         (address escrow, uint256 oTokenIndex) = _createEscrow();
+        uint96 exerciseFee = getExerciseFee();
         IEscrow(escrow).initializeRFQMatch(
             address(this),
             escrowOwner,
             preview.quoter,
-            getExerciseFee(),
+            exerciseFee,
             rfqInitialization,
             oTokenIndex
         );
@@ -375,8 +379,8 @@ contract Router is Ownable, IRouter {
             escrowOwner,
             escrow,
             rfqInitialization,
-            preview.matchFeeProtocol,
-            preview.matchFeeDistPartner,
+            preview,
+            exerciseFee,
             distPartner
         );
     }

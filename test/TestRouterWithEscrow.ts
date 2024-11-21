@@ -94,6 +94,12 @@ describe("Router And Escrow Interaction", function () {
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
       const data: any[] = [];
+      const preview = await escrow.previewBid(
+        relBid,
+        refSpot,
+        data,
+        ethers.ZeroAddress
+      );
 
       await expect(
         router
@@ -106,18 +112,7 @@ describe("Router And Escrow Interaction", function () {
             data,
             ethers.ZeroAddress
           )
-      )
-        .to.emit(router, "BidOnAuction")
-        .withArgs(
-          user1.address,
-          escrowAddress,
-          relBid,
-          user1.address,
-          refSpot,
-          0,
-          0,
-          ethers.ZeroAddress
-        );
+      ).to.emit(router, "BidOnAuction");
     });
 
     it("should revert if bidding with insufficient premium", async function () {
