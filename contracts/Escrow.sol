@@ -428,10 +428,10 @@ contract Escrow is InitializableERC20, IEscrow {
     )
         public
         view
-        returns (DataTypes.BidPreview memory preview, address _distpartner)
+        returns (DataTypes.BidPreview memory preview, address _distPartner)
     {
         uint64 _currAsk = currAsk();
-        address _distPartner = distPartner;
+        _distPartner = distPartner;
         if (optionMinted) {
             return (
                 _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted),
