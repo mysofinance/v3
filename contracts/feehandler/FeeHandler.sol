@@ -117,29 +117,25 @@ contract FeeHandler is Ownable, IFeeHandler {
         address[] calldata settlementTokens,
         DataTypes.MatchFeePerPair[] calldata _matchFeesPerPair
     ) public virtual onlyOwner {
+        uint256 length = underlyingTokens.length;
         if (
-            underlyingTokens.length == 0 ||
-            underlyingTokens.length != settlementTokens.length ||
-            underlyingTokens.length != _matchFeesPerPair.length
+            length == 0 ||
+            length != settlementTokens.length ||
+            length != _matchFeesPerPair.length
         ) {
             revert Errors.InvalidArrayLength();
         }
 
-        for (uint256 i = 0; i < underlyingTokens.length; ++i) {
-            DataTypes.MatchFeePerPair
-                memory currentMatchFeePerPair = _matchFeesPerPair[i];
+        for (uint256 i = 0; i < length; ++i) {
+            DataTypes.MatchFeePerPair memory feePerPair = _matchFeesPerPair[i];
 
-            if (
-                currentMatchFeePerPair.isSet &&
-                currentMatchFeePerPair.matchFee > MAX_MATCH_FEE
-            ) {
-                revert Errors.InvalidMatchFee();
-            }
-
-            if (currentMatchFeePerPair.isSet) {
+            if (feePerPair.isSet) {
+                if (feePerPair.matchFee > MAX_MATCH_FEE) {
+                    revert Errors.InvalidMatchFee();
+                }
                 matchFeePerPair[underlyingTokens[i]][
                     settlementTokens[i]
-                ] = currentMatchFeePerPair;
+                ] = feePerPair;
             } else {
                 delete matchFeePerPair[underlyingTokens[i]][
                     settlementTokens[i]
