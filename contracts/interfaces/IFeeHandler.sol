@@ -59,7 +59,8 @@ interface IFeeHandler {
 
     /// @notice Returns the match fee and distribution partner fee share for a given option match.
     /// @param distPartner The address of the distribution partner.
-    /// @param optionInfo The details of the option, including underlying and settlement tokens.
+    /// @param optionPremium The given option premium.
+    /// @param optionInfo The given option info.
     /// @return _matchFee The applicable match fee for the given option.
     /// @return _matchFeeDistPartnerShare The distribution partner's share of the match fee.
     function getMatchFeeInfo(
