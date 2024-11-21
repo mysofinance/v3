@@ -549,7 +549,8 @@ contract Router is Ownable, IRouter {
 
     function getMatchFees(
         address distPartner,
-        uint128 optionPremium
+        uint128 optionPremium,
+        DataTypes.OptionInfo calldata optionInfo
     )
         public
         view
@@ -559,7 +560,7 @@ contract Router is Ownable, IRouter {
         if (_feeHandler != address(0)) {
             (uint256 matchFee, uint256 matchFeeDistPartnerShare) = IFeeHandler(
                 _feeHandler
-            ).getMatchFeeInfo(distPartner);
+            ).getMatchFeeInfo(distPartner, optionPremium, optionInfo);
 
             uint256 cappedMatchFee = matchFee > MAX_MATCH_FEE
                 ? MAX_MATCH_FEE
@@ -691,7 +692,8 @@ contract Router is Ownable, IRouter {
         }
         (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = getMatchFees(
             distPartner,
-            rfqInitialization.rfqQuote.premium
+            rfqInitialization.rfqQuote.premium,
+            rfqInitialization.optionInfo
         );
         return
             DataTypes.TakeQuotePreview({

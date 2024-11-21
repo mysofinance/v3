@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {DataTypes} from "../DataTypes.sol";
+
 /// @title IFeeHandler
 /// @dev Interface for the FeeHandler contract.
 /// Provides functionality for managing and distributing fees, and setting fee configurations.
@@ -20,6 +22,16 @@ interface IFeeHandler {
     /// @notice Emitted when match fee is set.
     /// @param matchFee The match fee set as a percentage.
     event SetMatchFee(uint256 matchFee);
+
+    /// @notice Emitted when match fees for specific pairs are updated or removed.
+    /// @param underlyingTokens The underlying tokens defining each pair.
+    /// @param settlementTokens The settlement tokens defining each pair.
+    /// @param matchFeesPerPair The match fee structs of given pairs.
+    event SetMatchFeePerPair(
+        address[] underlyingTokens,
+        address[] settlementTokens,
+        DataTypes.MatchFeePerPair[] matchFeesPerPair
+    );
 
     /// @notice Emitted when mint fee is set.
     /// @param mintFee The mint fee set as a percentage.
@@ -45,12 +57,15 @@ interface IFeeHandler {
     /// @param amount The amount of tokens to withdraw.
     function withdraw(address to, address token, uint256 amount) external;
 
-    /// @notice Returns the match fee and fee share for given distribution partner.
+    /// @notice Returns the match fee and distribution partner fee share for a given option trade.
     /// @param distPartner The address of the distribution partner.
-    /// @return _matchFee The match fee as a percentage.
-    /// @return _matchFeeDistPartnerShare The share of the match fee for the distribution partner.
+    /// @param optionInfo The details of the option, including underlying and settlement tokens.
+    /// @return _matchFee The applicable match fee for the given option.
+    /// @return _matchFeeDistPartnerShare The distribution partner's share of the match fee.
     function getMatchFeeInfo(
-        address distPartner
+        address distPartner,
+        uint128 optionPremium,
+        DataTypes.OptionInfo calldata optionInfo
     )
         external
         view
@@ -78,6 +93,16 @@ interface IFeeHandler {
     /// @notice Sets the match fee and distribution partner share.
     /// @param _matchFee The match fee as a percentage.
     function setMatchFee(uint96 _matchFee) external;
+
+    /// @notice Sets or removes match fees for specific token pairs.
+    /// @param underlyingTokens The list of underlying tokens for the pairs.
+    /// @param settlementTokens The list of settlement tokens for the pairs.
+    /// @param _matchFeePerPair The list of match fee structs per pair.
+    function setMatchFeePerPair(
+        address[] calldata underlyingTokens,
+        address[] calldata settlementTokens,
+        DataTypes.MatchFeePerPair[] calldata _matchFeePerPair
+    ) external;
 
     /// @notice Sets the exercise fee.
     /// @param _exerciseFee The exercise fee as a percentage.

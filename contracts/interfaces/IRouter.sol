@@ -325,12 +325,14 @@ interface IRouter {
 
     /// @notice Calculates match fees for a given distribution partner and premium
     /// @param distPartner The distribution partner's address
-    /// @param optionPremium The premium amount of the option
+    /// @param optionPremium The option premium
+    /// @param optionInfo The given option info
     /// @return matchFeeProtocol The protocol's match fee
     /// @return matchFeeDistPartner The distribution partner's match fee
     function getMatchFees(
         address distPartner,
-        uint128 optionPremium
+        uint128 optionPremium,
+        DataTypes.OptionInfo calldata optionInfo
     )
         external
         view

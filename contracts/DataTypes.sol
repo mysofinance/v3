@@ -108,4 +108,9 @@ library DataTypes {
         string name;
         string symbol;
     }
+
+    struct MatchFeePerPair {
+        bool isSet;
+        uint96 matchFee;
+    }
 }
