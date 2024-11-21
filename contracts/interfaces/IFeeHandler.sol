@@ -57,7 +57,7 @@ interface IFeeHandler {
     /// @param amount The amount of tokens to withdraw.
     function withdraw(address to, address token, uint256 amount) external;
 
-    /// @notice Returns the match fee and distribution partner fee share for a given matched option.
+    /// @notice Returns the match fee and distribution partner fee share for a given option match.
     /// @param distPartner The address of the distribution partner.
     /// @param optionInfo The details of the option, including underlying and settlement tokens.
     /// @return _matchFee The applicable match fee for the given option.
