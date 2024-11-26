@@ -138,7 +138,6 @@ interface IEscrow {
     /// @param optionReceiver Address receiving the option tokens.
     /// @param _refSpot Reference spot price.
     /// @param _oracleData Additional optional oracle data.
-    /// @param distPartner Address of the distribution partner.
     /// @return preview Returns a BidPreview struct with the bid's outcome.
     /// @return distPartner Returns the address of the distribution partner.
     function handleAuctionBid(

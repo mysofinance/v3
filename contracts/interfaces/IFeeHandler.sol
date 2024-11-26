@@ -114,6 +114,7 @@ interface IFeeHandler {
     function matchFee() external view returns (uint96);
 
     /// @notice Returns the distribution fee share for a given account.
+    /// @param account The account to query the distribution fee share for.
     /// @return The fee share for the given distribution partner.
     function distPartnerFeeShare(
         address account
