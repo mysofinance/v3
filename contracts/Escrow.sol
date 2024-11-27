@@ -517,26 +517,26 @@ contract Escrow is InitializableERC20, IEscrow {
     }
 
     function currAsk() public view returns (uint64) {
+        uint256 _decayStartTime = auctionParams.decayStartTime;
+        uint256 _decayDuration = auctionParams.decayDuration;
         uint256 currentAsk;
-        // @dev: guaranteed to be performed safely by logical inference
-        unchecked {
-            uint256 _decayStartTime = auctionParams.decayStartTime;
-            uint256 _decayDuration = auctionParams.decayDuration;
-            if (block.timestamp < _decayStartTime) {
-                currentAsk = auctionParams.relPremiumStart;
-            } else if (block.timestamp < _decayStartTime + _decayDuration) {
-                uint256 _timePassed = block.timestamp - _decayStartTime;
-                uint256 _relPremiumFloor = auctionParams.relPremiumFloor;
-                uint256 _relPremiumStart = auctionParams.relPremiumStart;
-                currentAsk =
-                    _relPremiumStart -
-                    ((_relPremiumStart - _relPremiumFloor) * _timePassed) /
-                    _decayDuration;
-            } else {
-                currentAsk = auctionParams.relPremiumFloor;
+        if (block.timestamp < _decayStartTime) {
+            currentAsk = auctionParams.relPremiumStart;
+        } else if (block.timestamp < _decayStartTime + _decayDuration) {
+            uint256 _timePassed;
+            // @dev: guaranteed to be performed safely by logical inference
+            unchecked {
+                _timePassed = block.timestamp - _decayStartTime;
             }
+            uint256 _relPremiumStart = auctionParams.relPremiumStart;
+            uint256 _decay = ((_relPremiumStart -
+                auctionParams.relPremiumFloor) * _timePassed) / _decayDuration;
+            unchecked {
+                currentAsk = _relPremiumStart - _decay;
+            }
+        } else {
+            currentAsk = auctionParams.relPremiumFloor;
         }
-
         return SafeCast.toUint64(currentAsk);
     }
 
