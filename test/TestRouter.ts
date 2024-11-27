@@ -812,6 +812,12 @@ describe("Router Contract", function () {
           } as DataTypes.OptionNaming
         )
       ).to.be.reverted;
+
+      // Check revert when trying to retrieve distribution partner on non-auction
+      await expect(escrow.distPartner()).to.be.revertedWithCustomError(
+        escrow,
+        "OnlyAvailableForAuctions"
+      );
     });
 
     describe("Option Token Minting with Fees", function () {
@@ -1204,10 +1210,11 @@ describe("Router Contract", function () {
     });
 
     it("should allow owner to redeem underlying tokens (1/2)", async function () {
-      // Transfer all option tokens back to the owner
+      // Transfer all option tokens back to the owner and check event emission
       const totalSupply = await escrow.totalSupply();
-      await escrow.connect(user1).transfer(owner.address, totalSupply);
-
+      await expect(escrow.connect(user1).transfer(owner.address, totalSupply))
+        .to.emit(router, "Transfer")
+        .withArgs(escrow.target, user1.address, owner.address, totalSupply);
       // Check initial balances
       const underlyingBalanceBefore = await underlyingToken.balanceOf(
         owner.address
@@ -1299,6 +1306,12 @@ describe("Router Contract", function () {
       await expect(
         escrow.connect(owner).redeem(owner.address)
       ).to.be.revertedWithCustomError(escrow, "NothingToRedeem");
+    });
+
+    it("should revert if trying to trigger transfer event with non-escrow caller", async function () {
+      await expect(
+        router.emitTransferEvent(owner.address, user1.address, 1n)
+      ).to.be.revertedWithCustomError(router, "NotAnEscrow");
     });
   });
 });

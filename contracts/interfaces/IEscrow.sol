@@ -85,6 +85,10 @@ interface IEscrow {
     /// @return optionMinted Boolean indicating if the option is minted.
     function optionMinted() external view returns (bool);
 
+    /// @notice Returns the distribution partner of an auction.
+    /// @return Returns the distribution partner of an auction.
+    function distPartner() external view returns (address);
+
     /// @notice Initializes the Escrow contract for an auction.
     /// @param _router The router address.
     /// @param _owner The address of the auction owner.
@@ -233,7 +237,7 @@ interface IEscrow {
     /// @param _refSpot Reference spot price.
     /// @param _oracleData Additional optional oracle data.
     /// @return preview Returns a BidPreview struct with the bid's outcome.
-    /// @return distPartner Returns the address of the distribution partner.
+    /// @return __distPartner Returns the address of the distribution partner.
     function previewBid(
         uint256 relBid,
         uint256 _refSpot,
@@ -241,7 +245,7 @@ interface IEscrow {
     )
         external
         view
-        returns (DataTypes.BidPreview memory preview, address distPartner);
+        returns (DataTypes.BidPreview memory preview, address __distPartner);
 
     /// @notice Returns the current ask of the auction in percentage of notional.
     /// @return Current ask percentage.
