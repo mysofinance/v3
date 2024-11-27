@@ -13,7 +13,7 @@ async function askQuestion(query: string): Promise<string> {
 
 async function deployFeeHandler(
   routerAddr: string,
-  owner: any,
+  owner: string,
   matchFee: any,
   exerciseFee: any,
   mintFee: any
@@ -35,15 +35,6 @@ async function main() {
   const [deployer] = await ethers.getSigners();
 
   const owner = deployer.address;
-  const matchFee = ethers.parseUnits("0.125", 18);
-  const exerciseFee = ethers.parseUnits("0.001", 18);
-  const mintFee = ethers.parseUnits("0.01", 18);
-  console.log("Deployment parameters");
-  console.log("owner: ", owner);
-  console.log("matchFee: ", matchFee);
-  console.log("exerciseFee: ", exerciseFee);
-  console.log("mintFee: ", mintFee);
-
   console.log("Deployer account:", deployer.address);
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log(`Account balance: ${ethers.formatEther(balance)} ETH\n`);
@@ -55,7 +46,28 @@ async function main() {
 
   const routerAddr = await askQuestion("Enter the Router contract address: ");
 
-  console.log(`You entered:\nRouter Address: ${routerAddr}`);
+  const matchFeeInput = await askQuestion(
+    "Enter the Match Fee percentage (e.g., 10 for 10%): "
+  );
+  const matchFee = ethers.parseUnits(matchFeeInput, 16);
+
+  const exerciseFeeInput = await askQuestion(
+    "Enter the Exercise Fee percentage (e.g., 0.1 for 0.1%): "
+  );
+  const exerciseFee = ethers.parseUnits(exerciseFeeInput, 16);
+
+  const mintFeeInput = await askQuestion(
+    "Enter the Mint Fee percentage (e.g., 1 for 1%): "
+  );
+  const mintFee = ethers.parseUnits(mintFeeInput, 16);
+
+  console.log("\nDeployment parameters:");
+  console.log("Router Address:", routerAddr);
+  console.log("Owner:", owner);
+  console.log("Match Fee (18 decimals):", matchFee.toString());
+  console.log("Exercise Fee (18 decimals):", exerciseFee.toString());
+  console.log("Mint Fee (18 decimals):", mintFee.toString());
+
   const confirm = await askQuestion(
     "Proceed with Fee Handler deployment? (yes/no): "
   );

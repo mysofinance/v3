@@ -11,20 +11,40 @@ async function askQuestion(query: string): Promise<string> {
   return new Promise((resolve) => rl.question(query, resolve));
 }
 
+async function getTokenDecimals(
+  tokenAddress: string,
+  deployer: any
+): Promise<bigint> {
+  try {
+    const ERC20 = await ethers.getContractAt(
+      "MockERC20",
+      tokenAddress,
+      deployer
+    );
+    const decimals = await ERC20.decimals();
+    return decimals;
+  } catch (error) {
+    console.error(
+      `Error fetching decimals for token at address ${tokenAddress}:`,
+      error
+    );
+    throw new Error("Failed to retrieve token decimals.");
+  }
+}
+
 async function setOraclePrice(
   mockOracle: any,
   underlyingTokenAddr: string,
   settlementTokenAddr: string,
-  price: string,
-  decimals: number,
+  priceStr: string,
+  priceParsed: bigint,
   deployer: any
 ) {
-  const formattedPrice = ethers.parseUnits(price, decimals);
   await mockOracle
     .connect(deployer)
-    .setPrice(underlyingTokenAddr, settlementTokenAddr, formattedPrice);
+    .setPrice(underlyingTokenAddr, settlementTokenAddr, priceParsed);
   console.log(
-    `Price of ${price} (with ${decimals} decimals) set for underlying token ${underlyingTokenAddr} vs settlement token ${settlementTokenAddr}`
+    `Price of ${priceStr} (=${priceParsed}) set for 1 unit of underlying token ${underlyingTokenAddr} vs settlement token ${settlementTokenAddr}`
   );
 }
 
@@ -57,28 +77,44 @@ async function main() {
       "Enter the underlying token address: "
     );
 
-    // Ask for price and decimals
-    const price = await askQuestion("Enter the price (e.g., 5.7): ");
-    const decimals = parseInt(
-      await askQuestion("Enter the decimals (e.g., 18): "),
-      10
-    );
-
-    console.log(`\nYou entered:\nPrice: ${price}\nDecimals: ${decimals}`);
-    const confirm = await askQuestion(
-      "Proceed with setting the price? (yes/no): "
-    );
-
-    if (confirm.toLowerCase() === "yes") {
-      await setOraclePrice(
-        mockOracle,
+    try {
+      console.log("Fetching token decimals...");
+      const underlyingDecimals = await getTokenDecimals(
         underlyingTokenAddr,
-        settlementTokenAddr,
-        price,
-        decimals,
         deployer
       );
-      console.log("\nPrice successfully set.");
+      const settlementDecimals = await getTokenDecimals(
+        settlementTokenAddr,
+        deployer
+      );
+
+      console.log(
+        `Decimals fetched: \nUnderlying token decimals: ${underlyingDecimals}\nSettlement token decimals: ${settlementDecimals}`
+      );
+
+      // Ask for price
+      const price = await askQuestion(
+        `Enter the price (i.e., settlement token amount for 1**${underlyingDecimals} unit of underlying token; e.g., 5.7): `
+      );
+      const priceParsed = ethers.parseUnits(price, settlementDecimals);
+      console.log(`\nYou entered:\nPrice: ${price} (=${priceParsed})`);
+      const confirm = await askQuestion(
+        "Proceed with setting the price? (yes/no): "
+      );
+
+      if (confirm.toLowerCase() === "yes") {
+        await setOraclePrice(
+          mockOracle,
+          underlyingTokenAddr,
+          settlementTokenAddr,
+          price,
+          priceParsed,
+          deployer
+        );
+        console.log("\nPrice successfully set.");
+      }
+    } catch (error) {
+      console.error("Error setting price:", error);
     }
 
     const continueAnswer = await askQuestion(

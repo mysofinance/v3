@@ -524,16 +524,18 @@ contract Escrow is InitializableERC20, IEscrow {
             currentAsk = auctionParams.relPremiumStart;
         } else if (block.timestamp < _decayStartTime + _decayDuration) {
             uint256 _timePassed;
+            uint256 _totalDecay;
+            uint256 _relPremiumStart = auctionParams.relPremiumStart;
             // @dev: guaranteed to be performed safely by logical inference
             unchecked {
                 _timePassed = block.timestamp - _decayStartTime;
+                _totalDecay = _relPremiumStart - auctionParams.relPremiumFloor;
             }
-            uint256 _relPremiumFloor = auctionParams.relPremiumFloor;
-            uint256 _relPremiumStart = auctionParams.relPremiumStart;
-            currentAsk =
-                _relPremiumStart -
-                ((_relPremiumStart - _relPremiumFloor) * _timePassed) /
+            uint256 _realizedDecay = (_totalDecay * _timePassed) /
                 _decayDuration;
+            unchecked {
+                currentAsk = _relPremiumStart - _realizedDecay;
+            }
         } else {
             currentAsk = auctionParams.relPremiumFloor;
         }
