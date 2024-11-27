@@ -421,6 +421,7 @@ contract Escrow is InitializableERC20, IEscrow {
             revert Errors.OwnerAlreadySet();
         }
         owner = newOwner;
+        IRouter(router).emitTransferOwnershipEvent(_owner, newOwner);
         emit TransferOwnership(msg.sender, _owner, newOwner);
     }
 

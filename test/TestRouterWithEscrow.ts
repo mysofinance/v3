@@ -1986,11 +1986,24 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should allow the owner to transfer ownership to a new address", async function () {
-      const newOwner = user2.address;
-      await expect(escrow.connect(owner).transferOwnership(newOwner))
+      const newOwner = user2;
+      await expect(escrow.connect(owner).transferOwnership(newOwner.address))
         .to.emit(escrow, "TransferOwnership")
-        .withArgs(owner.address, owner.address, newOwner);
-      expect(await escrow.owner()).to.equal(newOwner);
+        .withArgs(owner.address, owner.address, newOwner.address);
+      expect(await escrow.owner()).to.equal(newOwner.address);
+
+      // check transfer ownership event is also emitted on router level
+      await expect(escrow.connect(newOwner).transferOwnership(owner.address))
+        .to.emit(router, "TransferOwnership")
+        .withArgs(escrow.target, newOwner.address, owner.address);
+      expect(await escrow.owner()).to.equal(owner.address);
+
+      // @dev: should revert when trying to emit transferOwnership with non escrow caller
+      await expect(
+        router
+          .connect(owner)
+          .emitTransferOwnershipEvent(owner.address, newOwner.address)
+      ).to.be.revertedWithCustomError(router, "NotAnEscrow");
     });
 
     it("should revert if a non-owner tries to transfer ownership", async function () {
