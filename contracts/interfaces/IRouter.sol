@@ -174,6 +174,16 @@ interface IRouter {
         uint256 value
     );
 
+    /// @notice Emitted when ownership of escrow is transferred
+    /// @param escrow The address of the escrow contract.
+    /// @param oldOwner The address of the old owner.
+    /// @param newOwner The address of the new owner.
+    event TransferOwnership(
+        address indexed escrow,
+        address indexed oldOwner,
+        address indexed newOwner
+    );
+
     /// @notice Returns the address of the escrow implementation contract.
     /// @return escrowImpl The address of the escrow implementation contract.
     function escrowImpl() external view returns (address);
@@ -392,5 +402,14 @@ interface IRouter {
         address from,
         address to,
         uint256 value
+    ) external;
+
+    /// @notice Emits a `TransferOwnership` event for an escrow contract.
+    /// @dev Callable only by registered escrows. Reverts if not an escrow.
+    /// @param oldOwner Address of the old owner.
+    /// @param newOwner Address of the new owner.
+    function emitTransferOwnershipEvent(
+        address oldOwner,
+        address newOwner
     ) external;
 }

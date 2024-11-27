@@ -549,6 +549,17 @@ contract Router is Ownable, IRouter {
         emit Transfer(escrow, from, to, value);
     }
 
+    function emitTransferOwnershipEvent(
+        address oldOwner,
+        address newOwner
+    ) external {
+        address escrow = msg.sender;
+        if (!isEscrow[escrow]) {
+            revert Errors.NotAnEscrow();
+        }
+        emit TransferOwnership(escrow, oldOwner, newOwner);
+    }
+
     function getExerciseFee() public view returns (uint96 exerciseFee) {
         address _feeHandler = feeHandler;
         if (_feeHandler == address(0)) {
