@@ -24,7 +24,7 @@ contract Escrow is InitializableERC20, IEscrow {
 
     address public router;
     address public owner;
-    address public distPartner;
+    address internal _distPartner;
 
     uint96 public exerciseFee;
     bool public isAuction;
@@ -41,7 +41,7 @@ contract Escrow is InitializableERC20, IEscrow {
         uint96 _exerciseFee,
         DataTypes.AuctionInitialization calldata _auctionInitialization,
         uint256 oTokenIndex,
-        address _distPartner
+        address __distPartner
     ) external initializer {
         if (
             _auctionInitialization.underlyingToken ==
@@ -94,7 +94,10 @@ contract Escrow is InitializableERC20, IEscrow {
 
         isAuction = true;
 
-        distPartner = _distPartner;
+        // @dev: distribution partner is only stored for auctions to handle
+        // fee distribution upon a successful bid/match; for RFQ matches,
+        // fee handling uses calldata, so storing is unnecessary.
+        _distPartner = __distPartner;
 
         _initialize(
             _router,
@@ -115,17 +118,17 @@ contract Escrow is InitializableERC20, IEscrow {
     ) external initializer {
         optionInfo = _rfqInitialization.optionInfo;
         premiumPaid = _rfqInitialization.rfqQuote.premium;
-        _mintAndApprove(
-            optionReceiver,
-            _rfqInitialization.optionInfo.notional,
-            _router
-        );
         _initialize(
             _router,
             _owner,
             _exerciseFee,
             _rfqInitialization.optionInfo.underlyingToken,
             oTokenIndex
+        );
+        _mintAndApprove(
+            optionReceiver,
+            _rfqInitialization.optionInfo.notional,
+            _router
         );
     }
 
@@ -159,13 +162,13 @@ contract Escrow is InitializableERC20, IEscrow {
         bytes[] memory _oracleData
     )
         external
-        returns (DataTypes.BidPreview memory preview, address _distPartner)
+        returns (DataTypes.BidPreview memory preview, address __distPartner)
     {
         address _router = router;
         if (msg.sender != _router) {
             revert Errors.InvalidSender();
         }
-        (preview, _distPartner) = previewBid(relBid, _refSpot, _oracleData);
+        (preview, __distPartner) = previewBid(relBid, _refSpot, _oracleData);
 
         if (preview.status != DataTypes.BidStatus.Success) {
             revert Errors.InvalidBid();
@@ -421,6 +424,34 @@ contract Escrow is InitializableERC20, IEscrow {
         emit TransferOwnership(msg.sender, _owner, newOwner);
     }
 
+    function distPartner() external view returns (address) {
+        if (isAuction) {
+            return _distPartner;
+        } else {
+            // @dev: revert for non-auctions
+            revert Errors.OnlyAvailableForAuctions();
+        }
+    }
+
+    function transfer(
+        address to,
+        uint256 value
+    ) public override returns (bool success) {
+        success = super.transfer(to, value);
+        // @dev: trigger event on router for easier tracking of transfers
+        IRouter(router).emitTransferEvent(msg.sender, to, value);
+    }
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 value
+    ) public override returns (bool success) {
+        success = super.transferFrom(from, to, value);
+        // @dev: trigger event on router for easier tracking of transfers
+        IRouter(router).emitTransferEvent(from, to, value);
+    }
+
     function previewBid(
         uint256 relBid,
         uint256 _refSpot,
@@ -428,20 +459,20 @@ contract Escrow is InitializableERC20, IEscrow {
     )
         public
         view
-        returns (DataTypes.BidPreview memory preview, address _distPartner)
+        returns (DataTypes.BidPreview memory preview, address __distPartner)
     {
         uint64 _currAsk = currAsk();
-        _distPartner = distPartner;
+        __distPartner = _distPartner;
         if (optionMinted) {
             return (
                 _createBidPreview(DataTypes.BidStatus.OptionAlreadyMinted),
-                _distPartner
+                __distPartner
             );
         }
         if (relBid < _currAsk) {
             return (
                 _createBidPreview(DataTypes.BidStatus.PremiumTooLow),
-                _distPartner
+                __distPartner
             );
         }
         // @dev: caching
@@ -457,7 +488,7 @@ contract Escrow is InitializableERC20, IEscrow {
         if (_refSpot < oracleSpotPrice) {
             return (
                 _createBidPreview(DataTypes.BidStatus.SpotPriceTooLow),
-                _distPartner
+                __distPartner
             );
         }
 
@@ -467,7 +498,7 @@ contract Escrow is InitializableERC20, IEscrow {
         ) {
             return (
                 _createBidPreview(DataTypes.BidStatus.OutOfRangeSpotPrice),
-                _distPartner
+                __distPartner
             );
         }
 
@@ -493,7 +524,7 @@ contract Escrow is InitializableERC20, IEscrow {
         );
         (uint128 matchFeeProtocol, uint128 matchFeeDistPartner) = IRouter(
             router
-        ).getMatchFees(distPartner, premium, optionInfo);
+        ).getMatchFees(_distPartner, premium, optionInfo);
 
         return (
             DataTypes.BidPreview({
@@ -512,7 +543,7 @@ contract Escrow is InitializableERC20, IEscrow {
                 matchFeeProtocol: matchFeeProtocol,
                 matchFeeDistPartner: matchFeeDistPartner
             }),
-            _distPartner
+            __distPartner
         );
     }
 

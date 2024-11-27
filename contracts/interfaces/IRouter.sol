@@ -11,11 +11,13 @@ interface IRouter {
     /// @param escrow The address of the created escrow contract
     /// @param auctionInitialization The initialization data for the auction
     /// @param exerciseFee The applicable exercise fee
+    /// @param distPartner The distribution partner's address
     event CreateAuction(
         address indexed escrowOwner,
         address indexed escrow,
         DataTypes.AuctionInitialization auctionInitialization,
-        uint96 exerciseFee
+        uint96 exerciseFee,
+        address distPartner
     );
 
     /// @notice Emitted when a withdrawal from escrow occurs and a new auction is created
@@ -159,6 +161,18 @@ interface IRouter {
     /// @param quoter The address whose pause status changed
     /// @param isPaused The new pause status
     event PauseQuotes(address indexed quoter, bool isPaused);
+
+    /// @notice Emitted when tokens are transferred between addresses.
+    /// @param token The address of the token contract.
+    /// @param from The address transferring the tokens.
+    /// @param to The address receiving the tokens.
+    /// @param value The amount of tokens transferred.
+    event Transfer(
+        address indexed token,
+        address indexed from,
+        address indexed to,
+        uint256 value
+    );
 
     /// @notice Returns the address of the escrow implementation contract.
     /// @return escrowImpl The address of the escrow implementation contract.
@@ -368,4 +382,15 @@ interface IRouter {
         uint256 from,
         uint256 numElements
     ) external view returns (address[] memory _escrows);
+
+    /// @notice Emits a `Transfer` event for a token.
+    /// @dev Callable only by registered escrows. Reverts if not an escrow.
+    /// @param from Address sending the tokens.
+    /// @param to Address receiving the tokens.
+    /// @param value Amount of tokens transferred.
+    function emitTransferEvent(
+        address from,
+        address to,
+        uint256 value
+    ) external;
 }

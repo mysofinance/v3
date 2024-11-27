@@ -66,7 +66,8 @@ contract Router is Ownable, IRouter {
             escrowOwner,
             escrow,
             auctionInitialization,
-            exerciseFee
+            exerciseFee,
+            distPartner
         );
     }
 
@@ -534,6 +535,18 @@ contract Router is Ownable, IRouter {
         }
         feeHandler = newFeeHandler;
         emit NewFeeHandler(oldFeeHandler, newFeeHandler);
+    }
+
+    function emitTransferEvent(
+        address from,
+        address to,
+        uint256 value
+    ) external {
+        address escrow = msg.sender;
+        if (!isEscrow[escrow]) {
+            revert Errors.NotAnEscrow();
+        }
+        emit Transfer(escrow, from, to, value);
     }
 
     function getExerciseFee() public view returns (uint96 exerciseFee) {

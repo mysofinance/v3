@@ -44,6 +44,7 @@ library Errors {
     error NotAnEscrow();
     error NothingToRedeem();
     error NothingToRepay();
+    error OnlyAvailableForAuctions();
     error OracleAlreadySet(address oracleAddr);
     error OwnerAlreadySet();
     error SwapQuoteAlreadyUsed();
