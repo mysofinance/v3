@@ -342,8 +342,11 @@ contract Escrow is InitializableERC20, IEscrow {
             underlyingRepayAmount,
             optionInfo.notional
         );
-        totalBorrowed -= underlyingRepayAmount;
-        borrowedUnderlyingAmounts[borrower] -= underlyingRepayAmount;
+        // @dev: guaranteed to be performed safely by logical inference
+        unchecked {
+            totalBorrowed -= underlyingRepayAmount;
+            borrowedUnderlyingAmounts[borrower] -= underlyingRepayAmount;
+        }
         _mint(borrower, underlyingRepayAmount);
         IERC20Metadata(optionInfo.settlementToken).safeTransfer(
             collateralReceiver,
