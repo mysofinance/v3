@@ -13,15 +13,14 @@ contract MysoPositionLib is IMysoPosition {
 
     address private immutable MYSO_ROUTER;
 
-    uint256 private _numEscrows;
     address[] private _escrows;
     address[] private _assets;
-    mapping(address => bool) _isAsset;
-    mapping(address => uint256) _assetIdx;
+    mapping(address => bool) private _isAsset;
+    mapping(address => uint256) private _assetIdx;
 
-    constructor(address _mysoRouter) {
-        require(_mysoRouter != address(0), "Invalid router address");
-        MYSO_ROUTER = _mysoRouter;
+    constructor(address mysoRouter) {
+        require(mysoRouter != address(0), "Invalid router address");
+        MYSO_ROUTER = mysoRouter;
     }
 
     /// @notice Initializes the external position
@@ -58,18 +57,16 @@ contract MysoPositionLib is IMysoPosition {
         uint256 numAssets = _assets.length;
 
         // Add underlying token if not already in the list
-        numAssets = _addAssetIfNotExists(
+        numAssets = _addAsset(
             rfqInitialization.optionInfo.underlyingToken,
             numAssets
         );
 
         // Add settlement token if not already in the list
-        numAssets = _addAssetIfNotExists(
+        numAssets = _addAsset(
             rfqInitialization.optionInfo.settlementToken,
             numAssets
         );
-
-        _numEscrows += 1;
 
         IRouter(MYSO_ROUTER).takeQuote(
             msg.sender,
@@ -77,13 +74,7 @@ contract MysoPositionLib is IMysoPosition {
             address(0)
         );
 
-        uint256 lastEscrowIdx = IRouter(MYSO_ROUTER).numEscrows();
-        address[] memory newEscrowAddr = IRouter(MYSO_ROUTER).getEscrows(
-            lastEscrowIdx - 1,
-            1
-        );
-        _escrows.push(newEscrowAddr[0]);
-        emit EscrowAdded(newEscrowAddr[0]);
+        _addLatestEscrow();
     }
 
     /// @notice Creates a new auction to write an option
@@ -92,21 +83,47 @@ contract MysoPositionLib is IMysoPosition {
         DataTypes.AuctionInitialization memory auctionInitialization = abi
             .decode(actionArgs, (DataTypes.AuctionInitialization));
 
+        IERC20Metadata(auctionInitialization.underlyingToken).transferFrom(
+            msg.sender,
+            address(this),
+            auctionInitialization.notional
+        );
+        IERC20Metadata(auctionInitialization.underlyingToken).approve(
+            MYSO_ROUTER,
+            auctionInitialization.notional
+        );
+
         IRouter(MYSO_ROUTER).createAuction(
             msg.sender,
             auctionInitialization,
             address(0)
         );
+
+        _addLatestEscrow();
     }
 
-    /// @notice Withdraws tokens from an escrow
-    /// @param actionArgs Encoded arguments containing escrow address, token address, and amount
+    /// @notice Withdraws tokens from escrows
+    /// @param actionArgs Encoded arguments containing escrow addresses, token addresses, and amounts
     function __withdraw(bytes memory actionArgs) private {
-        (address escrow, address token, uint256 amount) = abi.decode(
-            actionArgs,
-            (address, address, uint256)
+        (
+            address[] memory escrows,
+            address[] memory tokens,
+            uint256[] memory amounts
+        ) = abi.decode(actionArgs, (address[], address[], uint256[]));
+
+        require(
+            escrows.length == tokens.length && tokens.length == amounts.length,
+            "__withdraw: Input arrays must have the same length"
         );
-        IRouter(MYSO_ROUTER).withdraw(escrow, msg.sender, token, amount);
+
+        for (uint256 i = 0; i < escrows.length; i++) {
+            IRouter(MYSO_ROUTER).withdraw(
+                escrows[i],
+                msg.sender,
+                tokens[i],
+                amounts[i]
+            );
+        }
     }
 
     ////////////////////
@@ -125,17 +142,30 @@ contract MysoPositionLib is IMysoPosition {
         assets_ = _assets;
         amounts_ = new uint256[](_assets.length);
 
+        // @dev: bounding of escrow length intentionally skipped
         for (uint256 i; i < _escrows.length; i++) {
+            address _escrow = _escrows[i];
+
+            require(
+                allowNavCalculation(_escrow),
+                "getManagedAssets: NAV calculation disallowed"
+            );
+
             (
                 address underlyingToken,
-                address settlementToken
-            ) = _getTokensFromOptionInfo(_escrows[i]);
+                ,
+                address settlementToken,
+                ,
+                ,
+                ,
+
+            ) = Escrow(_escrow).optionInfo();
             amounts_[_assetIdx[underlyingToken]] += IERC20Metadata(
                 underlyingToken
-            ).balanceOf(_escrows[i]);
+            ).balanceOf(_escrow);
             amounts_[_assetIdx[settlementToken]] += IERC20Metadata(
                 settlementToken
-            ).balanceOf(_escrows[i]);
+            ).balanceOf(_escrow);
         }
 
         return (assets_, amounts_);
@@ -152,47 +182,14 @@ contract MysoPositionLib is IMysoPosition {
         return (assets_, amounts_);
     }
 
-    function getManagedAssetsForEscrows(
-        uint256 from,
-        uint256 numElements
-    )
-        external
-        view
-        returns (address[] memory assets_, uint256[] memory amounts_)
-    {
-        uint256 length = _escrows.length;
-        require(
-            numElements != 0 && from + numElements <= length,
-            "Invalid from or numElements"
-        );
-
-        assets_ = _assets;
-        amounts_ = new uint256[](_assets.length);
-
-        for (uint256 i; i < numElements; i++) {
-            (
-                address underlyingToken,
-                address settlementToken
-            ) = _getTokensFromOptionInfo(_escrows[i]);
-            amounts_[_assetIdx[underlyingToken]] += IERC20Metadata(
-                underlyingToken
-            ).balanceOf(_escrows[from + i]);
-            amounts_[_assetIdx[settlementToken]] += IERC20Metadata(
-                settlementToken
-            ).balanceOf(_escrows[from + i]);
-        }
-
-        return (assets_, amounts_);
-    }
-
     ///////////////////
     // STATE GETTERS //
     ///////////////////
 
     /// @notice Retrieves the number of escrows
     /// @return The total number of escrows managed by this contract
-    function getNumEscrows() public view returns (uint256) {
-        return _numEscrows;
+    function getNumEscrows() external view returns (uint256) {
+        return _escrows.length;
     }
 
     /// @notice Retrieves the escrow addresses within the specified range
@@ -206,7 +203,7 @@ contract MysoPositionLib is IMysoPosition {
         uint256 length = _escrows.length;
         require(
             numElements != 0 && from + numElements <= length,
-            "Invalid from or numElements"
+            "getEscrowAddresses: Invalid range"
         );
 
         _escrowArray = new address[](numElements);
@@ -215,28 +212,34 @@ contract MysoPositionLib is IMysoPosition {
         }
     }
 
-    /// @notice Retrieves withdrawal states of escrows within the specified range
-    /// @param from Starting index
-    /// @param numElements Number of escrows to check
-    /// @return _isWithdrawableArray List of withdrawal states
-    function getEscrowStates(
-        uint256 from,
-        uint256 numElements
-    ) external view returns (bool[] memory _isWithdrawableArray) {
-        uint256 length = _escrows.length;
-        require(
-            numElements != 0 && from + numElements <= length,
-            "Invalid from or numElements"
-        );
-
-        _isWithdrawableArray = new bool[](numElements);
-        for (uint256 i = 0; i < numElements; ++i) {
-            bool isOptionMinted = Escrow(_escrows[from + i]).optionMinted();
-            if (isOptionMinted) {
-                uint256 expiry = _getExpiryFromOptionInfo(_escrows[i]);
-                _isWithdrawableArray[i] = block.timestamp > expiry;
-            }
+    function allowNavCalculation(address escrow) public view returns (bool) {
+        // @dev: note if there's an unmatched/in progress auction
+        // (=no minted option) then we disallow NAV calculation
+        // to automatically prevent deposits during this time
+        // that otherwise could potentially dilute early depositors
+        if (!Escrow(escrow).optionMinted()) {
+            return false;
         }
+
+        // @dev: two cases where we support NAV calculation
+
+        // case 1 - option was exercised: this is the case if
+        // option minted but option supply is 0 (and no open borrows)
+        if (
+            IERC20Metadata(escrow).totalSupply() == 0 &&
+            Escrow(escrow).totalBorrowed() == 0
+        ) {
+            return true;
+        }
+
+        // case 2 - option expired unexercised: this is the
+        // case if option minted but expired
+        (, uint256 expiry, , , , , ) = Escrow(escrow).optionInfo();
+        if (block.timestamp > expiry) {
+            return true;
+        }
+
+        return false;
     }
 
     //////////////////////
@@ -247,7 +250,7 @@ contract MysoPositionLib is IMysoPosition {
     /// @param token Address of the token to add
     /// @param numAssets Current number of assets
     /// @return Updated number of assets
-    function _addAssetIfNotExists(
+    function _addAsset(
         address token,
         uint256 numAssets
     ) internal returns (uint256) {
@@ -263,23 +266,18 @@ contract MysoPositionLib is IMysoPosition {
         return numAssets;
     }
 
-    /// @notice Retrieves the underlying and settlement tokens from option info
-    /// @param escrow Address of the escrow
-    /// @return underlyingToken Address of the underlying token
-    /// @return settlementToken Address of the settlement token
-    function _getTokensFromOptionInfo(
-        address escrow
-    ) internal view returns (address underlyingToken, address settlementToken) {
-        (underlyingToken, , settlementToken, , , , ) = Escrow(escrow)
-            .optionInfo();
-    }
+    function _addLatestEscrow() internal {
+        uint256 numEscrows = IRouter(MYSO_ROUTER).numEscrows();
+        if (numEscrows > 0) {
+            address[] memory newEscrowAddr = IRouter(MYSO_ROUTER).getEscrows(
+                numEscrows - 1,
+                1
+            );
 
-    /// @notice Retrieves the expiry timestamp from option info
-    /// @param escrow Address of the escrow
-    /// @return expiry Expiry timestamp of the option
-    function _getExpiryFromOptionInfo(
-        address escrow
-    ) internal view returns (uint256 expiry) {
-        (, expiry, , , , , ) = Escrow(escrow).optionInfo();
+            // @dev: bounding of escrow length intentionally skipped
+            _escrows.push(newEscrowAddr[0]);
+
+            emit EscrowAdded(newEscrowAddr[0]);
+        }
     }
 }

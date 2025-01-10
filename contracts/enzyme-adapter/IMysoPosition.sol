@@ -11,10 +11,4 @@ interface IMysoPosition is IExternalPosition {
         CreateAuction,
         Withdraw
     }
-
-    enum EscrowState {
-        Unmatched,
-        MatchedAndOngoing,
-        MatchedAndExpired
-    }
 }
