@@ -41,7 +41,7 @@ describe("Router Contract", function () {
   });
 
   describe("Create Auction", function () {
-    it("should create an auction through the library", async function () {
+    it("should be able to create an auction and withdraw through the external position instance", async function () {
       // Prepare the auction initialization parameters
       const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),

@@ -68,8 +68,9 @@ contract MysoPositionLib is IMysoPosition {
             numAssets
         );
 
+        // @dev: set External Position (EP) as escrow owner
         IRouter(MYSO_ROUTER).takeQuote(
-            msg.sender,
+            address(this),
             rfqInitialization,
             address(0)
         );
@@ -93,8 +94,9 @@ contract MysoPositionLib is IMysoPosition {
             auctionInitialization.notional
         );
 
+        // @dev: set External Position (EP) as escrow owner
         IRouter(MYSO_ROUTER).createAuction(
-            msg.sender,
+            address(this),
             auctionInitialization,
             address(0)
         );
