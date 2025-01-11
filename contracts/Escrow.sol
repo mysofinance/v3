@@ -225,9 +225,11 @@ contract Escrow is InitializableERC20, IEscrow {
         uint256 settlementTokenDecimals = IERC20Metadata(settlementToken)
             .decimals();
 
-        settlementAmount =
-            (strike * underlyingExerciseAmount) /
-            (10 ** underlyingTokenDecimals);
+        settlementAmount = _getConversionAmount(
+            strike,
+            underlyingExerciseAmount,
+            underlyingTokenDecimals
+        );
         exerciseFeeAmount = (settlementAmount * exerciseFee) / BASE;
 
         uint256 exerciseCostInUnderlying;
@@ -287,15 +289,15 @@ contract Escrow is InitializableERC20, IEscrow {
         if (
             underlyingBorrowAmount == 0 ||
             (totalBorrowed + underlyingBorrowAmount) * BASE >
-            optionInfo.notional * optionInfo.advancedSettings.borrowCap
+            optionInfo.notional * uint256(optionInfo.advancedSettings.borrowCap)
         ) {
             revert Errors.InvalidBorrowAmount();
         }
         settlementToken = optionInfo.settlementToken;
-        collateralAmount = _getCollateralAmount(
+        collateralAmount = _getConversionAmount(
             optionInfo.strike,
             underlyingBorrowAmount,
-            optionInfo.notional
+            IERC20Metadata(optionInfo.underlyingToken).decimals()
         );
 
         // @dev: apply exercise fee to ensure equivalence between
@@ -337,10 +339,10 @@ contract Escrow is InitializableERC20, IEscrow {
             revert Errors.InvalidRepayAmount();
         }
         underlyingToken = optionInfo.underlyingToken;
-        unlockedCollateralAmount = _getCollateralAmount(
+        unlockedCollateralAmount = _getConversionAmount(
             optionInfo.strike,
             underlyingRepayAmount,
-            optionInfo.notional
+            IERC20Metadata(optionInfo.underlyingToken).decimals()
         );
         // @dev: guaranteed to be performed safely by logical inference
         unchecked {
@@ -632,11 +634,11 @@ contract Escrow is InitializableERC20, IEscrow {
             });
     }
 
-    function _getCollateralAmount(
+    function _getConversionAmount(
         uint256 strike,
-        uint256 borrowOrRepayAmount,
-        uint256 notional
+        uint256 underlyingAmount,
+        uint256 underlyingTokenDecimals
     ) internal pure returns (uint256) {
-        return (strike * borrowOrRepayAmount) / notional;
+        return (strike * underlyingAmount) / (10 ** underlyingTokenDecimals);
     }
 }

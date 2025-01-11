@@ -725,10 +725,6 @@ describe("Router And Escrow Interaction", function () {
       const postUndBal = await underlyingToken.balanceOf(user1.address);
       const postSettlementBal = await settlementToken.balanceOf(user1.address);
 
-      console.log("underlyingBorrowAmount", underlyingBorrowAmount);
-      console.log("expectedCollatAmount", expectedCollatAmount);
-      console.log("strike", strike);
-
       expect(postUndBal - preUndBal).to.be.equal(underlyingBorrowAmount);
       expect(preSettlementBal - postSettlementBal).to.be.equal(
         expectedCollatAmount
@@ -740,7 +736,10 @@ describe("Router And Escrow Interaction", function () {
       );
 
       // Fast forward time to after expiry
-      await ethers.provider.send("evm_increaseTime", [86400 * 7]);
+      const currentTime = (await provider.getBlock("latest")).timestamp;
+      await ethers.provider.send("evm_increaseTime", [
+        rfqInitialization.optionInfo.expiry - currentTime + 1,
+      ]);
       await ethers.provider.send("evm_mine", []);
 
       // Check collateral balance in escrow
