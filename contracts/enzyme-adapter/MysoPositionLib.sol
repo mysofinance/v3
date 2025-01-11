@@ -217,8 +217,8 @@ contract MysoPositionLib is IMysoPosition {
     function allowNavCalculation(address escrow) public view returns (bool) {
         // @dev: note if there's an unmatched/in progress auction
         // (=no minted option) then we disallow NAV calculation
-        // to automatically prevent deposits during this time
-        // that otherwise could potentially dilute early depositors
+        // to automatically prevent deposits during this time which
+        // otherwise could potentially dilute early depositors
         if (!Escrow(escrow).optionMinted()) {
             return false;
         }
