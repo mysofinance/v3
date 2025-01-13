@@ -225,10 +225,12 @@ contract Escrow is InitializableERC20, IEscrow {
         uint256 settlementTokenDecimals = IERC20Metadata(settlementToken)
             .decimals();
 
+        // @dev: round conversion amount up
         settlementAmount = _getConversionAmount(
             strike,
             underlyingExerciseAmount,
-            underlyingTokenDecimals
+            underlyingTokenDecimals,
+            true
         );
         exerciseFeeAmount = (settlementAmount * exerciseFee) / BASE;
 
@@ -294,10 +296,13 @@ contract Escrow is InitializableERC20, IEscrow {
             revert Errors.InvalidBorrowAmount();
         }
         settlementToken = optionInfo.settlementToken;
+
+        // @dev: round collateral amount up
         collateralAmount = _getConversionAmount(
             optionInfo.strike,
             underlyingBorrowAmount,
-            IERC20Metadata(optionInfo.underlyingToken).decimals()
+            IERC20Metadata(optionInfo.underlyingToken).decimals(),
+            true
         );
 
         // @dev: apply exercise fee to ensure equivalence between
@@ -339,10 +344,13 @@ contract Escrow is InitializableERC20, IEscrow {
             revert Errors.InvalidRepayAmount();
         }
         underlyingToken = optionInfo.underlyingToken;
+
+        // @dev: round released collateral amount downwards
         unlockedCollateralAmount = _getConversionAmount(
             optionInfo.strike,
             underlyingRepayAmount,
-            IERC20Metadata(optionInfo.underlyingToken).decimals()
+            IERC20Metadata(optionInfo.underlyingToken).decimals(),
+            false
         );
         // @dev: guaranteed to be performed safely by logical inference
         unchecked {
@@ -637,8 +645,14 @@ contract Escrow is InitializableERC20, IEscrow {
     function _getConversionAmount(
         uint256 strike,
         uint256 underlyingAmount,
-        uint256 underlyingTokenDecimals
+        uint256 underlyingTokenDecimals,
+        bool roundUp
     ) internal pure returns (uint256) {
-        return (strike * underlyingAmount) / (10 ** underlyingTokenDecimals);
+        uint256 denominator = 10 ** underlyingTokenDecimals;
+        if (roundUp) {
+            return (strike * underlyingAmount + denominator - 1) / denominator;
+        } else {
+            return (strike * underlyingAmount) / denominator;
+        }
     }
 }
