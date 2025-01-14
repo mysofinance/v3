@@ -288,6 +288,8 @@ contract Escrow is InitializableERC20, IEscrow {
         ) {
             revert Errors.InvalidBorrowTime();
         }
+        // @dev: Cast borrowCap to uint256 to ensure RHS multiplication
+        // is in uint256; notional is implicitly promoted to uint256.
         if (
             underlyingBorrowAmount == 0 ||
             (totalBorrowed + underlyingBorrowAmount) * BASE >
