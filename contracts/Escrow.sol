@@ -650,15 +650,12 @@ contract Escrow is InitializableERC20, IEscrow {
         uint256 underlyingTokenDecimals,
         bool roundUp
     ) internal pure returns (uint256) {
-        uint256 result = (strike * underlyingAmount) /
-            10 ** underlyingTokenDecimals;
-        uint256 remainder = (strike * underlyingAmount) %
-            10 ** underlyingTokenDecimals;
-
-        if (roundUp && remainder > 0) {
-            return result + 1;
+        uint256 nominator = strike * underlyingAmount;
+        uint256 denominator = 10 ** underlyingTokenDecimals;
+        if (roundUp) {
+            return ((nominator - 1) / denominator) + 1;
         } else {
-            return result;
+            return nominator / denominator;
         }
     }
 }
