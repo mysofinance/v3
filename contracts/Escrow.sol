@@ -225,9 +225,13 @@ contract Escrow is InitializableERC20, IEscrow {
         uint256 settlementTokenDecimals = IERC20Metadata(settlementToken)
             .decimals();
 
-        settlementAmount =
-            (strike * underlyingExerciseAmount) /
-            (10 ** underlyingTokenDecimals);
+        // @dev: round conversion amount up
+        settlementAmount = _getConversionAmount(
+            strike,
+            underlyingExerciseAmount,
+            underlyingTokenDecimals,
+            true
+        );
         exerciseFeeAmount = (settlementAmount * exerciseFee) / BASE;
 
         uint256 exerciseCostInUnderlying;
@@ -284,18 +288,23 @@ contract Escrow is InitializableERC20, IEscrow {
         ) {
             revert Errors.InvalidBorrowTime();
         }
+        // @dev: Cast borrowCap to uint256 to ensure RHS multiplication
+        // is in uint256; notional is implicitly promoted to uint256.
         if (
             underlyingBorrowAmount == 0 ||
             (totalBorrowed + underlyingBorrowAmount) * BASE >
-            optionInfo.notional * optionInfo.advancedSettings.borrowCap
+            optionInfo.notional * uint256(optionInfo.advancedSettings.borrowCap)
         ) {
             revert Errors.InvalidBorrowAmount();
         }
         settlementToken = optionInfo.settlementToken;
-        collateralAmount = _getCollateralAmount(
+
+        // @dev: round collateral amount up
+        collateralAmount = _getConversionAmount(
             optionInfo.strike,
             underlyingBorrowAmount,
-            optionInfo.notional
+            IERC20Metadata(optionInfo.underlyingToken).decimals(),
+            true
         );
 
         // @dev: apply exercise fee to ensure equivalence between
@@ -337,10 +346,13 @@ contract Escrow is InitializableERC20, IEscrow {
             revert Errors.InvalidRepayAmount();
         }
         underlyingToken = optionInfo.underlyingToken;
-        unlockedCollateralAmount = _getCollateralAmount(
+
+        // @dev: round released collateral amount downwards
+        unlockedCollateralAmount = _getConversionAmount(
             optionInfo.strike,
             underlyingRepayAmount,
-            optionInfo.notional
+            IERC20Metadata(optionInfo.underlyingToken).decimals(),
+            false
         );
         // @dev: guaranteed to be performed safely by logical inference
         unchecked {
@@ -632,11 +644,21 @@ contract Escrow is InitializableERC20, IEscrow {
             });
     }
 
-    function _getCollateralAmount(
+    function _getConversionAmount(
         uint256 strike,
-        uint256 borrowOrRepayAmount,
-        uint256 notional
+        uint256 underlyingAmount,
+        uint256 underlyingTokenDecimals,
+        bool roundUp
     ) internal pure returns (uint256) {
-        return (strike * borrowOrRepayAmount) / notional;
+        uint256 result = (strike * underlyingAmount) /
+            10 ** underlyingTokenDecimals;
+        uint256 remainder = (strike * underlyingAmount) %
+            10 ** underlyingTokenDecimals;
+
+        if (roundUp && remainder > 0) {
+            return result + 1;
+        } else {
+            return result;
+        }
     }
 }

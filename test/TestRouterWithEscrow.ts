@@ -333,7 +333,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Exercise Call", function () {
-    it("should allow exercising a call option", async function () {
+    it("should allow exercising a call option (1/4)", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
         underlyingToken: String(underlyingToken.target),
         settlementToken: String(settlementToken.target),
@@ -394,6 +394,340 @@ describe("Router And Escrow Interaction", function () {
       ).to.emit(router, "Exercise");
     });
 
+    it("should allow exercising a call option (2/4)", async function () {
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const settlementTokenDecimals = await settlementToken.decimals();
+      const BASE = ethers.parseEther("1");
+      const tenor = 60 * 60 * 24 * 7;
+      const notionalAmount = ethers.parseUnits(
+        "1050000",
+        underlyingTokenDecimals
+      );
+      const strike = ethers.parseUnits("0.0824", settlementTokenDecimals);
+      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const rfqInitialization = await getRFQInitialization({
+        notionalAmount: notionalAmount,
+        strike: strike,
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("6674.757", settlementTokenDecimals),
+        borrowCap: BASE,
+        tenor: tenor,
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+
+      // Retrieve and return the created escrow instance
+      const numEscrows = await router.numEscrows();
+      const escrows = await router.getEscrows(numEscrows - 1n, 1);
+      const escrowAddress = escrows[0];
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+      const optionInfo = await escrow.optionInfo();
+      expect(optionInfo.strike).to.be.equal(strike);
+      expect(Number(optionInfo.expiry) - Number(currentTime)).to.be.closeTo(
+        tenor,
+        15
+      ); // Allowing a delta of 15 seconds
+
+      // Approve settlement token for exercise
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+
+      const expectedConversionAmount =
+        (notionalAmount * strike) / 10n ** underlyingTokenDecimals;
+
+      // Check pre balances
+      const preUndBalUser = await underlyingToken.balanceOf(user1.address);
+      const preSettlementBalUser = await settlementToken.balanceOf(
+        user1.address
+      );
+      const preUndBalOwner = await underlyingToken.balanceOf(owner.address);
+      const preSettlementBalOwner = await settlementToken.balanceOf(
+        owner.address
+      );
+      const preUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+      const preSettlementBalEscrow = await settlementToken.balanceOf(
+        escrow.target
+      );
+
+      // Exercise the call
+      await expect(
+        router.connect(user1).exercise(
+          escrowAddress,
+          user1.address,
+          notionalAmount,
+          true, // Pay in settlement token
+          []
+        )
+      ).to.emit(router, "Exercise");
+
+      // Check pre balances
+      const postUndBalUser = await underlyingToken.balanceOf(user1.address);
+      const postSettlementBalUser = await settlementToken.balanceOf(
+        user1.address
+      );
+      const postUndBalOwner = await underlyingToken.balanceOf(owner.address);
+      const postSettlementBalOwner = await settlementToken.balanceOf(
+        owner.address
+      );
+      const postUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+      const postSettlementBalEscrow = await settlementToken.balanceOf(
+        escrow.target
+      );
+
+      expect(postUndBalUser - preUndBalUser).to.be.equal(notionalAmount);
+      expect(preSettlementBalUser - postSettlementBalUser).to.be.equal(
+        expectedConversionAmount
+      );
+      expect(preUndBalOwner).to.be.equal(postUndBalOwner);
+      expect(postSettlementBalOwner - preSettlementBalOwner).to.be.equal(
+        expectedConversionAmount
+      );
+      expect(preUndBalEscrow - postUndBalEscrow).to.be.equal(notionalAmount);
+      expect(postSettlementBalEscrow).to.be.equal(preSettlementBalEscrow);
+    });
+
+    it("should allow exercising a call option - large notional and small strike (3/4)", async function () {
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const settlementTokenDecimals = await settlementToken.decimals();
+      const BASE = ethers.parseEther("1");
+      const tenor = 60 * 60 * 24 * 7;
+      const notionalAmount = ethers.parseUnits(
+        String(100000000 / 0.000001),
+        underlyingTokenDecimals
+      ); // 100m of pepe assuming pepe at $0.000001
+      const strike = ethers.parseUnits("0.000001", settlementTokenDecimals); // at-the-money strike
+      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const rfqInitialization = await getRFQInitialization({
+        notionalAmount: notionalAmount,
+        strike: strike,
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("4000000", settlementTokenDecimals),
+        borrowCap: BASE,
+        tenor: tenor,
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      const expectedConversionAmount =
+        (notionalAmount * strike) / 10n ** underlyingTokenDecimals;
+      await settlementToken.mint(
+        user1.address,
+        rfqInitialization.rfqQuote.premium + expectedConversionAmount
+      );
+      await underlyingToken.mint(owner.address, notionalAmount);
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+
+      // Retrieve and return the created escrow instance
+      const numEscrows = await router.numEscrows();
+      const escrows = await router.getEscrows(numEscrows - 1n, 1);
+      const escrowAddress = escrows[0];
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+      const optionInfo = await escrow.optionInfo();
+      expect(optionInfo.strike).to.be.equal(strike);
+      expect(Number(optionInfo.expiry) - Number(currentTime)).to.be.closeTo(
+        tenor,
+        15
+      ); // Allowing a delta of 15 seconds
+
+      // Approve settlement token for exercise
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+
+      // Check pre balances
+      const preUndBalUser = await underlyingToken.balanceOf(user1.address);
+      const preSettlementBalUser = await settlementToken.balanceOf(
+        user1.address
+      );
+      const preUndBalOwner = await underlyingToken.balanceOf(owner.address);
+      const preSettlementBalOwner = await settlementToken.balanceOf(
+        owner.address
+      );
+      const preUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+      const preSettlementBalEscrow = await settlementToken.balanceOf(
+        escrow.target
+      );
+
+      // Exercise the call
+      await expect(
+        router.connect(user1).exercise(
+          escrowAddress,
+          user1.address,
+          notionalAmount,
+          true, // Pay in settlement token
+          []
+        )
+      ).to.emit(router, "Exercise");
+
+      // Check pre balances
+      const postUndBalUser = await underlyingToken.balanceOf(user1.address);
+      const postSettlementBalUser = await settlementToken.balanceOf(
+        user1.address
+      );
+      const postUndBalOwner = await underlyingToken.balanceOf(owner.address);
+      const postSettlementBalOwner = await settlementToken.balanceOf(
+        owner.address
+      );
+      const postUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+      const postSettlementBalEscrow = await settlementToken.balanceOf(
+        escrow.target
+      );
+
+      expect(postUndBalUser - preUndBalUser).to.be.equal(notionalAmount);
+      expect(preSettlementBalUser - postSettlementBalUser).to.be.equal(
+        expectedConversionAmount
+      );
+      expect(preUndBalOwner).to.be.equal(postUndBalOwner);
+      expect(postSettlementBalOwner - preSettlementBalOwner).to.be.equal(
+        expectedConversionAmount
+      );
+      expect(preUndBalEscrow - postUndBalEscrow).to.be.equal(notionalAmount);
+      expect(postSettlementBalEscrow).to.be.equal(preSettlementBalEscrow);
+    });
+
+    it("should allow exercising a put option (4/4)", async function () {
+      const usdcDecimals = await settlementToken.decimals();
+      const undDecimals = await underlyingToken.decimals();
+
+      const BASE = ethers.parseEther("1");
+      const tenor = 60 * 60 * 24 * 7;
+      const notionalAmount = ethers.parseUnits("1000000", usdcDecimals);
+      const strike = ethers.parseUnits("0.00033333333", undDecimals);
+      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const rfqInitialization = await getRFQInitialization({
+        notionalAmount: notionalAmount,
+        strike: strike,
+        underlyingTokenAddress: String(settlementToken.target),
+        settlementTokenAddress: String(underlyingToken.target),
+        premium: ethers.parseUnits("60674.757", usdcDecimals),
+        borrowCap: BASE,
+        tenor: tenor,
+        premiumTokenIsUnderlying: true,
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await settlementToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+
+      // Retrieve and return the created escrow instance
+      const numEscrows = await router.numEscrows();
+      const escrows = await router.getEscrows(numEscrows - 1n, 1);
+      const escrowAddress = escrows[0];
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+      const optionInfo = await escrow.optionInfo();
+      expect(optionInfo.strike).to.be.equal(strike);
+      expect(Number(optionInfo.expiry) - Number(currentTime)).to.be.closeTo(
+        tenor,
+        15
+      ); // Allowing a delta of 15 seconds
+
+      // Approve settlement token for exercise
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+
+      const expectedConversionAmount =
+        (notionalAmount * strike) / 10n ** usdcDecimals;
+
+      // Check pre balances
+      const preUndBalUser = await settlementToken.balanceOf(user1.address);
+      const preSettlementBalUser = await underlyingToken.balanceOf(
+        user1.address
+      );
+      const preUndBalOwner = await settlementToken.balanceOf(owner.address);
+      const preSettlementBalOwner = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const preUndBalEscrow = await settlementToken.balanceOf(escrow.target);
+      const preSettlementBalEscrow = await underlyingToken.balanceOf(
+        escrow.target
+      );
+
+      // Exercise the call
+      await expect(
+        router.connect(user1).exercise(
+          escrowAddress,
+          user1.address,
+          notionalAmount,
+          true, // Pay in settlement token
+          []
+        )
+      ).to.emit(router, "Exercise");
+
+      // Check pre balances
+      const postUndBalUser = await settlementToken.balanceOf(user1.address);
+      const postSettlementBalUser = await underlyingToken.balanceOf(
+        user1.address
+      );
+      const postUndBalOwner = await settlementToken.balanceOf(owner.address);
+      const postSettlementBalOwner = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const postUndBalEscrow = await settlementToken.balanceOf(escrow.target);
+      const postSettlementBalEscrow = await underlyingToken.balanceOf(
+        escrow.target
+      );
+
+      expect(postUndBalUser - preUndBalUser).to.be.equal(notionalAmount);
+      expect(preSettlementBalUser - postSettlementBalUser).to.be.equal(
+        expectedConversionAmount
+      );
+      expect(preUndBalOwner).to.be.equal(postUndBalOwner);
+      expect(postSettlementBalOwner - preSettlementBalOwner).to.be.equal(
+        expectedConversionAmount
+      );
+      expect(preUndBalEscrow - postUndBalEscrow).to.be.equal(notionalAmount);
+      expect(postSettlementBalEscrow).to.be.equal(preSettlementBalEscrow);
+    });
+
     it("should revert if exercising before earliest exercise tenor", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
         underlyingToken: String(underlyingToken.target),
@@ -452,7 +786,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Borrow and Repay", function () {
-    it("should allow borrowing and repaying", async function () {
+    it("should allow borrowing and repaying (1/5)", async function () {
       const auctionInitialization: DataTypes.AuctionInitialization = {
         underlyingToken: String(underlyingToken.target),
         settlementToken: String(settlementToken.target),
@@ -496,12 +830,33 @@ describe("Router And Escrow Interaction", function () {
       await ethers.provider.send("evm_increaseTime", [86400 * 7]);
       await ethers.provider.send("evm_mine", []);
 
+      // Calculate expected collat amount
+      const optionInfo = await escrow.optionInfo();
+      const strike = optionInfo.strike;
+      const underlyingBorrowAmount = ethers.parseEther("10");
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const expectedCollatAmount =
+        (strike * underlyingBorrowAmount) / 10n ** underlyingTokenDecimals;
+
+      // Check pre balances
+      const preUndBal = await underlyingToken.balanceOf(user1.address);
+      const preSettlementBal = await settlementToken.balanceOf(user1.address);
+
       // Borrow underlying tokens
       await expect(
         router
           .connect(user1)
           .borrow(escrowAddress, user1.address, ethers.parseEther("10"))
       ).to.emit(router, "Borrow");
+
+      // Check pre balances
+      const postUndBal = await underlyingToken.balanceOf(user1.address);
+      const postSettlementBal = await settlementToken.balanceOf(user1.address);
+
+      expect(postUndBal - preUndBal).to.be.equal(underlyingBorrowAmount);
+      expect(preSettlementBal - postSettlementBal).to.be.equal(
+        expectedCollatAmount
+      );
 
       // Check borrowed amount
       expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
@@ -524,6 +879,651 @@ describe("Router And Escrow Interaction", function () {
       expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
         ethers.parseEther("0")
       );
+    });
+
+    it("should allow borrowing and repaying (2/5)", async function () {
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const settlementTokenDecimals = await settlementToken.decimals();
+      const BASE = ethers.parseEther("1");
+      const rfqInitialization = await getRFQInitialization({
+        notionalAmount: ethers.parseUnits("250000", underlyingTokenDecimals),
+        strike: ethers.parseUnits("0.45", settlementTokenDecimals),
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2500", settlementTokenDecimals),
+        borrowCap: BASE,
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+
+      // Retrieve and return the created escrow instance
+      const numEscrows = await router.numEscrows();
+      const escrows = await router.getEscrows(numEscrows - 1n, 1);
+      const escrowAddress = escrows[0];
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+
+      // Calculate expected collat amount
+      const optionInfo = await escrow.optionInfo();
+      const strike = optionInfo.strike;
+      const underlyingBorrowAmount = rfqInitialization.optionInfo.notional;
+      const expectedCollatAmount =
+        (strike * underlyingBorrowAmount) / 10n ** underlyingTokenDecimals;
+
+      // Check pre borrow balances
+      const preUndBal = await underlyingToken.balanceOf(user1.address);
+      const preSettlementBal = await settlementToken.balanceOf(user1.address);
+      const preSettlementBalEscrow = await settlementToken.balanceOf(
+        escrow.target
+      );
+
+      // Borrow underlying tokens
+      await expect(
+        router
+          .connect(user1)
+          .borrow(escrowAddress, user1.address, underlyingBorrowAmount)
+      ).to.emit(router, "Borrow");
+
+      // Check post borrow balances
+      const postUndBal = await underlyingToken.balanceOf(user1.address);
+      const postSettlementBal = await settlementToken.balanceOf(user1.address);
+      const postSettlementBalEscrow = await settlementToken.balanceOf(
+        escrow.target
+      );
+
+      expect(postUndBal - preUndBal).to.be.equal(underlyingBorrowAmount);
+      expect(preSettlementBal - postSettlementBal).to.be.equal(
+        expectedCollatAmount
+      );
+      expect(postSettlementBalEscrow - preSettlementBalEscrow).to.be.equal(
+        expectedCollatAmount
+      );
+
+      // Check escrow owner cannot withdraw collateral pre expiry
+      await expect(
+        escrow.handleWithdraw(
+          owner.address,
+          settlementToken.target,
+          expectedCollatAmount
+        )
+      ).to.be.reverted;
+
+      // Check borrowed amount
+      expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
+        underlyingBorrowAmount
+      );
+
+      // Approve underlying token for repayment
+      await underlyingToken
+        .connect(user1)
+        .approve(router.target, underlyingBorrowAmount);
+
+      // Check pre repay balances
+      const preUndBal2 = await underlyingToken.balanceOf(user1.address);
+      const preSettlementBal2 = await settlementToken.balanceOf(user1.address);
+
+      // Repay borrowed amount
+      await expect(
+        router
+          .connect(user1)
+          .repay(escrowAddress, user1.address, underlyingBorrowAmount)
+      ).to.emit(router, "Repay");
+
+      // Check post repay balances
+      const postUndBal2 = await underlyingToken.balanceOf(user1.address);
+      const postSettlementBal2 = await settlementToken.balanceOf(user1.address);
+
+      expect(preUndBal2 - postUndBal2).to.be.equal(underlyingBorrowAmount);
+      expect(postSettlementBal2 - preSettlementBal2).to.be.equal(
+        expectedCollatAmount
+      );
+
+      // Check borrowed amount after repayment
+      expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
+        ethers.parseEther("0")
+      );
+    });
+
+    it("should allow borrowing and repaying - partial borrow (3/5)", async function () {
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const settlementTokenDecimals = await settlementToken.decimals();
+      const BASE = ethers.parseEther("1");
+      const notional = ethers.parseUnits("250000", underlyingTokenDecimals);
+      const rfqInitialization = await getRFQInitialization({
+        notionalAmount: notional,
+        strike: ethers.parseUnits("0.45", settlementTokenDecimals),
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2500", settlementTokenDecimals),
+        borrowCap: BASE,
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+
+      // Retrieve and return the created escrow instance
+      const numEscrows = await router.numEscrows();
+      const escrows = await router.getEscrows(numEscrows - 1n, 1);
+      const escrowAddress = escrows[0];
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+
+      // Calculate expected collat amount
+      const optionInfo = await escrow.optionInfo();
+      const strike = optionInfo.strike;
+      const underlyingBorrowAmount =
+        (rfqInitialization.optionInfo.notional * 3n) / 10n; // partially borrow 30%
+      const expectedCollatAmount =
+        (strike * underlyingBorrowAmount) / 10n ** underlyingTokenDecimals;
+
+      // Check pre borrow balances
+      const preUndBal = await underlyingToken.balanceOf(user1.address);
+      const preSettlementBal = await settlementToken.balanceOf(user1.address);
+
+      // Borrow underlying tokens
+      await expect(
+        router
+          .connect(user1)
+          .borrow(escrowAddress, user1.address, underlyingBorrowAmount)
+      ).to.emit(router, "Borrow");
+
+      // Check post borrow balances
+      const postUndBal = await underlyingToken.balanceOf(user1.address);
+      const postSettlementBal = await settlementToken.balanceOf(user1.address);
+
+      expect(postUndBal - preUndBal).to.be.equal(underlyingBorrowAmount);
+      expect(preSettlementBal - postSettlementBal).to.be.equal(
+        expectedCollatAmount
+      );
+
+      // Check borrowed amount
+      expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
+        underlyingBorrowAmount
+      );
+
+      // Check owner cannot withdraw collateral amount pre expiry
+      await expect(
+        escrow.handleWithdraw(
+          owner.address,
+          settlementToken.target,
+          expectedCollatAmount
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidWithdraw");
+      await expect(
+        router.withdraw(
+          escrow.target,
+          owner.address,
+          settlementToken.target,
+          expectedCollatAmount
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidWithdraw");
+
+      // Check owner cannot withdraw remaining underlying amount pre expiry
+      await expect(
+        escrow.handleWithdraw(
+          owner.address,
+          underlyingToken.target,
+          notional - underlyingBorrowAmount
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidWithdraw");
+      await expect(
+        router.withdraw(
+          escrow.target,
+          owner.address,
+          underlyingToken.target,
+          notional - underlyingBorrowAmount
+        )
+      ).to.be.revertedWithCustomError(escrow, "InvalidWithdraw");
+
+      // Fast forward time to after expiry
+      const currentTime = (await provider.getBlock("latest")).timestamp;
+      await ethers.provider.send("evm_increaseTime", [
+        rfqInitialization.optionInfo.expiry - currentTime + 1,
+      ]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Check collateral balance in escrow
+      const preEscrowBal = await settlementToken.balanceOf(escrow.target);
+      expect(preEscrowBal).to.be.gt(0);
+      expect(preEscrowBal).to.be.equal(expectedCollatAmount);
+
+      // Check pre balances
+      const preOwnerBal = await settlementToken.balanceOf(owner.address);
+
+      // Check owner can withdraw collateral amount post expiry
+      await escrow.handleWithdraw(
+        owner.address,
+        settlementToken.target,
+        expectedCollatAmount
+      );
+
+      // Check owner can withdraw remaining underlying amount post expiry
+      await escrow.handleWithdraw(
+        owner.address,
+        underlyingToken.target,
+        notional - underlyingBorrowAmount
+      );
+
+      // Check post balances
+      const postEscrowBal = await settlementToken.balanceOf(escrow.target);
+      const postOwnerBal = await settlementToken.balanceOf(owner.address);
+
+      expect(postOwnerBal - preOwnerBal).to.be.equal(expectedCollatAmount);
+      expect(preEscrowBal - postEscrowBal).to.be.equal(expectedCollatAmount);
+    });
+
+    it("should allow borrowing and repaying - multiple times before expiry (4/5)", async function () {
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const settlementTokenDecimals = await settlementToken.decimals();
+      const BASE = ethers.parseEther("1");
+
+      const rfqInitialization = await getRFQInitialization({
+        notionalAmount: ethers.parseUnits("250000", underlyingTokenDecimals),
+        strike: ethers.parseUnits("0.45", settlementTokenDecimals),
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("2500", settlementTokenDecimals),
+        borrowCap: BASE,
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+
+      // Retrieve and attach the created escrow instance
+      const numEscrows = await router.numEscrows();
+      const escrows = await router.getEscrows(numEscrows - 1n, 1);
+      const escrowAddress = escrows[0];
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+
+      const optionInfo = await escrow.optionInfo();
+      const strike = optionInfo.strike;
+
+      // Partial borrow and repay amounts
+      const borrowAmounts = [
+        (rfqInitialization.optionInfo.notional * 5n) / 100n,
+        (rfqInitialization.optionInfo.notional * 10n) / 100n,
+        (rfqInitialization.optionInfo.notional * 15n) / 100n,
+        (rfqInitialization.optionInfo.notional * 20n) / 100n,
+        (rfqInitialization.optionInfo.notional * 25n) / 100n,
+        (rfqInitialization.optionInfo.notional * 30n) / 100n,
+        (rfqInitialization.optionInfo.notional * 35n) / 100n,
+        (rfqInitialization.optionInfo.notional * 40n) / 100n,
+        (rfqInitialization.optionInfo.notional * 45n) / 100n,
+        (rfqInitialization.optionInfo.notional * 50n) / 100n,
+        (rfqInitialization.optionInfo.notional * 55n) / 100n,
+        (rfqInitialization.optionInfo.notional * 60n) / 100n,
+        (rfqInitialization.optionInfo.notional * 65n) / 100n,
+        (rfqInitialization.optionInfo.notional * 70n) / 100n,
+        (rfqInitialization.optionInfo.notional * 75n) / 100n,
+        (rfqInitialization.optionInfo.notional * 80n) / 100n,
+        (rfqInitialization.optionInfo.notional * 85n) / 100n,
+        (rfqInitialization.optionInfo.notional * 90n) / 100n,
+        (rfqInitialization.optionInfo.notional * 95n) / 100n,
+        (rfqInitialization.optionInfo.notional * 100n) / 100n,
+      ];
+
+      for (const underlyingBorrowAmount of borrowAmounts) {
+        const expectedCollatAmount =
+          (strike * underlyingBorrowAmount) / 10n ** underlyingTokenDecimals;
+
+        // Check pre borrow balances
+        const preUndBal = await underlyingToken.balanceOf(user1.address);
+        const preSettlementBal = await settlementToken.balanceOf(user1.address);
+        const preUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+        const preSettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        await settlementToken
+          .connect(user1)
+          .approve(router.target, ethers.MaxUint256);
+
+        // Borrow underlying tokens
+        await expect(
+          router
+            .connect(user1)
+            .borrow(escrowAddress, user1.address, underlyingBorrowAmount)
+        ).to.emit(router, "Borrow");
+
+        // Check post borrow balances
+        const postUndBal = await underlyingToken.balanceOf(user1.address);
+        const postSettlementBal = await settlementToken.balanceOf(
+          user1.address
+        );
+        const postUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+        const postSettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        expect(postUndBal - preUndBal).to.be.equal(underlyingBorrowAmount);
+        expect(preSettlementBal - postSettlementBal).to.be.equal(
+          expectedCollatAmount
+        );
+        expect(preUndBalEscrow - postUndBalEscrow).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(postSettlementBalEscrow - preSettlementBalEscrow).to.be.equal(
+          expectedCollatAmount
+        );
+
+        // Check borrowed amount
+        expect(await escrow.totalBorrowed()).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(
+          await escrow.borrowedUnderlyingAmounts(user1.address)
+        ).to.be.equal(underlyingBorrowAmount);
+
+        // Check balances
+        const preRepayUndBal = await underlyingToken.balanceOf(user1.address);
+        const preRepaySettlementBal = await settlementToken.balanceOf(
+          user1.address
+        );
+        const preRepayUndBalEscrow = await underlyingToken.balanceOf(
+          escrow.target
+        );
+        const preRepaySettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        // Repay borrowed amount
+        await underlyingToken
+          .connect(user1)
+          .approve(router.target, ethers.MaxUint256);
+        await expect(
+          router
+            .connect(user1)
+            .repay(escrowAddress, user1.address, underlyingBorrowAmount)
+        ).to.emit(router, "Repay");
+
+        // Check balances after repayment
+        const postRepayUndBal = await underlyingToken.balanceOf(user1.address);
+        const postRepaySettlementBal = await settlementToken.balanceOf(
+          user1.address
+        );
+        const postRepayUndBalEscrow = await underlyingToken.balanceOf(
+          escrow.target
+        );
+        const postRepaySettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        expect(preRepayUndBal - postRepayUndBal).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(postRepaySettlementBal - preRepaySettlementBal).to.be.equal(
+          expectedCollatAmount
+        );
+        expect(postRepayUndBalEscrow - preRepayUndBalEscrow).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(
+          preRepaySettlementBalEscrow - postRepaySettlementBalEscrow
+        ).to.be.equal(expectedCollatAmount);
+      }
+
+      // Ensure this works before expiry
+      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const timeToExpiry = rfqInitialization.optionInfo.expiry - currentTime;
+      expect(timeToExpiry).to.be.greaterThan(0);
+
+      // Fast forward time to after expiry
+      await ethers.provider.send("evm_increaseTime", [timeToExpiry + 1]);
+      await ethers.provider.send("evm_mine", []);
+
+      for (const underlyingBorrowAmount of borrowAmounts) {
+        // Expect borrowing to revert
+        await expect(
+          router
+            .connect(user1)
+            .borrow(escrowAddress, user1.address, underlyingBorrowAmount)
+        ).to.be.revertedWithCustomError(escrow, "InvalidBorrowTime");
+      }
+    });
+
+    it("should allow borrowing and repaying - multiple times with large notional and small strike (5/5)", async function () {
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const settlementTokenDecimals = await settlementToken.decimals();
+      const BASE = ethers.parseEther("1");
+      const tenor = 60 * 60 * 24 * 7;
+      const notionalAmount = ethers.parseUnits(
+        String(100000000 / 0.000001),
+        underlyingTokenDecimals
+      ); // 100m of pepe assuming pepe at $0.000001
+      const strike = ethers.parseUnits("0.000001", settlementTokenDecimals); // at-the-money strike
+      const rfqInitialization = await getRFQInitialization({
+        notionalAmount: notionalAmount,
+        strike: strike,
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        premium: ethers.parseUnits("4000000", settlementTokenDecimals),
+        borrowCap: BASE,
+        tenor: tenor,
+      });
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await user1.signMessage(ethers.getBytes(payloadHash));
+      rfqInitialization.rfqQuote.signature = signature;
+
+      const expectedMaxCollatAmount =
+        (strike * notionalAmount) / 10n ** underlyingTokenDecimals;
+
+      await underlyingToken.mint(owner.address, notionalAmount);
+      await settlementToken.mint(
+        user1.address,
+        expectedMaxCollatAmount + rfqInitialization.rfqQuote.premium
+      );
+
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.MaxUint256);
+      await underlyingToken
+        .connect(owner)
+        .approve(router.target, ethers.MaxUint256);
+
+      await expect(
+        router
+          .connect(owner)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+      ).to.emit(router, "TakeQuote");
+
+      // Retrieve and attach the created escrow instance
+      const numEscrows = await router.numEscrows();
+      const escrows = await router.getEscrows(numEscrows - 1n, 1);
+      const escrowAddress = escrows[0];
+      const EscrowImpl = await ethers.getContractFactory("Escrow");
+      const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
+
+      const optionInfo = await escrow.optionInfo();
+
+      // Partial borrow and repay amounts
+      const borrowAmounts = [
+        (rfqInitialization.optionInfo.notional * 5n) / 100n,
+        (rfqInitialization.optionInfo.notional * 10n) / 100n,
+        (rfqInitialization.optionInfo.notional * 15n) / 100n,
+        (rfqInitialization.optionInfo.notional * 20n) / 100n,
+        (rfqInitialization.optionInfo.notional * 25n) / 100n,
+        (rfqInitialization.optionInfo.notional * 30n) / 100n,
+        (rfqInitialization.optionInfo.notional * 35n) / 100n,
+        (rfqInitialization.optionInfo.notional * 40n) / 100n,
+        (rfqInitialization.optionInfo.notional * 45n) / 100n,
+        (rfqInitialization.optionInfo.notional * 50n) / 100n,
+        (rfqInitialization.optionInfo.notional * 55n) / 100n,
+        (rfqInitialization.optionInfo.notional * 60n) / 100n,
+        (rfqInitialization.optionInfo.notional * 65n) / 100n,
+        (rfqInitialization.optionInfo.notional * 70n) / 100n,
+        (rfqInitialization.optionInfo.notional * 75n) / 100n,
+        (rfqInitialization.optionInfo.notional * 80n) / 100n,
+        (rfqInitialization.optionInfo.notional * 85n) / 100n,
+        (rfqInitialization.optionInfo.notional * 90n) / 100n,
+        (rfqInitialization.optionInfo.notional * 95n) / 100n,
+        (rfqInitialization.optionInfo.notional * 100n) / 100n,
+      ];
+
+      for (const underlyingBorrowAmount of borrowAmounts) {
+        const expectedCollatAmount =
+          (strike * underlyingBorrowAmount) / 10n ** underlyingTokenDecimals;
+
+        // Check pre borrow balances
+        const preUndBal = await underlyingToken.balanceOf(user1.address);
+        const preSettlementBal = await settlementToken.balanceOf(user1.address);
+        const preUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+        const preSettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        await settlementToken
+          .connect(user1)
+          .approve(router.target, ethers.MaxUint256);
+
+        // Borrow underlying tokens
+        await expect(
+          router
+            .connect(user1)
+            .borrow(escrowAddress, user1.address, underlyingBorrowAmount)
+        ).to.emit(router, "Borrow");
+
+        // Check post borrow balances
+        const postUndBal = await underlyingToken.balanceOf(user1.address);
+        const postSettlementBal = await settlementToken.balanceOf(
+          user1.address
+        );
+        const postUndBalEscrow = await underlyingToken.balanceOf(escrow.target);
+        const postSettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        expect(postUndBal - preUndBal).to.be.equal(underlyingBorrowAmount);
+        expect(preSettlementBal - postSettlementBal).to.be.equal(
+          expectedCollatAmount
+        );
+        expect(preUndBalEscrow - postUndBalEscrow).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(postSettlementBalEscrow - preSettlementBalEscrow).to.be.equal(
+          expectedCollatAmount
+        );
+
+        // Check borrowed amount
+        expect(await escrow.totalBorrowed()).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(
+          await escrow.borrowedUnderlyingAmounts(user1.address)
+        ).to.be.equal(underlyingBorrowAmount);
+
+        // Check balances
+        const preRepayUndBal = await underlyingToken.balanceOf(user1.address);
+        const preRepaySettlementBal = await settlementToken.balanceOf(
+          user1.address
+        );
+        const preRepayUndBalEscrow = await underlyingToken.balanceOf(
+          escrow.target
+        );
+        const preRepaySettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        // Repay borrowed amount
+        await underlyingToken
+          .connect(user1)
+          .approve(router.target, ethers.MaxUint256);
+        await expect(
+          router
+            .connect(user1)
+            .repay(escrowAddress, user1.address, underlyingBorrowAmount)
+        ).to.emit(router, "Repay");
+
+        // Check balances after repayment
+        const postRepayUndBal = await underlyingToken.balanceOf(user1.address);
+        const postRepaySettlementBal = await settlementToken.balanceOf(
+          user1.address
+        );
+        const postRepayUndBalEscrow = await underlyingToken.balanceOf(
+          escrow.target
+        );
+        const postRepaySettlementBalEscrow = await settlementToken.balanceOf(
+          escrow.target
+        );
+
+        expect(preRepayUndBal - postRepayUndBal).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(postRepaySettlementBal - preRepaySettlementBal).to.be.equal(
+          expectedCollatAmount
+        );
+        expect(postRepayUndBalEscrow - preRepayUndBalEscrow).to.be.equal(
+          underlyingBorrowAmount
+        );
+        expect(
+          preRepaySettlementBalEscrow - postRepaySettlementBalEscrow
+        ).to.be.equal(expectedCollatAmount);
+      }
+
+      // Ensure this works before expiry
+      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const timeToExpiry = rfqInitialization.optionInfo.expiry - currentTime;
+      expect(timeToExpiry).to.be.greaterThan(0);
+
+      // Fast forward time to after expiry
+      await ethers.provider.send("evm_increaseTime", [timeToExpiry + 1]);
+      await ethers.provider.send("evm_mine", []);
+
+      for (const underlyingBorrowAmount of borrowAmounts) {
+        // Expect borrowing to revert
+        await expect(
+          router
+            .connect(user1)
+            .borrow(escrowAddress, user1.address, underlyingBorrowAmount)
+        ).to.be.revertedWithCustomError(escrow, "InvalidBorrowTime");
+      }
     });
 
     it("should revert if borrowing is not allowed", async function () {
