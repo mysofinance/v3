@@ -159,9 +159,9 @@ contract MysoPositionLib is IMysoPosition {
             uint256 underlyingTokenBalance = IERC20Metadata(underlyingToken)
                 .balanceOf(escrows[i]);
 
-            // check case a) - unmatched auction
+            // check case a) - unmatched auction (option not minted yet)
             bool isOptionMinted = Escrow(escrows[i]).optionMinted();
-            if (isOptionMinted) {
+            if (!isOptionMinted) {
                 // mark as settled and sweep underlying tokens;
                 // settlement tokens can be skipped
                 _markAsClosedAndSweepEscrow(

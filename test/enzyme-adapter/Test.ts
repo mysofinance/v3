@@ -14,6 +14,61 @@ import {
   rfqSignaturePayload,
 } from "../helpers";
 
+/**
+ * Encodes RFQInitialization struct into ABI format.
+ *
+ * @param rfqInitialization - The RFQ initialization object containing optionInfo and rfqQuote.
+ * @param actionId - The action ID for the RFQ process (default is 0 for Take Quote).
+ * @returns Encoded action data ready for contract interaction.
+ */
+export function encodeRFQInitialization(
+  rfqInitialization: any,
+  actionId: number = 0
+): string {
+  const abiCoder = new ethers.AbiCoder();
+
+  // Define the ABI structure for the RFQInitialization struct
+  const rfqAbi = [
+    "tuple((address,uint48,address,uint48,uint128,uint128,(uint64,address,bool,bool,address)),(uint128,uint256,bytes,address))",
+  ];
+
+  // Encode the struct values
+  const encodedRfqInitialization = abiCoder.encode(rfqAbi, [
+    [
+      [
+        rfqInitialization.optionInfo.underlyingToken,
+        rfqInitialization.optionInfo.expiry,
+        rfqInitialization.optionInfo.settlementToken,
+        rfqInitialization.optionInfo.earliestExercise,
+        rfqInitialization.optionInfo.notional,
+        rfqInitialization.optionInfo.strike,
+        [
+          rfqInitialization.optionInfo.advancedSettings.borrowCap,
+          rfqInitialization.optionInfo.advancedSettings.oracle,
+          rfqInitialization.optionInfo.advancedSettings
+            .premiumTokenIsUnderlying,
+          rfqInitialization.optionInfo.advancedSettings.votingDelegationAllowed,
+          rfqInitialization.optionInfo.advancedSettings.allowedDelegateRegistry,
+        ],
+      ],
+      [
+        rfqInitialization.rfqQuote.premium,
+        rfqInitialization.rfqQuote.validUntil,
+        rfqInitialization.rfqQuote.signature,
+        rfqInitialization.rfqQuote.eip1271Maker,
+      ],
+    ],
+  ]);
+
+  // Wrap the action ID and encoded struct into a single payload
+  const actionData = abiCoder.encode(
+    ["uint256", "bytes"],
+    [ethers.toBigInt(actionId), encodedRfqInitialization]
+  );
+
+  return actionData;
+}
+
 describe("Router Contract", function () {
   let router: Router;
   let escrowImpl: Escrow;
@@ -213,47 +268,8 @@ describe("Router Contract", function () {
         .connect(mockEnzymeVault)
         .approve(mysoPositionLib.target, ethers.MaxUint256);
 
-      // Encode action data for RFQ initialization
-      const abiCoder = new ethers.AbiCoder();
-      const actionArgs = abiCoder.encode(
-        [
-          "tuple((address,uint48,address,uint48,uint128,uint128,(uint64,address,bool,bool,address)),(uint128,uint256,bytes,address))",
-        ],
-        [
-          [
-            [
-              rfqInitialization.optionInfo.underlyingToken,
-              rfqInitialization.optionInfo.expiry,
-              rfqInitialization.optionInfo.settlementToken,
-              rfqInitialization.optionInfo.earliestExercise,
-              rfqInitialization.optionInfo.notional,
-              rfqInitialization.optionInfo.strike,
-              [
-                rfqInitialization.optionInfo.advancedSettings.borrowCap,
-                rfqInitialization.optionInfo.advancedSettings.oracle,
-                rfqInitialization.optionInfo.advancedSettings
-                  .premiumTokenIsUnderlying,
-                rfqInitialization.optionInfo.advancedSettings
-                  .votingDelegationAllowed,
-                rfqInitialization.optionInfo.advancedSettings
-                  .allowedDelegateRegistry,
-              ],
-            ],
-            [
-              rfqInitialization.rfqQuote.premium,
-              rfqInitialization.rfqQuote.validUntil,
-              rfqInitialization.rfqQuote.signature,
-              rfqInitialization.rfqQuote.eip1271Maker,
-            ],
-          ],
-        ]
-      );
-
       // Wrap the action ID and encoded args into a single bytes payload
-      const actionData = abiCoder.encode(
-        ["uint256", "bytes"],
-        [ethers.toBigInt(0), actionArgs] // Action ID for RFQ/Take Quote 0
-      );
+      const actionData = encodeRFQInitialization(rfqInitialization, 0);
 
       // Call receiveCallFromVault to create an escrow via RFQ
       await expect(
@@ -276,11 +292,11 @@ describe("Router Contract", function () {
       await expect(mysoPositionLib.getManagedAssets()).to.be.reverted;
 
       // Prepare close and sweep action arguments
+      const abiCoder = new ethers.AbiCoder();
       const closeAndSweepActionArgs = abiCoder.encode(
         ["address[]"],
         [[escrows[0]]]
       );
-
       const closeAndSweepActionData = abiCoder.encode(
         ["uint256", "bytes"],
         [ethers.toBigInt(2), closeAndSweepActionArgs]
@@ -290,14 +306,13 @@ describe("Router Contract", function () {
         mysoPositionLib
           .connect(mockEnzymeVault)
           .receiveCallFromVault(closeAndSweepActionData)
-      ).to.be.revertedWithCustomError(escrowImpl, "InvalidWithdraw");
+      ).to.be.revertedWith("__closeAndSweepEscrow: Option hasn't expired yet");
 
       // Move forward in time post expiry
       const block = await ethers.provider.getBlock("latest");
       const blockTimestamp = block?.timestamp || new Date().getTime() / 1000;
       const moveForwardTime =
         Number(rfqInitialization.optionInfo.expiry) - blockTimestamp + 1;
-
       await ethers.provider.send("evm_increaseTime", [moveForwardTime]);
       await ethers.provider.send("evm_mine", []);
 
@@ -314,6 +329,386 @@ describe("Router Contract", function () {
           rfqInitialization.optionInfo.notional,
           settlementToken.target,
           0n
+        );
+
+      // Verify now no more open escrows
+      expect(await mysoPositionLib.getNumOpenEscrows()).to.equal(0);
+      expect(await mysoPositionLib.isEscrowClosed(escrows[0])).to.equal(true);
+
+      // Verify that calling getManagedAssets() now possible
+      await mysoPositionLib.getManagedAssets();
+    });
+
+    it("should handle 100% exercise scenario correctly", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await tradingFirm.signMessage(
+        ethers.getBytes(payloadHash)
+      );
+
+      // Trading firm approves to pay premium
+      await settlementToken
+        .connect(tradingFirm)
+        .approve(router.target, ethers.MaxUint256);
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Vault manager approves to pull underlying notional
+      await underlyingToken
+        .connect(mockEnzymeVault)
+        .approve(mysoPositionLib.target, ethers.MaxUint256);
+
+      // Wrap the action ID and encoded args into a single bytes payload
+      const actionData = encodeRFQInitialization(rfqInitialization, 0);
+
+      // Call receiveCallFromVault to create an escrow via RFQ
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(actionData)
+      ).to.emit(mysoPositionLib, "EscrowCreated");
+
+      // Get latest escrow
+      const escrows = await mysoPositionLib.getEscrowAddresses(0, 1);
+
+      // Trading firm exercise 100%
+      await router
+        .connect(tradingFirm)
+        .exercise(
+          escrows[0],
+          tradingFirm.address,
+          rfqInitialization.optionInfo.notional,
+          true,
+          []
+        );
+
+      // Check in case of 100% exercise vault manager can close and sweep prior to expiry
+      const abiCoder = new ethers.AbiCoder();
+      const closeAndSweepActionArgs = abiCoder.encode(
+        ["address[]"],
+        [[escrows[0]]]
+      );
+      const closeAndSweepActionData = abiCoder.encode(
+        ["uint256", "bytes"],
+        [ethers.toBigInt(2), closeAndSweepActionArgs]
+      );
+
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(closeAndSweepActionData)
+      )
+        .to.emit(mysoPositionLib, "EscrowClosedAndSweeped")
+        .withArgs(
+          escrows[0],
+          underlyingToken.target,
+          0n,
+          settlementToken.target,
+          0n
+        );
+
+      // Verify now no more open escrows
+      expect(await mysoPositionLib.getNumOpenEscrows()).to.equal(0);
+      expect(await mysoPositionLib.isEscrowClosed(escrows[0])).to.equal(true);
+
+      // Verify that calling getManagedAssets() now possible
+      await mysoPositionLib.getManagedAssets();
+    });
+
+    it("should handle partial exercise scenario correctly", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await tradingFirm.signMessage(
+        ethers.getBytes(payloadHash)
+      );
+
+      // Trading firm approves to pay premium
+      await settlementToken
+        .connect(tradingFirm)
+        .approve(router.target, ethers.MaxUint256);
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Vault manager approves to pull underlying notional
+      await underlyingToken
+        .connect(mockEnzymeVault)
+        .approve(mysoPositionLib.target, ethers.MaxUint256);
+
+      // Wrap the action ID and encoded args into a single bytes payload
+      const actionData = encodeRFQInitialization(rfqInitialization, 0);
+
+      // Call receiveCallFromVault to create an escrow via RFQ
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(actionData)
+      ).to.emit(mysoPositionLib, "EscrowCreated");
+
+      // Get latest escrow
+      const escrows = await mysoPositionLib.getEscrowAddresses(0, 1);
+
+      // Trading firm exercise 50%
+      await router
+        .connect(tradingFirm)
+        .exercise(
+          escrows[0],
+          tradingFirm.address,
+          rfqInitialization.optionInfo.notional / 2n,
+          true,
+          []
+        );
+
+      // Check in case of partial exercise vault manager cannot close and sweep prior to expiry
+      const abiCoder = new ethers.AbiCoder();
+      const closeAndSweepActionArgs = abiCoder.encode(
+        ["address[]"],
+        [[escrows[0]]]
+      );
+      const closeAndSweepActionData = abiCoder.encode(
+        ["uint256", "bytes"],
+        [ethers.toBigInt(2), closeAndSweepActionArgs]
+      );
+
+      // Should fail
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(closeAndSweepActionData)
+      ).to.be.reverted;
+
+      // Move forward in time post expiry
+      const block = await ethers.provider.getBlock("latest");
+      const blockTimestamp = block?.timestamp || new Date().getTime() / 1000;
+      const moveForwardTime =
+        Number(rfqInitialization.optionInfo.expiry) - blockTimestamp + 1;
+      await ethers.provider.send("evm_increaseTime", [moveForwardTime]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Closing and sweeping post expiry should work
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(closeAndSweepActionData)
+      )
+        .to.emit(mysoPositionLib, "EscrowClosedAndSweeped")
+        .withArgs(
+          escrows[0],
+          underlyingToken.target,
+          rfqInitialization.optionInfo.notional / 2n,
+          settlementToken.target,
+          0n
+        );
+
+      // Verify now no more open escrows
+      expect(await mysoPositionLib.getNumOpenEscrows()).to.equal(0);
+      expect(await mysoPositionLib.isEscrowClosed(escrows[0])).to.equal(true);
+
+      // Verify that calling getManagedAssets() now possible
+      await mysoPositionLib.getManagedAssets();
+    });
+
+    it("should handle 100% borrow w/o repay scenario correctly", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        borrowCap: ethers.parseEther("1"), // 100% borrow cap
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await tradingFirm.signMessage(
+        ethers.getBytes(payloadHash)
+      );
+
+      // Trading firm approves to pay premium
+      await settlementToken
+        .connect(tradingFirm)
+        .approve(router.target, ethers.MaxUint256);
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Vault manager approves to pull underlying notional
+      await underlyingToken
+        .connect(mockEnzymeVault)
+        .approve(mysoPositionLib.target, ethers.MaxUint256);
+
+      // Wrap the action ID and encoded args into a single bytes payload
+      const actionData = encodeRFQInitialization(rfqInitialization, 0);
+
+      // Call receiveCallFromVault to create an escrow via RFQ
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(actionData)
+      ).to.emit(mysoPositionLib, "EscrowCreated");
+
+      // Get latest escrow
+      const escrows = await mysoPositionLib.getEscrowAddresses(0, 1);
+
+      // Trading firm borrows 100%
+      await router
+        .connect(tradingFirm)
+        .borrow(
+          escrows[0],
+          tradingFirm.address,
+          rfqInitialization.optionInfo.notional
+        );
+
+      // Check in case of borrow vault manager cannot close and sweep prior to expiry
+      const abiCoder = new ethers.AbiCoder();
+      const closeAndSweepActionArgs = abiCoder.encode(
+        ["address[]"],
+        [[escrows[0]]]
+      );
+      const closeAndSweepActionData = abiCoder.encode(
+        ["uint256", "bytes"],
+        [ethers.toBigInt(2), closeAndSweepActionArgs]
+      );
+
+      // Should fail
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(closeAndSweepActionData)
+      ).to.be.reverted;
+
+      // Move forward in time post expiry
+      const block = await ethers.provider.getBlock("latest");
+      const blockTimestamp = block?.timestamp || new Date().getTime() / 1000;
+      const moveForwardTime =
+        Number(rfqInitialization.optionInfo.expiry) - blockTimestamp + 1;
+      await ethers.provider.send("evm_increaseTime", [moveForwardTime]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Closing and sweeping post expiry should work
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const expectedSettlementTokenSweep =
+        (rfqInitialization.optionInfo.strike *
+          rfqInitialization.optionInfo.notional) /
+        10n ** underlyingTokenDecimals;
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(closeAndSweepActionData)
+      )
+        .to.emit(mysoPositionLib, "EscrowClosedAndSweeped")
+        .withArgs(
+          escrows[0],
+          underlyingToken.target,
+          0n,
+          settlementToken.target,
+          expectedSettlementTokenSweep
+        );
+
+      // Verify now no more open escrows
+      expect(await mysoPositionLib.getNumOpenEscrows()).to.equal(0);
+      expect(await mysoPositionLib.isEscrowClosed(escrows[0])).to.equal(true);
+
+      // Verify that calling getManagedAssets() now possible
+      await mysoPositionLib.getManagedAssets();
+    });
+
+    it("should handle partial borrow w/o repay scenario correctly", async function () {
+      const rfqInitialization = await getRFQInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        borrowCap: ethers.parseEther("1"), // 100% borrow cap
+      });
+
+      const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
+      const signature = await tradingFirm.signMessage(
+        ethers.getBytes(payloadHash)
+      );
+
+      // Trading firm approves to pay premium
+      await settlementToken
+        .connect(tradingFirm)
+        .approve(router.target, ethers.MaxUint256);
+      rfqInitialization.rfqQuote.signature = signature;
+
+      // Vault manager approves to pull underlying notional
+      await underlyingToken
+        .connect(mockEnzymeVault)
+        .approve(mysoPositionLib.target, ethers.MaxUint256);
+
+      // Wrap the action ID and encoded args into a single bytes payload
+      const actionData = encodeRFQInitialization(rfqInitialization, 0);
+
+      // Call receiveCallFromVault to create an escrow via RFQ
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(actionData)
+      ).to.emit(mysoPositionLib, "EscrowCreated");
+
+      // Get latest escrow
+      const escrows = await mysoPositionLib.getEscrowAddresses(0, 1);
+
+      // Trading firm borrows 50%
+      await router
+        .connect(tradingFirm)
+        .borrow(
+          escrows[0],
+          tradingFirm.address,
+          rfqInitialization.optionInfo.notional / 2n
+        );
+
+      // Check in case of borrow vault manager cannot close and sweep prior to expiry
+      const abiCoder = new ethers.AbiCoder();
+      const closeAndSweepActionArgs = abiCoder.encode(
+        ["address[]"],
+        [[escrows[0]]]
+      );
+      const closeAndSweepActionData = abiCoder.encode(
+        ["uint256", "bytes"],
+        [ethers.toBigInt(2), closeAndSweepActionArgs]
+      );
+
+      // Should fail
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(closeAndSweepActionData)
+      ).to.be.reverted;
+
+      // Move forward in time post expiry
+      const block = await ethers.provider.getBlock("latest");
+      const blockTimestamp = block?.timestamp || new Date().getTime() / 1000;
+      const moveForwardTime =
+        Number(rfqInitialization.optionInfo.expiry) - blockTimestamp + 1;
+      await ethers.provider.send("evm_increaseTime", [moveForwardTime]);
+      await ethers.provider.send("evm_mine", []);
+
+      // Closing and sweeping post expiry should work
+      // @dev: since trading firm only partially borrowed the escrow
+      // will have two relevant balances, i.e., 50% of non-borrowed and
+      // non-exercised underlying tokens and settlement tokens left as
+      // collateral but not reclaimed as borrowed amount was not repaid
+      // before expiry
+      const underlyingTokenDecimals = await underlyingToken.decimals();
+      const expectedUnderlyingTokenSweep =
+        rfqInitialization.optionInfo.notional / 2n;
+      const expectedSettlementTokenSweep =
+        (rfqInitialization.optionInfo.strike *
+          rfqInitialization.optionInfo.notional) /
+        2n /
+        10n ** underlyingTokenDecimals;
+      await expect(
+        mysoPositionLib
+          .connect(mockEnzymeVault)
+          .receiveCallFromVault(closeAndSweepActionData)
+      )
+        .to.emit(mysoPositionLib, "EscrowClosedAndSweeped")
+        .withArgs(
+          escrows[0],
+          underlyingToken.target,
+          expectedUnderlyingTokenSweep,
+          settlementToken.target,
+          expectedSettlementTokenSweep
         );
 
       // Verify now no more open escrows
