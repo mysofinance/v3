@@ -14,9 +14,8 @@ contract MysoPositionLib is IMysoPosition {
     address private immutable MYSO_ROUTER;
 
     address[] private _escrows;
-    address[] private _assets;
-    mapping(address => bool) private _isAsset;
-    mapping(address => uint256) private _assetIdx;
+    uint256 private _numOpenEscrows;
+    mapping(address => bool) private _escrowClosed;
 
     constructor(address mysoRouter) {
         require(mysoRouter != address(0), "Invalid router address");
@@ -36,36 +35,37 @@ contract MysoPositionLib is IMysoPosition {
         );
 
         if (actionId == uint256(Actions.TakeQuote)) {
-            __takeQuote(actionArgs);
+            __createEscrowByTakingQuote(actionArgs);
         } else if (actionId == uint256(Actions.CreateAuction)) {
-            __createAuction(actionArgs);
+            __createEscrowByStartingAuction(actionArgs);
+        } else if (actionId == uint256(Actions.CloseAndSweep)) {
+            __closeAndSweepEscrows(actionArgs);
         } else if (actionId == uint256(Actions.Withdraw)) {
-            __withdraw(actionArgs);
+            __withdrawStuckTokens(actionArgs);
         } else {
             revert("receiveCallFromVault: Invalid actionId");
         }
     }
 
-    /// @notice Takes a quote and writes an option
+    /// @notice Creates an escrow by taking a quote and writing an option
     /// @param actionArgs Encoded arguments containing RFQ initialization data
-    function __takeQuote(bytes memory actionArgs) private {
+    function __createEscrowByTakingQuote(bytes memory actionArgs) private {
         DataTypes.RFQInitialization memory rfqInitialization = abi.decode(
             actionArgs,
             (DataTypes.RFQInitialization)
         );
 
-        uint256 numAssets = _assets.length;
-
-        // Add underlying token if not already in the list
-        numAssets = _addAsset(
-            rfqInitialization.optionInfo.underlyingToken,
-            numAssets
-        );
-
-        // Add settlement token if not already in the list
-        numAssets = _addAsset(
-            rfqInitialization.optionInfo.settlementToken,
-            numAssets
+        // @dev: pull notional amount to this contract
+        IERC20Metadata(rfqInitialization.optionInfo.underlyingToken)
+            .safeTransferFrom(
+                msg.sender,
+                address(this),
+                rfqInitialization.optionInfo.notional
+            );
+        // @dev: approve router to pull notional amount from this contract
+        IERC20Metadata(rfqInitialization.optionInfo.underlyingToken).approve(
+            MYSO_ROUTER,
+            rfqInitialization.optionInfo.notional
         );
 
         // @dev: set External Position (EP) as escrow owner
@@ -75,20 +75,27 @@ contract MysoPositionLib is IMysoPosition {
             address(0)
         );
 
-        _addLatestEscrow();
+        // @dev: keep track of escrows and number of open/unsettled escrows
+        _addLatestEscrow(
+            rfqInitialization.optionInfo.underlyingToken,
+            rfqInitialization.optionInfo.notional,
+            false
+        );
     }
 
-    /// @notice Creates a new auction to write an option
+    /// @notice Creates a escrow by starting new auction to write an option
     /// @param actionArgs Encoded arguments containing auction initialization data
-    function __createAuction(bytes memory actionArgs) private {
+    function __createEscrowByStartingAuction(bytes memory actionArgs) private {
         DataTypes.AuctionInitialization memory auctionInitialization = abi
             .decode(actionArgs, (DataTypes.AuctionInitialization));
 
-        IERC20Metadata(auctionInitialization.underlyingToken).transferFrom(
+        // @dev: approve router to pull notional amount from this contract
+        IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
             msg.sender,
             address(this),
             auctionInitialization.notional
         );
+        // @dev: approve router to pull notional amount from this contract
         IERC20Metadata(auctionInitialization.underlyingToken).approve(
             MYSO_ROUTER,
             auctionInitialization.notional
@@ -101,12 +108,116 @@ contract MysoPositionLib is IMysoPosition {
             address(0)
         );
 
-        _addLatestEscrow();
+        // @dev: keep track of escrows and number of open/unsettled escrows
+        _addLatestEscrow(
+            auctionInitialization.underlyingToken,
+            auctionInitialization.notional,
+            true
+        );
     }
 
-    /// @notice Withdraws tokens from escrows
+    /// @notice Close open escrows and sweeps any related balances
+    /// @param actionArgs Encoded arguments containing escrows to close and sweep
+    function __closeAndSweepEscrows(bytes memory actionArgs) private {
+        // @dev: vault manager needs to close escrows individually
+        // note: high level there are three cases to consider:
+        // a) cancel auction: vault manager cancels auction before any match
+        // -> vault manager needs to mark escrow as closed; can do that any time before match
+        // -> in this case underlying tokens need to be swept
+        // b) early "full" exercise: trading firm exercises all option tokens
+        // -> vault manager needs to mark escrow as closed; can do that any time
+        // -> in this case no tokens need to be swept because conversion is automatically
+        // sent to escrow owner / vault manager upon exercise
+        // c) in all other cases: trading firm didn't (fully) exercise option
+        // -> vault manager needs to mark escrow as closed after expiry
+        // -> in this case underlying tokens and settlement tokens need to be swept;
+        // underlying tokens may be related to left-overs from only partial exercise;
+        // settlement tokens may be related to unclaimed collateral from borrows w/o repay;
+        // note: case c) includes following "sub-scenarios":
+        // c.i) option expired out-of-the-money: trading firm didn't exercise at all
+        // c.ii) partial exercise: trading firm partially exercised
+        // c.iii) borrow without repay: trading firm borrowed (part of) underlying but
+        // didn't repay before expiry
+
+        address[] memory escrows = abi.decode(actionArgs, (address[]));
+
+        require(
+            escrows.length > 0,
+            "__closeAndSweepEscrows: Input array must not be empty"
+        );
+        for (uint256 i = 0; i < escrows.length; i++) {
+            // @dev: retrieve relevant token addresses for sweeping
+            (
+                address underlyingToken,
+                uint256 expiry,
+                address settlementToken,
+                ,
+                ,
+                ,
+
+            ) = Escrow(escrows[i]).optionInfo();
+            uint256 underlyingTokenBalance = IERC20Metadata(underlyingToken)
+                .balanceOf(escrows[i]);
+
+            // check case a) - unmatched auction
+            bool isOptionMinted = Escrow(escrows[i]).optionMinted();
+            if (isOptionMinted) {
+                // mark as settled and sweep underlying tokens;
+                // settlement tokens can be skipped
+                _markAsClosedAndSweepEscrow(
+                    escrows[i],
+                    underlyingToken,
+                    underlyingTokenBalance,
+                    settlementToken,
+                    0
+                );
+                continue;
+            }
+
+            // check case b) - full exercise iff:
+            // option token supply == 0 and total borrows == 0
+            uint256 optionTokenSupply = IERC20Metadata(escrows[i])
+                .totalSupply();
+            uint256 totalBorrowed = Escrow(escrows[i]).totalBorrowed();
+            if (optionTokenSupply == 0 && totalBorrowed == 0) {
+                // mark as settled; no sweeping needed as conversion amount
+                // must've been sent to escrow.owner / vault manager already
+                _markAsClosedAndSweepEscrow(
+                    escrows[i],
+                    underlyingToken,
+                    0,
+                    settlementToken,
+                    0
+                );
+                continue;
+            }
+
+            // check case c) - all other cases:
+            // need to check if option already expired; otherwise revert as
+            // we cannot withdraw yet
+            uint256 settlementTokenBalance = IERC20Metadata(settlementToken)
+                .balanceOf(escrows[i]);
+            require(
+                block.timestamp > expiry,
+                "__closeAndSweepEscrow: Option hasn't expired yet"
+            );
+            _markAsClosedAndSweepEscrow(
+                escrows[i],
+                underlyingToken,
+                underlyingTokenBalance,
+                settlementToken,
+                settlementTokenBalance
+            );
+        }
+    }
+
+    /// @notice Withdraws potentially stuck tokens from escrows
     /// @param actionArgs Encoded arguments containing escrow addresses, token addresses, and amounts
-    function __withdraw(bytes memory actionArgs) private {
+    function __withdrawStuckTokens(bytes memory actionArgs) private {
+        // @dev: allow vault manager to withdraw generic coins if needed
+        // note: generic withdrawing will not mark given escrows as closed,
+        // in which case getManagedAssets() will continue to fail if given
+        // escrows are not explicitly closed via __closeAndSweepEscrow()
         (
             address[] memory escrows,
             address[] memory tokens,
@@ -125,6 +236,7 @@ contract MysoPositionLib is IMysoPosition {
                 tokens[i],
                 amounts[i]
             );
+            emit WithdrawFromEscrow(escrows[i], tokens[i], amounts[i]);
         }
     }
 
@@ -141,47 +253,24 @@ contract MysoPositionLib is IMysoPosition {
         override
         returns (address[] memory assets_, uint256[] memory amounts_)
     {
-        assets_ = _assets;
-        amounts_ = new uint256[](_assets.length);
-
-        // @dev: bounding of escrow length intentionally skipped
-        for (uint256 i; i < _escrows.length; i++) {
-            address _escrow = _escrows[i];
-
-            require(
-                allowNavCalculation(_escrow),
-                "getManagedAssets: NAV calculation disallowed"
-            );
-
-            (
-                address underlyingToken,
-                ,
-                address settlementToken,
-                ,
-                ,
-                ,
-
-            ) = Escrow(_escrow).optionInfo();
-            amounts_[_assetIdx[underlyingToken]] += IERC20Metadata(
-                underlyingToken
-            ).balanceOf(_escrow);
-            amounts_[_assetIdx[settlementToken]] += IERC20Metadata(
-                settlementToken
-            ).balanceOf(_escrow);
-        }
-
-        return (assets_, amounts_);
+        // @dev: check if vault manager has open escrows, in which case fair value
+        // calculation is non-deterministic and not supported;
+        require(
+            _numOpenEscrows == 0,
+            "getManagedAssets: Must not have open escrows"
+        );
+        // else return empty list as all assets are with vault manager already;
+        return (new address[](0), new uint256[](0));
     }
 
     function getDebtAssets()
         external
-        view
+        pure
         override
         returns (address[] memory assets_, uint256[] memory amounts_)
     {
-        assets_ = _assets;
-        amounts_ = new uint256[](_assets.length);
-        return (assets_, amounts_);
+        // @dev: no debt assets to track
+        return (new address[](0), new uint256[](0));
     }
 
     ///////////////////
@@ -194,6 +283,18 @@ contract MysoPositionLib is IMysoPosition {
         return _escrows.length;
     }
 
+    /// @notice Retrieves the number of open escrows
+    /// @return The total number of open escrows managed by this contract
+    function getNumOpenEscrows() external view returns (uint256) {
+        return _numOpenEscrows;
+    }
+
+    /// @notice Retrieves if escrow is closed
+    /// @return Boolean flag if escrow is closed
+    function isEscrowClosed(address escrow) external view returns (bool) {
+        return _escrowClosed[escrow];
+    }
+
     /// @notice Retrieves the escrow addresses within the specified range
     /// @param from Starting index
     /// @param numElements Number of escrow addresses to retrieve
@@ -204,7 +305,7 @@ contract MysoPositionLib is IMysoPosition {
     ) external view returns (address[] memory _escrowArray) {
         uint256 length = _escrows.length;
         require(
-            numElements != 0 && from + numElements <= length,
+            numElements > 0 && from + numElements <= length,
             "getEscrowAddresses: Invalid range"
         );
 
@@ -214,72 +315,76 @@ contract MysoPositionLib is IMysoPosition {
         }
     }
 
-    function allowNavCalculation(address escrow) public view returns (bool) {
-        // @dev: note if there's an unmatched/in progress auction
-        // (=no minted option) then we disallow NAV calculation
-        // to automatically prevent deposits during this time which
-        // otherwise could potentially dilute early depositors
-        if (!Escrow(escrow).optionMinted()) {
-            return false;
-        }
-
-        // @dev: two cases where we support NAV calculation
-
-        // case 1 - option was exercised: this is the case if
-        // option minted but option supply is 0 (and no open borrows)
-        if (
-            IERC20Metadata(escrow).totalSupply() == 0 &&
-            Escrow(escrow).totalBorrowed() == 0
-        ) {
-            return true;
-        }
-
-        // case 2 - option expired unexercised: this is the
-        // case if option minted but expired
-        (, uint256 expiry, , , , , ) = Escrow(escrow).optionInfo();
-        if (block.timestamp > expiry) {
-            return true;
-        }
-
-        return false;
-    }
-
     //////////////////////
     // INTERNAL HELPERS //
     //////////////////////
 
-    /// @notice Adds a token to the assets list if not already present
-    /// @param token Address of the token to add
-    /// @param numAssets Current number of assets
-    /// @return Updated number of assets
-    function _addAsset(
-        address token,
-        uint256 numAssets
-    ) internal returns (uint256) {
-        if (!_isAsset[token]) {
-            _isAsset[token] = true;
-            _assets.push(token);
-
-            numAssets += 1;
-
-            _assetIdx[token] = numAssets - 1;
-            emit AssetAdded(token);
-        }
-        return numAssets;
-    }
-
-    function _addLatestEscrow() internal {
+    function _addLatestEscrow(
+        address underlyingToken,
+        uint256 underlyingAmount,
+        bool isAuction
+    ) internal {
         uint256 numEscrows = IRouter(MYSO_ROUTER).numEscrows();
         if (numEscrows > 0) {
+            // @dev: increment number of open escrows
+            _numOpenEscrows += 1;
+            // get latest escrow and push to internal list
             address[] memory newEscrowAddr = IRouter(MYSO_ROUTER).getEscrows(
                 numEscrows - 1,
                 1
             );
-
-            // @dev: bounding of escrow length intentionally skipped
             _escrows.push(newEscrowAddr[0]);
 
-            emit EscrowAdded(newEscrowAddr[0]);
+            emit EscrowCreated(
+                newEscrowAddr[0],
+                underlyingToken,
+                underlyingAmount,
+                isAuction
+            );
         }
+    }
+
+    function _markAsClosedAndSweepEscrow(
+        address escrow,
+        address underlyingToken,
+        uint256 underlyingTokenBalance,
+        address settlementToken,
+        uint256 settlementTokenBalance
+    ) internal {
+        require(
+            !_escrowClosed[escrow],
+            "_markAsClosedAndSweepEscrow: Escrow already closed"
+        );
+        // @dev: mark escrow as closed and decrement
+        // number of open escrows
+        _escrowClosed[escrow] = true;
+        _numOpenEscrows -= 1;
+
+        // sweep any underlying token balances
+        if (underlyingTokenBalance > 0) {
+            IRouter(MYSO_ROUTER).withdraw(
+                escrow,
+                msg.sender,
+                underlyingToken,
+                underlyingTokenBalance
+            );
+        }
+
+        // sweep any settlement token balances
+        if (settlementTokenBalance > 0) {
+            IRouter(MYSO_ROUTER).withdraw(
+                escrow,
+                msg.sender,
+                settlementToken,
+                settlementTokenBalance
+            );
+        }
+        emit EscrowClosedAndSweeped(
+            escrow,
+            underlyingToken,
+            underlyingTokenBalance,
+            settlementToken,
+            settlementTokenBalance
+        );
     }
 }
