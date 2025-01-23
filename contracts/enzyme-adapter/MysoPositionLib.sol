@@ -8,6 +8,40 @@ import {Escrow} from "../Escrow.sol";
 import {IRouter} from "../interfaces/IRouter.sol";
 import {IMysoPosition} from "./IMysoPosition.sol";
 
+/**
+ * @title MysoPositionLib
+ * @dev This contract serves as an external position manager for MYSO V3, enabling the writing of covered calls
+ * as an Enzyme vault manager and facilitating their creation and settlement on-chain via escrow contracts.
+ * Options can be written by either taking a quote via RFQ or through Dutch auctions.
+ *
+ * ## Key Functionalities:
+ *
+ * 1. **Escrow Creation**:
+ *    - `__createEscrowByTakingQuote`: Creates an escrow based on an RFQ quote, locking underlying tokens.
+ *    - `__createEscrowByStartingAuction`: Initiates an auction-based escrow with defined parameters.
+ *
+ * 2. **Escrow Lifecycle Management**:
+ *    - `__closeAndSweepEscrows`: Closes escrows and retrieves any leftover balances based on auction/exercise status.
+ *    - `__withdrawStuckTokens`: Allows withdrawal of potentially stuck or airdropped tokens from escrows.
+ *
+ * 3. **State Getters**:
+ *    - `getManagedAssets`: Retrieves all currently managed assets under the position.
+ *    - `getDebtAssets`: Returns a list of debt-related assets (always empty in this implementation).
+ *    - `getNumEscrows`: Provides the total count of escrows managed by this contract.
+ *    - `getNumOpenEscrows`: Tracks the number of currently active (open) escrows.
+ *    - `getEscrowAddresses`: Retrieves escrow addresses based on specified index ranges.
+ *    - `isEscrowClosed`: Checks if a specific escrow has been closed.
+ *
+ * @notice Whenever there are open escrows, the associated asset positions are considered
+ * non-deterministic. Therefore, related NAV calculations are not supported in this version.
+ * Vault managers must actively mark escrows as closed to prevent `getManagedAssets` from reverting.
+ *
+ * This approach simplifies overall asset tracking, as relevant assets are always either:
+ * (a) held within the associated Enzyme vault (e.g., when an option is exercised, the conversion amount
+ * is automatically sent to the MYSO escrow owner, which in this case is the Enzyme vault), or
+ * (b) require sweeping (e.g., when an option is not exercised or only partially exercised,
+ * as well as when a trading firm borrows coins, posts collateral, but does not reclaim it).
+ */
 contract MysoPositionLib is IMysoPosition {
     using SafeERC20 for IERC20Metadata;
 
@@ -34,13 +68,13 @@ contract MysoPositionLib is IMysoPosition {
             (uint256, bytes)
         );
 
-        if (actionId == uint256(Actions.TakeQuote)) {
+        if (actionId == uint256(Actions.CreateEscrowByTakingQuote)) {
             __createEscrowByTakingQuote(actionArgs);
-        } else if (actionId == uint256(Actions.CreateAuction)) {
+        } else if (actionId == uint256(Actions.CreateEscrowByStartingAuction)) {
             __createEscrowByStartingAuction(actionArgs);
-        } else if (actionId == uint256(Actions.CloseAndSweep)) {
+        } else if (actionId == uint256(Actions.CloseAndSweepEscrow)) {
             __closeAndSweepEscrows(actionArgs);
-        } else if (actionId == uint256(Actions.Withdraw)) {
+        } else if (actionId == uint256(Actions.WithdrawStuckTokens)) {
             __withdrawStuckTokens(actionArgs);
         } else {
             revert("receiveCallFromVault: Invalid actionId");

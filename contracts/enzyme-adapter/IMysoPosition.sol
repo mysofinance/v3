@@ -23,9 +23,9 @@ interface IMysoPosition is IExternalPosition {
     );
 
     enum Actions {
-        TakeQuote,
-        CreateAuction,
-        CloseAndSweep,
-        Withdraw
+        CreateEscrowByTakingQuote,
+        CreateEscrowByStartingAuction,
+        CloseAndSweepEscrow,
+        WithdrawStuckTokens
     }
 }
