@@ -252,6 +252,7 @@ describe("Router Contract Fee Tests", function () {
         initialFeeHandlerBalance + expectedMatchFee
       );
     });
+
     it("should apply correct fees when borrowing", async function () {
       const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
@@ -311,9 +312,10 @@ describe("Router Contract Fee Tests", function () {
       );
 
       // Calculate expected fees
+      const underlyingTokenDecimals = await underlyingToken.decimals();
       const expectedBorrowFee =
         (borrowAmount * refSpot * ethers.parseEther("0.001")) /
-        (BASE * auctionInitialization.notional);
+        (BASE * 10n ** underlyingTokenDecimals);
 
       // Check balances
       expect(finalUser1Balance).to.be.lt(initialUser1Balance);
