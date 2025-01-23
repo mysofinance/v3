@@ -1,5 +1,20 @@
 import { ethers } from "hardhat";
 import { getNetworkInfo } from "./utils";
+import readline from "readline";
+
+async function askUserConfirmation(question: string): Promise<boolean> {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === "y");
+    });
+  });
+}
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -11,6 +26,16 @@ async function main() {
   console.log("Current chain ID:", CHAIN_ID);
   console.log("Current NETWORK_NAME:", NETWORK_NAME);
   console.log("");
+
+  // Ask for user confirmation before proceeding
+  const proceed = await askUserConfirmation(
+    "Do you want to proceed with the deployment? (y/n): "
+  );
+
+  if (!proceed) {
+    console.log("Deployment aborted.");
+    process.exit(0);
+  }
 
   // Deploy Escrow implementation
   const Escrow = await ethers.getContractFactory("Escrow");
