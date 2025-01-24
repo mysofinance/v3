@@ -149,10 +149,10 @@ describe("Router Contract", function () {
         [actionId, actionArgs]
       );
 
-      // Approve the underlying token for the MysoPositionLib contract
+      // @dev: mock vault sending underlying notional to EP before calling position lib
       await underlyingToken
         .connect(mockEnzymeVault)
-        .approve(mysoPositionLib.target, ethers.MaxUint256);
+        .transfer(mysoPositionLib.target, auctionInitialization.notional);
 
       // Check initial number of escrows
       expect(await router.numEscrows()).to.equal(0);
@@ -263,10 +263,13 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.MaxUint256);
       rfqInitialization.rfqQuote.signature = signature;
 
-      // Vault manager approves to pull underlying notional
+      // @dev: mock vault sending underlying notional to EP before calling position lib
       await underlyingToken
         .connect(mockEnzymeVault)
-        .approve(mysoPositionLib.target, ethers.MaxUint256);
+        .transfer(
+          mysoPositionLib.target,
+          rfqInitialization.optionInfo.notional
+        );
 
       // Wrap the action ID and encoded args into a single bytes payload
       const actionData = encodeRFQInitialization(rfqInitialization, 0);
@@ -356,10 +359,13 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.MaxUint256);
       rfqInitialization.rfqQuote.signature = signature;
 
-      // Vault manager approves to pull underlying notional
+      // @dev: mock vault sending underlying notional to EP before calling position lib
       await underlyingToken
         .connect(mockEnzymeVault)
-        .approve(mysoPositionLib.target, ethers.MaxUint256);
+        .transfer(
+          mysoPositionLib.target,
+          rfqInitialization.optionInfo.notional
+        );
 
       // Wrap the action ID and encoded args into a single bytes payload
       const actionData = encodeRFQInitialization(rfqInitialization, 0);
@@ -435,10 +441,13 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.MaxUint256);
       rfqInitialization.rfqQuote.signature = signature;
 
-      // Vault manager approves to pull underlying notional
+      // @dev: mock vault sending underlying notional to EP before calling position lib
       await underlyingToken
         .connect(mockEnzymeVault)
-        .approve(mysoPositionLib.target, ethers.MaxUint256);
+        .transfer(
+          mysoPositionLib.target,
+          rfqInitialization.optionInfo.notional
+        );
 
       // Wrap the action ID and encoded args into a single bytes payload
       const actionData = encodeRFQInitialization(rfqInitialization, 0);
@@ -531,10 +540,13 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.MaxUint256);
       rfqInitialization.rfqQuote.signature = signature;
 
-      // Vault manager approves to pull underlying notional
+      // @dev: mock vault sending underlying notional to EP before calling position lib
       await underlyingToken
         .connect(mockEnzymeVault)
-        .approve(mysoPositionLib.target, ethers.MaxUint256);
+        .transfer(
+          mysoPositionLib.target,
+          rfqInitialization.optionInfo.notional
+        );
 
       // Wrap the action ID and encoded args into a single bytes payload
       const actionData = encodeRFQInitialization(rfqInitialization, 0);
@@ -630,10 +642,13 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.MaxUint256);
       rfqInitialization.rfqQuote.signature = signature;
 
-      // Vault manager approves to pull underlying notional
+      // @dev: mock vault sending underlying notional to EP before calling position lib
       await underlyingToken
         .connect(mockEnzymeVault)
-        .approve(mysoPositionLib.target, ethers.MaxUint256);
+        .transfer(
+          mysoPositionLib.target,
+          rfqInitialization.optionInfo.notional
+        );
 
       // Wrap the action ID and encoded args into a single bytes payload
       const actionData = encodeRFQInitialization(rfqInitialization, 0);

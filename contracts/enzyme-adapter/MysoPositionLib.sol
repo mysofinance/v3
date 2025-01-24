@@ -57,7 +57,7 @@ contract MysoPositionLib is IMysoPosition {
     }
 
     /// @notice Initializes the external position
-    /// @dev Nothing to initialize for this contract
+    /// @dev Nothing to initialize for this MYSO v3 external position type
     function init(bytes memory) external override {}
 
     /// @notice Receives and executes a call from the Vault
@@ -89,14 +89,8 @@ contract MysoPositionLib is IMysoPosition {
             (DataTypes.RFQInitialization)
         );
 
-        // @dev: pull notional amount to this contract
-        IERC20Metadata(rfqInitialization.optionInfo.underlyingToken)
-            .safeTransferFrom(
-                msg.sender,
-                address(this),
-                rfqInitialization.optionInfo.notional
-            );
         // @dev: approve router to pull notional amount from this contract
+        // note: given notional amount is assumed to have been sent prior to this call
         IERC20Metadata(rfqInitialization.optionInfo.underlyingToken).approve(
             MYSO_ROUTER,
             rfqInitialization.optionInfo.notional
@@ -124,12 +118,7 @@ contract MysoPositionLib is IMysoPosition {
             .decode(actionArgs, (DataTypes.AuctionInitialization));
 
         // @dev: approve router to pull notional amount from this contract
-        IERC20Metadata(auctionInitialization.underlyingToken).safeTransferFrom(
-            msg.sender,
-            address(this),
-            auctionInitialization.notional
-        );
-        // @dev: approve router to pull notional amount from this contract
+        // note: given notional amount is assumed to have been sent prior to this call
         IERC20Metadata(auctionInitialization.underlyingToken).approve(
             MYSO_ROUTER,
             auctionInitialization.notional
