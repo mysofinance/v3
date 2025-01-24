@@ -39,9 +39,15 @@ contract MysoPositionParser is IExternalPositionParser {
             _actionId ==
             uint256(IMysoPosition.Actions.CreateEscrowByTakingQuote)
         ) {
-            (assetsToSend_, amountsToSend_) = __decodeCreateEscrowByTakingQuote(
-                _encodedActionArgs
-            );
+            (
+                assetsToSend_,
+                amountsToSend_
+            ) = __decodeCreateEscrowByTakingQuote({
+                _actionArgs: abi.decode(
+                    _encodedActionArgs,
+                    (IMysoPosition.CreateEscrowByTakingQuoteActionArgs)
+                )
+            });
         } else if (
             _actionId ==
             uint256(IMysoPosition.Actions.CreateEscrowByStartingAuction)
@@ -49,15 +55,30 @@ contract MysoPositionParser is IExternalPositionParser {
             (
                 assetsToSend_,
                 amountsToSend_
-            ) = __decodeCreateEscrowByStartingAuction(_encodedActionArgs);
+            ) = __decodeCreateEscrowByStartingAuction({
+                _actionArgs: abi.decode(
+                    _encodedActionArgs,
+                    (IMysoPosition.CreateEscrowByStartingAuctionActionArgs)
+                )
+            });
         } else if (
             _actionId == uint256(IMysoPosition.Actions.CloseAndSweepEscrow)
         ) {
-            assetsToReceive_ = __decodeCloseAndSweepEscrows(_encodedActionArgs);
+            assetsToReceive_ = __decodeCloseAndSweepEscrows({
+                _actionArgs: abi.decode(
+                    _encodedActionArgs,
+                    (IMysoPosition.CloseAndSweepEscrowActionArgs)
+                )
+            });
         } else if (
             _actionId == uint256(IMysoPosition.Actions.WithdrawStuckTokens)
         ) {
-            assetsToReceive_ = __decodeWithdrawStuckTokens(_encodedActionArgs);
+            assetsToReceive_ = __decodeWithdrawStuckTokens({
+                _actionArgs: abi.decode(
+                    _encodedActionArgs,
+                    (IMysoPosition.WithdrawStuckTokensActionArgs)
+                )
+            });
         } else {
             revert("parseAssetsForAction: Invalid actionId");
         }
@@ -72,11 +93,9 @@ contract MysoPositionParser is IExternalPositionParser {
     ) external override returns (bytes memory) {}
 
     function __decodeCloseAndSweepEscrows(
-        bytes memory _actionArgs
+        IMysoPosition.CloseAndSweepEscrowActionArgs memory _actionArgs
     ) internal view returns (address[] memory assetsToReceive_) {
-        address[] memory escrows = abi.decode(_actionArgs, (address[]));
-
-        for (uint256 i = 0; i < escrows.length; i++) {
+        for (uint256 i = 0; i < _actionArgs.escrows.length; i++) {
             // @dev: retrieve relevant token addresses for sweeping
             (
                 address underlyingToken,
@@ -86,59 +105,52 @@ contract MysoPositionParser is IExternalPositionParser {
                 ,
                 ,
 
-            ) = Escrow(escrows[i]).optionInfo();
+            ) = Escrow(_actionArgs.escrows[i]).optionInfo();
             // @dev: ensure uniqueness using AddressArrayLib
-            assetsToReceive_ = assetsToReceive_.addUniqueItem(underlyingToken);
-            assetsToReceive_ = assetsToReceive_.addUniqueItem(settlementToken);
+            assetsToReceive_ = assetsToReceive_.addUniqueItem({
+                _itemToAdd: underlyingToken
+            });
+            assetsToReceive_ = assetsToReceive_.addUniqueItem({
+                _itemToAdd: settlementToken
+            });
         }
         return assetsToReceive_;
     }
 
     function __decodeCreateEscrowByTakingQuote(
-        bytes memory _actionArgs
+        IMysoPosition.CreateEscrowByTakingQuoteActionArgs memory _actionArgs
     ) internal pure returns (address[] memory, uint256[] memory) {
         address[] memory assets_ = new address[](1);
         uint256[] memory amounts_ = new uint256[](1);
 
-        DataTypes.AuctionInitialization memory auctionInitialization = abi
-            .decode(_actionArgs, (DataTypes.AuctionInitialization));
-
         // @dev: asset to be sent is the underlying token and amount
         // the given notional
-        assets_[0] = auctionInitialization.underlyingToken;
-        amounts_[0] = auctionInitialization.notional;
+        assets_[0] = _actionArgs.rfqInitialization.optionInfo.underlyingToken;
+        amounts_[0] = _actionArgs.rfqInitialization.optionInfo.notional;
         return (assets_, amounts_);
     }
 
     function __decodeCreateEscrowByStartingAuction(
-        bytes memory _actionArgs
+        IMysoPosition.CreateEscrowByStartingAuctionActionArgs memory _actionArgs
     ) internal pure returns (address[] memory, uint256[] memory) {
         address[] memory assets_ = new address[](1);
         uint256[] memory amounts_ = new uint256[](1);
 
-        DataTypes.RFQInitialization memory rfqInitialization = abi.decode(
-            _actionArgs,
-            (DataTypes.RFQInitialization)
-        );
-
         // @dev: asset to be sent is the underlying token and amount
         // the given notional
-        assets_[0] = rfqInitialization.optionInfo.underlyingToken;
-        amounts_[0] = rfqInitialization.optionInfo.notional;
+        assets_[0] = _actionArgs.auctionInitialization.underlyingToken;
+        amounts_[0] = _actionArgs.auctionInitialization.notional;
         return (assets_, amounts_);
     }
 
     function __decodeWithdrawStuckTokens(
-        bytes memory _actionArgs
+        IMysoPosition.WithdrawStuckTokensActionArgs memory _actionArgs
     ) internal pure returns (address[] memory assetsToReceive_) {
-        (, address[] memory tokens, ) = abi.decode(
-            _actionArgs,
-            (address[], address[], uint256[])
-        );
-
-        for (uint256 i = 0; i < tokens.length; i++) {
+        for (uint256 i = 0; i < _actionArgs.tokens.length; i++) {
             // @dev: retrieve unique assets
-            assetsToReceive_ = assetsToReceive_.addUniqueItem(tokens[i]);
+            assetsToReceive_ = assetsToReceive_.addUniqueItem({
+                _itemToAdd: _actionArgs.tokens[i]
+            });
         }
     }
 }

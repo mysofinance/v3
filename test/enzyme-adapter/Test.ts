@@ -29,33 +29,37 @@ export function encodeRFQInitialization(
 
   // Define the ABI structure for the RFQInitialization struct
   const rfqAbi = [
-    "tuple((address,uint48,address,uint48,uint128,uint128,(uint64,address,bool,bool,address)),(uint128,uint256,bytes,address))",
+    "tuple(((address,uint48,address,uint48,uint128,uint128,(uint64,address,bool,bool,address)),(uint128,uint256,bytes,address)))",
   ];
 
   // Encode the struct values
   const encodedRfqInitialization = abiCoder.encode(rfqAbi, [
     [
       [
-        rfqInitialization.optionInfo.underlyingToken,
-        rfqInitialization.optionInfo.expiry,
-        rfqInitialization.optionInfo.settlementToken,
-        rfqInitialization.optionInfo.earliestExercise,
-        rfqInitialization.optionInfo.notional,
-        rfqInitialization.optionInfo.strike,
         [
-          rfqInitialization.optionInfo.advancedSettings.borrowCap,
-          rfqInitialization.optionInfo.advancedSettings.oracle,
-          rfqInitialization.optionInfo.advancedSettings
-            .premiumTokenIsUnderlying,
-          rfqInitialization.optionInfo.advancedSettings.votingDelegationAllowed,
-          rfqInitialization.optionInfo.advancedSettings.allowedDelegateRegistry,
+          rfqInitialization.optionInfo.underlyingToken,
+          rfqInitialization.optionInfo.expiry,
+          rfqInitialization.optionInfo.settlementToken,
+          rfqInitialization.optionInfo.earliestExercise,
+          rfqInitialization.optionInfo.notional,
+          rfqInitialization.optionInfo.strike,
+          [
+            rfqInitialization.optionInfo.advancedSettings.borrowCap,
+            rfqInitialization.optionInfo.advancedSettings.oracle,
+            rfqInitialization.optionInfo.advancedSettings
+              .premiumTokenIsUnderlying,
+            rfqInitialization.optionInfo.advancedSettings
+              .votingDelegationAllowed,
+            rfqInitialization.optionInfo.advancedSettings
+              .allowedDelegateRegistry,
+          ],
         ],
-      ],
-      [
-        rfqInitialization.rfqQuote.premium,
-        rfqInitialization.rfqQuote.validUntil,
-        rfqInitialization.rfqQuote.signature,
-        rfqInitialization.rfqQuote.eip1271Maker,
+        [
+          rfqInitialization.rfqQuote.premium,
+          rfqInitialization.rfqQuote.validUntil,
+          rfqInitialization.rfqQuote.signature,
+          rfqInitialization.rfqQuote.eip1271Maker,
+        ],
       ],
     ],
   ]);
@@ -115,30 +119,32 @@ describe("Router Contract", function () {
       const abiCoder = new ethers.AbiCoder();
       const actionArgs = abiCoder.encode(
         [
-          "tuple(address,address,uint256,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256),(uint256,address,bool,bool,address))",
+          "tuple((address,address,uint256,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256),(uint256,address,bool,bool,address)))",
         ],
         [
           [
-            auctionInitialization.underlyingToken,
-            auctionInitialization.settlementToken,
-            auctionInitialization.notional,
             [
-              auctionInitialization.auctionParams.relStrike,
-              auctionInitialization.auctionParams.tenor,
-              auctionInitialization.auctionParams.earliestExerciseTenor,
-              auctionInitialization.auctionParams.decayStartTime,
-              auctionInitialization.auctionParams.decayDuration,
-              auctionInitialization.auctionParams.relPremiumStart,
-              auctionInitialization.auctionParams.relPremiumFloor,
-              auctionInitialization.auctionParams.minSpot,
-              auctionInitialization.auctionParams.maxSpot,
-            ],
-            [
-              auctionInitialization.advancedSettings.borrowCap,
-              auctionInitialization.advancedSettings.oracle,
-              auctionInitialization.advancedSettings.premiumTokenIsUnderlying,
-              auctionInitialization.advancedSettings.votingDelegationAllowed,
-              auctionInitialization.advancedSettings.allowedDelegateRegistry,
+              auctionInitialization.underlyingToken,
+              auctionInitialization.settlementToken,
+              auctionInitialization.notional,
+              [
+                auctionInitialization.auctionParams.relStrike,
+                auctionInitialization.auctionParams.tenor,
+                auctionInitialization.auctionParams.earliestExerciseTenor,
+                auctionInitialization.auctionParams.decayStartTime,
+                auctionInitialization.auctionParams.decayDuration,
+                auctionInitialization.auctionParams.relPremiumStart,
+                auctionInitialization.auctionParams.relPremiumFloor,
+                auctionInitialization.auctionParams.minSpot,
+                auctionInitialization.auctionParams.maxSpot,
+              ],
+              [
+                auctionInitialization.advancedSettings.borrowCap,
+                auctionInitialization.advancedSettings.oracle,
+                auctionInitialization.advancedSettings.premiumTokenIsUnderlying,
+                auctionInitialization.advancedSettings.votingDelegationAllowed,
+                auctionInitialization.advancedSettings.allowedDelegateRegistry,
+              ],
             ],
           ],
         ]
@@ -179,11 +185,13 @@ describe("Router Contract", function () {
 
       // Prepare withdraw action arguments
       const withdrawActionArgs = abiCoder.encode(
-        ["address[]", "address[]", "uint256[]"],
+        ["tuple(address[],address[],uint256[])"],
         [
-          [escrows[0]], // Escrow address
-          [underlyingToken.target], // Token address
-          [auctionInitialization.notional], // Withdrawal amount
+          [
+            [escrows[0]], // Escrow address
+            [underlyingToken.target], // Token address
+            [auctionInitialization.notional], // Withdrawal amount
+          ],
         ]
       );
 
@@ -213,8 +221,8 @@ describe("Router Contract", function () {
 
       // Prepare close and sweep action arguments
       const closeAndSweepActionArgs = abiCoder.encode(
-        ["address[]"],
-        [[escrows[0]]]
+        ["tuple(address[])"],
+        [[[escrows[0]]]]
       );
 
       const closeAndSweepActionData = abiCoder.encode(
@@ -297,8 +305,8 @@ describe("Router Contract", function () {
       // Prepare close and sweep action arguments
       const abiCoder = new ethers.AbiCoder();
       const closeAndSweepActionArgs = abiCoder.encode(
-        ["address[]"],
-        [[escrows[0]]]
+        ["tuple(address[])"],
+        [[[escrows[0]]]]
       );
       const closeAndSweepActionData = abiCoder.encode(
         ["uint256", "bytes"],
@@ -394,8 +402,8 @@ describe("Router Contract", function () {
       // Check in case of 100% exercise vault manager can close and sweep prior to expiry
       const abiCoder = new ethers.AbiCoder();
       const closeAndSweepActionArgs = abiCoder.encode(
-        ["address[]"],
-        [[escrows[0]]]
+        ["tuple(address[])"],
+        [[[escrows[0]]]]
       );
       const closeAndSweepActionData = abiCoder.encode(
         ["uint256", "bytes"],
@@ -476,8 +484,8 @@ describe("Router Contract", function () {
       // Check in case of partial exercise vault manager cannot close and sweep prior to expiry
       const abiCoder = new ethers.AbiCoder();
       const closeAndSweepActionArgs = abiCoder.encode(
-        ["address[]"],
-        [[escrows[0]]]
+        ["tuple(address[])"],
+        [[[escrows[0]]]]
       );
       const closeAndSweepActionData = abiCoder.encode(
         ["uint256", "bytes"],
@@ -573,8 +581,8 @@ describe("Router Contract", function () {
       // Check in case of borrow vault manager cannot close and sweep prior to expiry
       const abiCoder = new ethers.AbiCoder();
       const closeAndSweepActionArgs = abiCoder.encode(
-        ["address[]"],
-        [[escrows[0]]]
+        ["tuple(address[])"],
+        [[[escrows[0]]]]
       );
       const closeAndSweepActionData = abiCoder.encode(
         ["uint256", "bytes"],
@@ -675,8 +683,8 @@ describe("Router Contract", function () {
       // Check in case of borrow vault manager cannot close and sweep prior to expiry
       const abiCoder = new ethers.AbiCoder();
       const closeAndSweepActionArgs = abiCoder.encode(
-        ["address[]"],
-        [[escrows[0]]]
+        ["tuple(address[])"],
+        [[[escrows[0]]]]
       );
       const closeAndSweepActionData = abiCoder.encode(
         ["uint256", "bytes"],
