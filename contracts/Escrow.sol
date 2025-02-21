@@ -29,6 +29,7 @@ contract Escrow is InitializableERC20, IEscrow {
     uint96 public exerciseFee;
     bool public isAuction;
     bool public optionMinted;
+    bool internal _auctionCancelled;
 
     mapping(address => uint256) public borrowedUnderlyingAmounts;
 
@@ -408,6 +409,11 @@ contract Escrow is InitializableERC20, IEscrow {
         if (optionMinted && block.timestamp <= optionInfo.expiry) {
             revert Errors.InvalidWithdraw();
         }
+        // @dev: an auction is considered cancelled as soon as
+        // the escrow owner calls withdraw prior to bidding;
+        if (!optionMinted) {
+            _auctionCancelled = true;
+        }
         IERC20Metadata(token).safeTransfer(to, amount);
         emit Withdraw(msg.sender, to, token, amount);
     }
@@ -514,6 +520,13 @@ contract Escrow is InitializableERC20, IEscrow {
         ) {
             return (
                 _createBidPreview(DataTypes.BidStatus.OutOfRangeSpotPrice),
+                __distPartner
+            );
+        }
+
+        if (_auctionCancelled) {
+            return (
+                _createBidPreview(DataTypes.BidStatus.AuctionCancelled),
                 __distPartner
             );
         }

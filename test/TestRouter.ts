@@ -214,6 +214,69 @@ describe("Router Contract", function () {
           .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
       ).to.emit(router, "BidOnAuction");
     });
+
+    it("should revert when trying to bid on an empty escrow", async function () {
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+      });
+      auctionInitialization.auctionParams.earliestExerciseTenor = 0;
+
+      const ownerBalPreEscrowCreation = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const escrow = await createAuction(auctionInitialization, router, owner);
+      const ownerBalPostEscrowCreation = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const escrowBalPostEscrowCreation = await underlyingToken.balanceOf(
+        escrow.target
+      );
+      expect(
+        ownerBalPreEscrowCreation - ownerBalPostEscrowCreation
+      ).to.be.equal(auctionInitialization.notional);
+      expect(escrowBalPostEscrowCreation).to.be.equal(
+        auctionInitialization.notional
+      );
+
+      // Escrow owner removes tokens
+      await router
+        .connect(owner)
+        .withdraw(
+          escrow.target,
+          owner.address,
+          underlyingToken.target,
+          escrowBalPostEscrowCreation
+        );
+      const ownerBalPostWithdraw = await underlyingToken.balanceOf(
+        owner.address
+      );
+      const vaultBalPostWithdraw = await underlyingToken.balanceOf(
+        escrow.target
+      );
+      expect(ownerBalPostWithdraw - ownerBalPostEscrowCreation).to.be.equal(
+        auctionInitialization.notional
+      );
+      expect(vaultBalPostWithdraw).to.be.equal(0n);
+
+      // Approve and bid on auction
+      let currentAsk = await escrow.currAsk();
+      await settlementToken
+        .connect(user1)
+        .approve(router.target, ethers.parseEther("100"));
+      const relBid = currentAsk;
+      const refSpot = ethers.parseUnits("1", 6);
+      const data: any = [];
+
+      const optionReceiver = user1.address;
+
+      await expect(
+        router
+          .connect(user1)
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
+      ).to.be.revertedWithCustomError(escrowImpl, "InvalidBid");
+    });
   });
 
   describe("Take Quote", function () {
@@ -1131,7 +1194,7 @@ describe("Router Contract", function () {
       );
     });
 
-    it("should not revert if there is insufficient funding", async function () {
+    it("should not allow bidding if escrow owner called withdraw", async function () {
       // Mock scenario where the auction contract has insufficient funds
       const bal = await underlyingToken.balanceOf(escrow.target);
       await router
@@ -1139,7 +1202,7 @@ describe("Router Contract", function () {
         .withdraw(escrow.target, owner.address, underlyingToken.target, bal);
 
       const { preview } = await escrow.previewBid(relBid, refSpot, data);
-      expect(preview.status).to.equal(DataTypes.BidStatus.Success);
+      expect(preview.status).to.equal(DataTypes.BidStatus.AuctionCancelled);
     });
 
     it("should revert if protocol fees exceed the premium", async function () {
