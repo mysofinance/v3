@@ -147,11 +147,23 @@ describe("Simulate", function () {
     console.log("Settlement Token:", settlementTokenAddr);
     console.log("  Symbol:", settlementTokenSymbol);
     console.log("  Decimals:", settlementTokenDecimals);
-    console.log("  Allowance for Router:", settlementTokenAllowance.toString());
+    console.log(
+      "  Allowance for Router:",
+      settlementTokenAllowance.toString(),
+      `(${ethers.formatUnits(settlementTokenAllowance, settlementTokenDecimals)})`
+    );
 
     console.log("\n--- Option Info ---");
-    console.log("Notional:", notional.toString());
-    console.log("Strike:", strike.toString());
+    console.log(
+      "Notional:",
+      notional.toString(),
+      `(${ethers.formatUnits(notional, underlyingTokenDecimals)})`
+    );
+    console.log(
+      "Strike:",
+      strike.toString(),
+      `(${ethers.formatUnits(strike, settlementTokenDecimals)})`
+    );
     console.log("Expiry:", expiry.toString(), `(${toDateTimeString(expiry)})`);
     console.log(
       "Earliest Exercise:",
@@ -198,19 +210,43 @@ describe("Simulate", function () {
 
     console.log("\n--- Signer Balances Before & After ---");
     console.log(`Underlying Token (${underlyingTokenSymbol})`);
-    console.log("  Before:", preUnderlyingBalance.toString());
-    console.log("  After: ", postUnderlyingBalance.toString());
+    console.log(
+      "  Before:",
+      preUnderlyingBalance.toString(),
+      `(${ethers.formatUnits(preUnderlyingBalance, underlyingTokenDecimals)})`
+    );
+    console.log(
+      "  After: ",
+      postUnderlyingBalance.toString(),
+      `(${ethers.formatUnits(postUnderlyingBalance, underlyingTokenDecimals)})`
+    );
     console.log(
       "  Δ      :",
-      (postUnderlyingBalance - preUnderlyingBalance).toString()
+      (postUnderlyingBalance - preUnderlyingBalance).toString(),
+      `(${ethers.formatUnits(
+        postUnderlyingBalance - preUnderlyingBalance,
+        underlyingTokenDecimals
+      )})`
     );
 
     console.log(`\nSettlement Token (${settlementTokenSymbol})`);
-    console.log("  Before:", preSettlementBalance.toString());
-    console.log("  After: ", postSettlementBalance.toString());
+    console.log(
+      "  Before:",
+      preSettlementBalance.toString(),
+      `(${ethers.formatUnits(preSettlementBalance, settlementTokenDecimals)})`
+    );
+    console.log(
+      "  After: ",
+      postSettlementBalance.toString(),
+      `(${ethers.formatUnits(postSettlementBalance, settlementTokenDecimals)})`
+    );
     console.log(
       "  Δ      :",
-      (postSettlementBalance - preSettlementBalance).toString()
+      (postSettlementBalance - preSettlementBalance).toString(),
+      `(${ethers.formatUnits(
+        postSettlementBalance - preSettlementBalance,
+        settlementTokenDecimals
+      )})`
     );
 
     const receipt = await tx.wait();
