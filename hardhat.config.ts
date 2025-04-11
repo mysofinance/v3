@@ -26,6 +26,11 @@ const config: HardhatUserConfig = {
       url: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_SEPOLIA_API_KEY}`,
       accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
     },
+    polygon: {
+      chainId: 137,
+      url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_POLYGON_API_KEY}`,
+      accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
+    },
     hardhat: {
       /*
       forking: {
