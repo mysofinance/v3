@@ -368,7 +368,7 @@ contract Escrow is InitializableERC20, IEscrow {
     }
 
     function handleOnChainVoting(address delegate) external {
-        if (msg.sender != owner) {
+        if (msg.sender != router && msg.sender != owner) {
             revert Errors.InvalidSender();
         }
         if (!optionInfo.advancedSettings.votingDelegationAllowed) {
@@ -379,7 +379,7 @@ contract Escrow is InitializableERC20, IEscrow {
     }
 
     function handleOffChainVoting(bytes32 spaceId, address delegate) external {
-        if (msg.sender != owner) {
+        if (msg.sender != router && msg.sender != owner) {
             revert Errors.InvalidSender();
         }
         address allowedDelegateRegistry = optionInfo
