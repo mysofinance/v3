@@ -27,7 +27,19 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "@arbitrum/nitro-contracts"
-    ]
+    ],
+    "overrides": {
+      "@openzeppelin/contracts-upgradeable@>=4.3.0 <4.8.3": ">=4.8.3",
+      "@openzeppelin/contracts-upgradeable@>=4.0.0 <4.9.3": ">=4.9.3",
+      "@openzeppelin/contracts-upgradeable@>=4.7.0 <4.9.2": ">=4.9.2",
+      "@openzeppelin/contracts-upgradeable@>=3.2.0 <4.8.3": ">=4.8.3",
+      "@openzeppelin/contracts-upgradeable@>=4.3.0 <4.9.1": ">=4.9.1",
+      "@openzeppelin/contracts-upgradeable@>=4.5.0 <4.9.6": ">=4.9.6",
+      "tmp@<=0.2.3": ">=0.2.4",
+      "lodash-es@>=4.0.0 <=4.17.22": ">=4.17.23",
+      "diff@>=6.0.0 <8.0.3": ">=8.0.3",
+      "serialize-javascript@<=7.0.2": ">=7.0.3"
+    }
   },
   "dependencies": {
     "@chainlink/contracts": "^1.2.0",
