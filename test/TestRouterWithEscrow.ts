@@ -1845,6 +1845,51 @@ describe("Router And Escrow Interaction", function () {
     });
   });
 
+  describe("Router handleOnChainVoting", function () {
+    let escrow: any;
+
+    beforeEach(async function () {
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(votingUnderlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        relStrike: ethers.parseEther("1"),
+        relPremiumStart: ethers.parseEther("0.01"),
+        oracleAddress: String(mockOracle.target),
+        votingDelegationAllowed: true,
+      });
+      escrow = await createAuction(auctionInitialization, router, owner);
+    });
+
+    it("should allow the escrow owner to delegate on-chain voting via Router", async function () {
+      const delegate = user2.address;
+
+      await expect(
+        router.connect(owner).handleOnChainVoting(escrow.target, delegate)
+      )
+        .to.emit(router, "OnChainVotingDelegation")
+        .withArgs(escrow.target, delegate)
+        .and.to.emit(escrow, "OnChainVotingDelegation")
+        .withArgs(delegate);
+    });
+
+    it("should revert if non-owner calls router.handleOnChainVoting", async function () {
+      const delegate = user2.address;
+
+      await expect(
+        router.connect(user1).handleOnChainVoting(escrow.target, delegate)
+      ).to.be.revertedWithCustomError(router, "InvalidSender");
+    });
+
+    it("should revert if address is not a registered escrow", async function () {
+      const delegate = user2.address;
+      const notAnEscrow = user2.address;
+
+      await expect(
+        router.connect(owner).handleOnChainVoting(notAnEscrow, delegate)
+      ).to.be.revertedWithCustomError(router, "NotAnEscrow");
+    });
+  });
+
   describe("Set Fee Handler", function () {
     it("should allow owner to set a new fee handler", async function () {
       const newFeeHandler = user1.address;
@@ -3205,6 +3250,68 @@ describe("Router And Escrow Interaction", function () {
       await expect(
         escrow.connect(owner).handleOffChainVoting(spaceId, delegate)
       ).to.be.revertedWithCustomError(escrow, "NoAllowedDelegateRegistry");
+    });
+  });
+
+  describe("Router handleOffChainVoting", function () {
+    let escrow: any;
+    let delegateRegistry: any;
+
+    beforeEach(async function () {
+      const DelegateRegistry = await ethers.getContractFactory(
+        "MockDelegateRegistry"
+      );
+      delegateRegistry = await DelegateRegistry.deploy();
+
+      const auctionInitialization = await getAuctionInitialization({
+        underlyingTokenAddress: String(underlyingToken.target),
+        settlementTokenAddress: String(settlementToken.target),
+        oracleAddress: String(mockOracle.target),
+        allowedDelegateRegistry: delegateRegistry.target,
+      });
+      escrow = await createAuction(auctionInitialization, router, owner);
+    });
+
+    it("should allow the escrow owner to delegate off-chain voting via Router", async function () {
+      const spaceId = ethers.encodeBytes32String("space1");
+      const delegate = user2.address;
+
+      await expect(
+        router
+          .connect(owner)
+          .handleOffChainVoting(escrow.target, spaceId, delegate)
+      )
+        .to.emit(router, "OffChainVotingDelegation")
+        .withArgs(escrow.target, spaceId, delegate)
+        .and.to.emit(escrow, "OffChainVotingDelegation")
+        .withArgs(delegateRegistry.target, spaceId, delegate);
+
+      expect(
+        await delegateRegistry.delegation(escrow.target, spaceId)
+      ).to.equal(delegate);
+    });
+
+    it("should revert if non-owner calls router.handleOffChainVoting", async function () {
+      const spaceId = ethers.encodeBytes32String("space1");
+      const delegate = user2.address;
+
+      await expect(
+        router
+          .connect(user1)
+          .handleOffChainVoting(escrow.target, spaceId, delegate)
+      ).to.be.revertedWithCustomError(router, "InvalidSender");
+    });
+
+    it("should revert if address is not a registered escrow", async function () {
+      const spaceId = ethers.encodeBytes32String("space1");
+      const delegate = user2.address;
+      const notAnEscrow = user2.address;
+
+      await expect(
+        router
+          .connect(owner)
+          .handleOffChainVoting(notAnEscrow, spaceId, delegate)
+      ).to.be.revertedWithCustomError(router, "NotAnEscrow");
     });
   });
 

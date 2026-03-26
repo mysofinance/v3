@@ -148,6 +148,35 @@ contract Router is Ownable, IRouter {
         emit Withdraw(msg.sender, escrow, to, token, amount);
     }
 
+    function handleOnChainVoting(
+        address escrow,
+        address delegate
+    ) external {
+        if (!isEscrow[escrow]) {
+            revert Errors.NotAnEscrow();
+        }
+        if (msg.sender != IEscrow(escrow).owner()) {
+            revert Errors.InvalidSender();
+        }
+        IEscrow(escrow).handleOnChainVoting(delegate);
+        emit OnChainVotingDelegation(escrow, delegate);
+    }
+
+    function handleOffChainVoting(
+        address escrow,
+        bytes32 spaceId,
+        address delegate
+    ) external {
+        if (!isEscrow[escrow]) {
+            revert Errors.NotAnEscrow();
+        }
+        if (msg.sender != IEscrow(escrow).owner()) {
+            revert Errors.InvalidSender();
+        }
+        IEscrow(escrow).handleOffChainVoting(spaceId, delegate);
+        emit OffChainVotingDelegation(escrow, spaceId, delegate);
+    }
+
     function bidOnAuction(
         address escrow,
         address optionReceiver,
