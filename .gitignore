@@ -1,5 +1,7 @@
+.*
+!.gitignore
+!.github
 node_modules
-.env
 
 # Hardhat files
 /cache
