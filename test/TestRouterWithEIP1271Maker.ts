@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { expect } from "chai";
 import hre from "hardhat";
-import { Signature, concat, toBeHex } from "ethers";
+import { Signature, Wallet, Contract, concat, toBeHex } from "ethers";
 import {
   setupTestContracts,
   getRFQInitialization,
@@ -10,7 +10,12 @@ import {
   swapSignaturePayload,
   setHardhatEthers,
 } from "./helpers.js";
-import type { Router, MockERC20 } from "../types/ethers-contracts/index.js";
+import type {
+  Router,
+  MockERC20,
+  EIP1271Maker,
+} from "../types/ethers-contracts/index.js";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { DataTypes } from "./DataTypes.js";
 
 // Constants
@@ -29,7 +34,7 @@ const SAFE_CALLBACK_ABI = [
 ];
 
 // Helper method to prepare the signature with Safe-compatible v adjustment
-function prepareSafeEIP1271Signature(signature: any) {
+function prepareSafeEIP1271Signature(signature: string) {
   const { v, r, s } = Signature.from(signature);
 
   // Adjust the v value for Safe's eth_sign compatibility
@@ -41,11 +46,12 @@ function prepareSafeEIP1271Signature(signature: any) {
 
 describe("EIP-1271 Signer Tests", function () {
   let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
-  let eip1271SignerKey: any;
-  let signer: any;
-  let signerAddress: any;
-  let chainId: any;
-  let eip1271Contract: any;
+  let eip1271SignerKey: string | undefined;
+  let signer: Wallet;
+  let signerAddress: string;
+  let chainId: number;
+  let chainIdHex: string;
+  let eip1271Contract: Contract;
 
   before(async function () {
     ({ ethers } = await hre.network.connect());
@@ -56,7 +62,8 @@ describe("EIP-1271 Signer Tests", function () {
     }
     signer = new ethers.Wallet(eip1271SignerKey, ethers.provider);
     signerAddress = await signer.getAddress();
-    chainId = await ethers.provider.send("eth_chainId");
+    chainIdHex = await ethers.provider.send("eth_chainId");
+    chainId = Number(chainIdHex);
   });
 
   it("should reconstruct and verify simple ecrecover", async function () {
@@ -81,7 +88,7 @@ describe("EIP-1271 Signer Tests", function () {
   });
 
   it("should reconstruct and verify a signature with Safe multisig checkNSignatures", async function () {
-    if (chainId !== "0xa4b1") {
+    if (chainIdHex !== "0xa4b1") {
       console.log(
         "Skipping test: Only meant for forked mainnet on Arbitrum to test with Safe multisig (chain ID 42161).",
       );
@@ -121,7 +128,7 @@ describe("EIP-1271 Signer Tests", function () {
   });
 
   it("should reconstruct and verify signature using Safe multisig isValidSignature", async function () {
-    if (chainId !== "0xa4b1") {
+    if (chainIdHex !== "0xa4b1") {
       // 42161 in hexadecimal
       console.log(
         "Skipping test: Only meant for forked mainnet on Arbitrum to test with Safe multisig (chain ID 42161).",
@@ -184,10 +191,10 @@ describe("EIP-1271 Signer Tests", function () {
     let router: Router;
     let settlementToken: MockERC20;
     let underlyingToken: MockERC20;
-    let owner: any;
-    let user1: any;
-    let user2: any;
-    let eip1271Maker: any;
+    let owner: HardhatEthersSigner;
+    let user1: HardhatEthersSigner;
+    let user2: HardhatEthersSigner;
+    let eip1271Maker: EIP1271Maker;
 
     beforeEach(async function () {
       const contracts = await setupTestContracts();
@@ -222,7 +229,7 @@ describe("EIP-1271 Signer Tests", function () {
       const signature = await user1.signMessage(ethers.getBytes(payloadHash));
 
       // Assign the EIP1271Maker's address as the quote signer
-      rfqInitialization.rfqQuote.eip1271Maker = eip1271Maker.target;
+      rfqInitialization.rfqQuote.eip1271Maker = String(eip1271Maker.target);
       rfqInitialization.rfqQuote.signature = signature;
 
       // Check msg hash
@@ -270,7 +277,7 @@ describe("EIP-1271 Signer Tests", function () {
       const signature = await owner.signMessage(ethers.getBytes(payloadHash));
 
       // Assign the EIP1271Maker's address as the quote signer
-      rfqInitialization.rfqQuote.eip1271Maker = eip1271Maker.target;
+      rfqInitialization.rfqQuote.eip1271Maker = String(eip1271Maker.target);
       rfqInitialization.rfqQuote.signature = signature;
 
       // Check msg hash
@@ -296,20 +303,20 @@ describe("EIP-1271 Signer Tests", function () {
   });
 
   describe("Simple Swap with EIP1271Maker as Maker", function () {
-    let router: any;
-    let settlementToken: any;
-    let underlyingToken: any;
-    let eip1271Maker: any;
-    let owner: any;
-    let user1: any;
-    let user2: any;
-    let swapQuote: any;
-    let CHAIN_ID: any;
-    let FUND_AMOUNT: any;
+    let router: Router;
+    let settlementToken: MockERC20;
+    let underlyingToken: MockERC20;
+    let eip1271Maker: EIP1271Maker;
+    let owner: HardhatEthersSigner;
+    let user1: HardhatEthersSigner;
+    let user2: HardhatEthersSigner;
+    let swapQuote: DataTypes.SwapQuote;
+    let CHAIN_ID: number;
+    let FUND_AMOUNT: bigint;
 
     beforeEach(async function () {
       FUND_AMOUNT = ethers.parseUnits("1000", 18);
-      CHAIN_ID = await ethers.provider.send("eth_chainId");
+      CHAIN_ID = Number(await ethers.provider.send("eth_chainId"));
       // Set up contracts and users
       const contracts = await setupTestContracts();
       ({ owner, user1, user2, settlementToken, underlyingToken, router } =
@@ -344,7 +351,7 @@ describe("EIP-1271 Signer Tests", function () {
         makerGiveAmount,
         validUntil: (await getLatestTimestamp()) + 60 * 5, // 5 minutes from now
         signature: "",
-        eip1271Maker: eip1271Maker.target,
+        eip1271Maker: String(eip1271Maker.target),
       };
 
       // Generate payload hash and have eip1271Maker sign it
@@ -404,7 +411,7 @@ describe("EIP-1271 Signer Tests", function () {
       const taker = user2;
 
       // Ensure eip1271Maker is set correctly and signer is registered on EIP1271 wallet
-      swapQuote.eip1271Maker = eip1271Maker.target;
+      swapQuote.eip1271Maker = String(eip1271Maker.target);
       expect(await eip1271Maker.isSigner(user1.address)).to.be.true;
       expect(swapQuote.eip1271Maker).to.be.equal(eip1271Maker.target);
 

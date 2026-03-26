@@ -1,11 +1,13 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { parseEther } from "ethers";
+import { parseEther, type BytesLike } from "ethers";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import type {
   Router,
   MockERC20,
   MockOracle,
   FeeHandler,
+  MockHighFeeHandler,
 } from "../types/ethers-contracts/index.js";
 
 import {
@@ -24,9 +26,9 @@ describe("Router Contract Fee Tests", function () {
   let underlyingToken: MockERC20;
   let mockOracle: MockOracle;
   let feeHandler: FeeHandler;
-  let owner: any;
-  let user1: any;
-  let user2: any;
+  let owner: HardhatEthersSigner;
+  let user1: HardhatEthersSigner;
+  let user2: HardhatEthersSigner;
   const CHAIN_ID = 31337;
   const BASE = parseEther("1");
   const MAX_MATCH_FEE = parseEther("0.2");
@@ -218,7 +220,7 @@ describe("Router Contract Fee Tests", function () {
 
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       // Get initial balances
       const initialOwnerBalance = await settlementToken.balanceOf(
@@ -277,7 +279,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -545,7 +547,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -636,7 +638,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -726,7 +728,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, bidAmount * 2n); // Approve extra for fees
       const relBid = ethers.parseEther("0.2");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
         feeHandler.target,
@@ -820,7 +822,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, bidAmount * 2n);
       const relBid = ethers.parseEther("0.1");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
         feeHandler.target,
@@ -860,7 +862,7 @@ describe("Router Contract Fee Tests", function () {
   });
 
   describe("Fee Capping", function () {
-    let highFeeHandler: any;
+    let highFeeHandler: MockHighFeeHandler;
     const optionPremium = parseEther("100"); // Example premium
     const notional = parseEther("1000"); // Example notional
 

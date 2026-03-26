@@ -1,14 +1,20 @@
 import { expect } from "chai";
 import hre from "hardhat";
 import { ZeroAddress, parseUnits, parseEther, Wallet } from "ethers";
+import type { Addressable } from "ethers";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
+import type {
+  OracleAdapter,
+  MockAggregatorV3,
+} from "../types/ethers-contracts/index.js";
 
 import { getLatestTimestamp, setHardhatEthers } from "./helpers.js";
 
 describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Comparison", function () {
   let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
-  let chainlinkOracle: any;
-  let owner: any;
-  let unauthorizedUser: any;
+  let chainlinkOracle: OracleAdapter;
+  let owner: HardhatEthersSigner;
+  let unauthorizedUser: HardhatEthersSigner;
 
   const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
   const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
@@ -118,7 +124,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const usdcDecimals = await ethers
           .getContractAt("IERC20Metadata", USDC)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, usdcDecimals);
 
         console.log("WETH price in USDC (on-chain):", onchainPrice);
@@ -143,7 +149,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const usdcDecimals = await ethers
           .getContractAt("IERC20Metadata", USDC)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, usdcDecimals);
 
         console.log("UNI price in USDC (on-chain):", onchainPrice);
@@ -167,7 +173,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const wethDecimals = await ethers
           .getContractAt("IERC20Metadata", WETH)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, wethDecimals);
 
         console.log("USDC price in WETH (on-chain):", onchainPrice);
@@ -191,7 +197,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const wethDecimals = await ethers
           .getContractAt("IERC20Metadata", WETH)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, wethDecimals);
 
         console.log("UNI price in WETH (on-chain):", onchainPrice);
@@ -215,7 +221,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const uniDecimals = await ethers
           .getContractAt("IERC20Metadata", UNI)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, uniDecimals);
 
         console.log("WETH price in UNI (on-chain):", onchainPrice);
@@ -350,7 +356,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         const onChainPrice = await chainlinkOracle.getPrice(SHIBA, USDC, []);
         const usdcDecimals = await ethers
           .getContractAt("IERC20Metadata", USDC)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, usdcDecimals);
 
         const coinGeckoPrice = await getPriceRatioFromCoinGecko(SHIBA, USDC);
@@ -373,16 +379,16 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
   });
 
   describe("OracleAdapter with Mock Aggregator", function () {
-    let oracleAdapter: any;
-    let mockAggregatorEthUsd: any;
-    let mockAggregatorUsdcUsd: any;
-    let mockAggregatorUniUsd: any;
-    let USDC: any;
-    let WETH: any;
-    let UNI: any;
-    let owner: any;
-    let user2: any;
-    let unauthorizedUser: any;
+    let oracleAdapter: OracleAdapter;
+    let mockAggregatorEthUsd: MockAggregatorV3;
+    let mockAggregatorUsdcUsd: MockAggregatorV3;
+    let mockAggregatorUniUsd: MockAggregatorV3;
+    let USDC: string | Addressable;
+    let WETH: string | Addressable;
+    let UNI: string | Addressable;
+    let owner: HardhatEthersSigner;
+    let user2: HardhatEthersSigner;
+    let unauthorizedUser: HardhatEthersSigner;
 
     const MAX_TIME_SINCE_LAST_UPDATE = 3600 * 12; // 12 hours
 

@@ -10,8 +10,14 @@ import {
   AbiCoder,
   keccak256,
 } from "ethers";
+import type { Log } from "ethers";
 import { DataTypes } from "./DataTypes.js";
-import type { MockERC20, Escrow } from "../types/ethers-contracts/index.js";
+import type {
+  MockERC20,
+  Escrow,
+  Router,
+} from "../types/ethers-contracts/index.js";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 
 let _ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"] | null =
   null;
@@ -160,9 +166,9 @@ export const getAuctionInitialization = async ({
 
 export const createAuction = async (
   auctionInitialization: DataTypes.AuctionInitialization,
-  router: any,
-  owner: any,
-  distPartner?: any,
+  router: Router,
+  owner: HardhatEthersSigner,
+  distPartner?: string,
 ): Promise<Escrow> => {
   const ethers = getHardhatEthers();
   // Attach the underlying token to its contract instance
@@ -379,16 +385,16 @@ export const getDefaultOptionInfo = async (
 
 export async function deployEscrowWithRFQ(
   rfqInitialization: DataTypes.RFQInitialization,
-  router: any,
-  owner: any,
-  Escrow: any,
+  router: Router,
+  owner: HardhatEthersSigner,
+  escrowImpl: Escrow,
 ) {
   const tx = await router
     .connect(owner)
     .takeQuote(owner.address, rfqInitialization, ZeroAddress);
   const receipt = await tx.wait();
 
-  const takeQuoteEvent = receipt?.logs.find((log: any) => {
+  const takeQuoteEvent = receipt?.logs.find((log: Log) => {
     try {
       const decoded = router.interface.parseLog({
         topics: log.topics as string[],
@@ -410,5 +416,5 @@ export async function deployEscrowWithRFQ(
   });
   const escrowAddress = decodedEvent?.args.escrow;
 
-  return Escrow.attach(escrowAddress);
+  return escrowImpl.attach(escrowAddress) as Escrow;
 }

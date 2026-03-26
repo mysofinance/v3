@@ -1,6 +1,8 @@
 import hre from "hardhat";
 import { getNetworkInfo } from "./utils.js";
 import readline from "readline";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
+import type { MockOracle } from "../types/ethers-contracts/index.js";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -13,7 +15,7 @@ async function askQuestion(query: string): Promise<string> {
 
 async function getTokenDecimals(
   tokenAddress: string,
-  deployer: any,
+  deployer: HardhatEthersSigner,
 ): Promise<bigint> {
   const { ethers } = await hre.network.connect();
 
@@ -35,12 +37,12 @@ async function getTokenDecimals(
 }
 
 async function setOraclePrice(
-  mockOracle: any,
+  mockOracle: MockOracle,
   underlyingTokenAddr: string,
   settlementTokenAddr: string,
   priceStr: string,
   priceParsed: bigint,
-  deployer: any,
+  deployer: HardhatEthersSigner,
 ) {
   await mockOracle
     .connect(deployer)

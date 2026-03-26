@@ -11,7 +11,6 @@ export default tseslint.config(
   {
     files: ["test/**/*.ts", "scripts/**/*.ts"],
     rules: {
-      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-expressions": "off",
     },
   },

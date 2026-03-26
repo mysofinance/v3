@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { parseEther } from "ethers";
+import { parseEther, type BytesLike } from "ethers";
 import type {
   Router,
   Escrow,
@@ -8,6 +8,7 @@ import type {
   MockOracle,
   FeeHandler,
 } from "../types/ethers-contracts/index.js";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import {
   setupTestContracts,
   getAuctionInitialization,
@@ -30,9 +31,9 @@ describe("Router Contract", function () {
   let settlementToken: MockERC20;
   let underlyingToken: MockERC20;
   let mockOracle: MockOracle;
-  let owner: any;
-  let user1: any;
-  let user2: any;
+  let owner: HardhatEthersSigner;
+  let user1: HardhatEthersSigner;
+  let user2: HardhatEthersSigner;
   const CHAIN_ID = 31337;
   let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
 
@@ -112,7 +113,7 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.parseEther("100"));
       let relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
+      const data: BytesLike[] = [];
       const previewBid1 = await escrow1.previewBid(relBid, refSpot, data);
       expect(previewBid1[1]).to.be.equal(ethers.ZeroAddress);
 
@@ -208,7 +209,7 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
+      const data: BytesLike[] = [];
       await escrow.previewBid(relBid, refSpot, data);
 
       const optionReceiver = user1.address;
@@ -271,7 +272,7 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
+      const data: BytesLike[] = [];
 
       const optionReceiver = user1.address;
 
@@ -401,7 +402,7 @@ describe("Router Contract", function () {
       const preBal2WethClient = await weth.balanceOf(client);
       const preBal2WethTradingFirm = await weth.balanceOf(tradingFirm);
       const payInSettlementToken = true; // pay in WETH
-      const oracleData: any = [];
+      const oracleData: BytesLike[] = [];
       await weth.connect(tradingFirm).approve(router.target, ethers.MaxUint256);
       await router
         .connect(tradingFirm)
@@ -449,7 +450,7 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
+      const data: BytesLike[] = [];
       await escrow.previewBid(relBid, refSpot, data);
       const optionReceiver = user1.address;
       await expect(
@@ -488,7 +489,7 @@ describe("Router Contract", function () {
       const underlyingReceiver = user1.address;
       const underlyingAmount = auctionInitialization.notional;
       const payInSettlementToken = true;
-      const oracleData: any = [];
+      const oracleData: BytesLike[] = [];
       await router
         .connect(user1)
         .exercise(
@@ -525,9 +526,9 @@ describe("Router Contract", function () {
 
   describe("Swap Option Token", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
-    let escrow: any;
+    let escrow: Escrow;
     let swapQuote: DataTypes.SwapQuote;
-    let maker: any;
+    let maker: HardhatEthersSigner;
     let optionReceiver: string;
     let optionTokenAddr: string;
     let optionTokenAmount: bigint;
@@ -551,7 +552,7 @@ describe("Router Contract", function () {
 
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
+      const data: BytesLike[] = [];
 
       optionReceiver = user1.address;
       await expect(
@@ -1073,13 +1074,13 @@ describe("Router Contract", function () {
 
   describe("Bid Preview Revert Scenarios", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
-    let escrow: any;
+    let escrow: Escrow;
     let currentAsk: bigint;
     let relBid: bigint;
     let refSpot: bigint;
     let minSpot: bigint;
     let maxSpot: bigint;
-    let data: any[];
+    let data: BytesLike[];
 
     beforeEach(async function () {
       // Initialize auction
@@ -1137,9 +1138,8 @@ describe("Router Contract", function () {
     });
 
     it("should revert if oracle spot price is out of range", async function () {
-      const auctionParams: DataTypes.AuctionParams =
-        await escrow.auctionParams();
-      const optionInfo: DataTypes.OptionInfo = await escrow.optionInfo();
+      const auctionParams = await escrow.auctionParams();
+      const optionInfo = await escrow.optionInfo();
 
       // Ensure correct initialization
       expect(mockOracle.target).to.be.equal(optionInfo.advancedSettings.oracle);

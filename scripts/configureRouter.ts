@@ -1,6 +1,7 @@
 import hre from "hardhat";
-import { getNetworkInfo } from "./utils.js"; // Import utility
+import { getNetworkInfo } from "./utils.js";
 import readline from "readline";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -14,13 +15,13 @@ async function askQuestion(query: string): Promise<string> {
 async function configureRouter(
   routerAddr: string,
   feeHandlerAddr: string,
-  deployer: any,
+  deployer: HardhatEthersSigner,
 ) {
   const { ethers } = await hre.network.connect();
 
   // Get the deployed Router
   const Router = await ethers.getContractFactory("Router");
-  const router: any = await Router.attach(routerAddr);
+  const router = await Router.attach(routerAddr);
 
   // Set Fee Handler
   await router.connect(deployer).setFeeHandler(feeHandlerAddr);

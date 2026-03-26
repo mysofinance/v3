@@ -12,11 +12,10 @@ async function askQuestion(query: string): Promise<string> {
 }
 
 async function deployFeeHandler(
-  routerAddr: string,
   owner: string,
-  matchFee: any,
-  exerciseFee: any,
-  mintFee: any,
+  matchFee: bigint,
+  exerciseFee: bigint,
+  mintFee: bigint,
 ) {
   const { ethers } = await hre.network.connect();
 
@@ -78,7 +77,6 @@ async function main() {
 
   if (confirm.toLowerCase() === "yes") {
     const feeHandler = await deployFeeHandler(
-      routerAddr,
       owner,
       matchFee,
       exerciseFee,

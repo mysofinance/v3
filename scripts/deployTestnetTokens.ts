@@ -1,6 +1,7 @@
 import hre from "hardhat";
 import { getNetworkInfo } from "./utils.js";
 import readline from "readline";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -15,7 +16,7 @@ async function deployToken(
   tokenName: string,
   tokenSymbol: string,
   tokenDecimals: number,
-  deployer: any,
+  deployer: HardhatEthersSigner,
 ) {
   const { ethers } = await hre.network.connect();
 

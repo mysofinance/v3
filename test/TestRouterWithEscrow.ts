@@ -1,12 +1,15 @@
 import { expect } from "chai";
 import hre from "hardhat";
+import type { BytesLike } from "ethers";
 import type {
   Router,
   Escrow,
   MockERC20,
   MockERC20Votes,
   MockOracle,
+  MockDelegateRegistry,
 } from "../types/ethers-contracts/index.js";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import { DataTypes } from "./DataTypes.js";
 import {
   setupTestContracts,
@@ -26,10 +29,9 @@ describe("Router And Escrow Interaction", function () {
   let underlyingToken: MockERC20;
   let votingUnderlyingToken: MockERC20Votes;
   let mockOracle: MockOracle;
-  let owner: any;
-  let user1: any;
-  let user2: any;
-  let provider: any;
+  let owner: HardhatEthersSigner;
+  let user1: HardhatEthersSigner;
+  let user2: HardhatEthersSigner;
   const CHAIN_ID = 31337;
   let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
 
@@ -44,7 +46,6 @@ describe("Router And Escrow Interaction", function () {
       owner,
       user1,
       user2,
-      provider,
       settlementToken,
       underlyingToken,
       votingUnderlyingToken,
@@ -80,7 +81,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 100,
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
@@ -100,7 +102,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
       await escrow.previewBid(relBid, refSpot, data);
 
       await expect(
@@ -124,7 +126,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 100,
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
@@ -144,7 +147,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const lowRelBid = ethers.parseEther("0.005"); // Below relPremiumStart
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await expect(
         router
@@ -232,7 +235,7 @@ describe("Router And Escrow Interaction", function () {
         .connect(owner)
         .approve(router.target, ethers.parseEther("100"));
 
-      const takeQuotePreview: any = await router.previewTakeQuote(
+      const takeQuotePreview = await router.previewTakeQuote(
         rfqInitialization,
         ethers.ZeroAddress,
       );
@@ -262,7 +265,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 1,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 1,
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
@@ -307,7 +311,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 1,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 1,
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
@@ -354,7 +359,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 100,
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
@@ -374,7 +380,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -411,7 +417,7 @@ describe("Router And Escrow Interaction", function () {
         underlyingTokenDecimals,
       );
       const strike = ethers.parseUnits("0.0824", settlementTokenDecimals);
-      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const currentTime = (await ethers.provider.getBlock("latest"))!.timestamp;
       const rfqInitialization = await getRFQInitialization({
         notionalAmount: notionalAmount,
         strike: strike,
@@ -521,7 +527,7 @@ describe("Router And Escrow Interaction", function () {
         underlyingTokenDecimals,
       ); // 100m of pepe assuming pepe at $0.000001
       const strike = ethers.parseUnits("0.000001", settlementTokenDecimals); // at-the-money strike
-      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const currentTime = (await ethers.provider.getBlock("latest"))!.timestamp;
       const rfqInitialization = await getRFQInitialization({
         notionalAmount: notionalAmount,
         strike: strike,
@@ -634,7 +640,7 @@ describe("Router And Escrow Interaction", function () {
       const tenor = 60 * 60 * 24 * 7;
       const notionalAmount = ethers.parseUnits("1000000", usdcDecimals);
       const strike = ethers.parseUnits("0.00033333333", undDecimals);
-      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const currentTime = (await ethers.provider.getBlock("latest"))!.timestamp;
       const rfqInitialization = await getRFQInitialization({
         notionalAmount: notionalAmount,
         strike: strike,
@@ -749,7 +755,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 100,
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
@@ -769,7 +776,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -807,7 +814,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 100,
         },
         advancedSettings: {
           borrowCap: ethers.parseEther("1"),
@@ -827,7 +835,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -1112,7 +1120,7 @@ describe("Router And Escrow Interaction", function () {
       ).to.be.revertedWithCustomError(escrow, "InvalidWithdraw");
 
       // Fast forward time to after expiry
-      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const currentTime = (await ethers.provider.getBlock("latest"))!.timestamp;
       await ethers.provider.send("evm_increaseTime", [
         rfqInitialization.optionInfo.expiry - currentTime + 1,
       ]);
@@ -1314,7 +1322,7 @@ describe("Router And Escrow Interaction", function () {
       }
 
       // Ensure this works before expiry
-      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const currentTime = (await ethers.provider.getBlock("latest"))!.timestamp;
       const timeToExpiry = rfqInitialization.optionInfo.expiry - currentTime;
       expect(timeToExpiry).to.be.greaterThan(0);
 
@@ -1515,7 +1523,7 @@ describe("Router And Escrow Interaction", function () {
       }
 
       // Ensure this works before expiry
-      const currentTime = (await provider.getBlock("latest")).timestamp;
+      const currentTime = (await ethers.provider.getBlock("latest"))!.timestamp;
       const timeToExpiry = rfqInitialization.optionInfo.expiry - currentTime;
       expect(timeToExpiry).to.be.greaterThan(0);
 
@@ -1547,7 +1555,8 @@ describe("Router And Escrow Interaction", function () {
           decayDuration: 86400 * 7, // 7 days
           minSpot: ethers.parseUnits("0.1", 6),
           maxSpot: ethers.parseUnits("1", 6),
-          decayStartTime: (await provider.getBlock("latest")).timestamp + 100,
+          decayStartTime:
+            (await ethers.provider.getBlock("latest"))!.timestamp + 100,
         },
         advancedSettings: {
           borrowCap: 0n, // Disallow borrowing
@@ -1567,7 +1576,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -1649,7 +1658,7 @@ describe("Router And Escrow Interaction", function () {
       // Get the new escrow address
       const newEscrows = await router.getEscrows(1, 1);
       const newEscrowAddress = newEscrows[0];
-      const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
+      const newEscrow = escrowImpl.attach(newEscrowAddress) as Escrow;
       const postBalNewEscrow = await underlyingToken.balanceOf(newEscrow);
 
       // Check balance changes
@@ -1664,7 +1673,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await expect(
         router
@@ -1718,7 +1727,7 @@ describe("Router And Escrow Interaction", function () {
       // Get the new escrow address
       const newEscrows = await router.getEscrows(1, 1);
       const newEscrowAddress = newEscrows[0];
-      const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
+      const newEscrow = escrowImpl.attach(newEscrowAddress) as Escrow;
       const postBalNewEscrow = await underlyingToken.balanceOf(newEscrow);
 
       // Check balance changes
@@ -1773,7 +1782,7 @@ describe("Router And Escrow Interaction", function () {
       // Get the new escrow address
       const newEscrows = await router.getEscrows(1, 1);
       const newEscrowAddress = newEscrows[0];
-      const newEscrow: any = await escrowImpl.attach(newEscrowAddress);
+      const newEscrow = escrowImpl.attach(newEscrowAddress) as Escrow;
       const postBalNewEscrow = await underlyingToken.balanceOf(newEscrow);
 
       // Check balance changes
@@ -1803,7 +1812,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -1838,7 +1847,7 @@ describe("Router And Escrow Interaction", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -1853,7 +1862,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Router handleOnChainVoting", function () {
-    let escrow: any;
+    let escrow: Escrow;
 
     beforeEach(async function () {
       const auctionInitialization = await getAuctionInitialization({
@@ -2419,7 +2428,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Escrow handleAuctionBid and handleExercise", function () {
-    let escrow: any;
+    let escrow: Escrow;
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
@@ -2615,7 +2624,7 @@ describe("Router And Escrow Interaction", function () {
       });
 
       it("should revert if exercising with underlying token but exercise cost is zero", async function () {
-        const optionInfo: DataTypes.OptionInfo = await escrow.optionInfo();
+        const optionInfo = await escrow.optionInfo();
         await ethers.provider.send("evm_setNextBlockTimestamp", [
           Number(optionInfo.earliestExercise) + 1,
         ]);
@@ -2692,7 +2701,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Escrow handleBorrow", function () {
-    let escrow: any;
+    let escrow: Escrow;
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
@@ -2833,7 +2842,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Escrow handleRepay", function () {
-    let escrow: any;
+    let escrow: Escrow;
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
@@ -3010,7 +3019,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Escrow transfer ownership", function () {
-    let escrow: any;
+    let escrow: Escrow;
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
@@ -3075,7 +3084,7 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Escrow handleWithdraw", function () {
-    let escrow: any;
+    let escrow: Escrow;
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
@@ -3178,8 +3187,8 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Escrow handleOffChainVoting", function () {
-    let escrow: any;
-    let delegateRegistry: any;
+    let escrow: Escrow;
+    let delegateRegistry: MockDelegateRegistry;
     let auctionInitialization: DataTypes.AuctionInitialization;
 
     beforeEach(async function () {
@@ -3193,7 +3202,7 @@ describe("Router And Escrow Interaction", function () {
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        allowedDelegateRegistry: delegateRegistry.target,
+        allowedDelegateRegistry: String(delegateRegistry.target),
       });
       escrow = await createAuction(auctionInitialization, router, owner);
 
@@ -3274,8 +3283,8 @@ describe("Router And Escrow Interaction", function () {
   });
 
   describe("Router handleOffChainVoting", function () {
-    let escrow: any;
-    let delegateRegistry: any;
+    let escrow: Escrow;
+    let delegateRegistry: MockDelegateRegistry;
 
     beforeEach(async function () {
       const DelegateRegistry = await ethers.getContractFactory(
@@ -3287,7 +3296,7 @@ describe("Router And Escrow Interaction", function () {
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
-        allowedDelegateRegistry: delegateRegistry.target,
+        allowedDelegateRegistry: String(delegateRegistry.target),
       });
       escrow = await createAuction(auctionInitialization, router, owner);
     });
