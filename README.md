@@ -36,7 +36,9 @@ npx hardhat keystore set MAINNET_DEPLOYER_KEY
 
 ### Deployment
 
-Deployment scripts are located in the `scripts/` directory. For example:
+Deployment scripts are located in the `scripts/` directory.
+
+Example of running script:
 
 ```bash
 npx hardhat run scripts/deployCore.ts --network sepolia
