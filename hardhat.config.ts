@@ -1,11 +1,8 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import "solidity-coverage";
-import "hardhat-gas-reporter";
-import * as dotenv from "dotenv";
-dotenv.config();
+import { defineConfig, configVariable } from "hardhat/config";
+import hardhatToolboxMochaEthers from "@nomicfoundation/hardhat-toolbox-mocha-ethers";
 
-const config: HardhatUserConfig = {
+export default defineConfig({
+  plugins: [hardhatToolboxMochaEthers],
   solidity: {
     version: "0.8.24",
     settings: {
@@ -17,38 +14,27 @@ const config: HardhatUserConfig = {
   },
   networks: {
     sepolia: {
+      type: "http",
       chainId: 11155111,
-      url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts: [`${process.env.DEPLOYER_KEY}`],
+      url: configVariable("SEPOLIA_RPC_URL"),
+      accounts: [configVariable("DEPLOYER_KEY")],
     },
     baseSepolia: {
+      type: "http",
       chainId: 84532,
-      url: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts: [`${process.env.DEPLOYER_KEY}`],
+      url: configVariable("BASE_SEPOLIA_RPC_URL"),
+      accounts: [configVariable("DEPLOYER_KEY")],
     },
     mainnet: {
+      type: "http",
       chainId: 1,
-      url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts: [`${process.env.DEPLOYER_KEY}`],
-    },
-    hardhat: {
-      /*
-      forking: {
-        url: `https://arb1.arbitrum.io/rpc`,
-      },
-      chainId: 42161,
-      */
-      /*
-      forking: {
-        url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_MAINNET_API_KEY}`,
-      },
-      chainId: 1,
-      */
+      url: configVariable("MAINNET_RPC_URL"),
+      accounts: [configVariable("DEPLOYER_KEY")],
     },
   },
-  etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || "",
+  verify: {
+    etherscan: {
+      apiKey: configVariable("ETHERSCAN_API_KEY"),
+    },
   },
-};
-
-export default config;
+});

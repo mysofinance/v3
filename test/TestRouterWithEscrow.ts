@@ -1,13 +1,14 @@
-const { expect } = require("chai");
-import { ethers } from "hardhat";
-import {
+import { expect } from "chai";
+import hre from "hardhat";
+import { parseEther, parseUnits, ZeroAddress, MaxUint256, getBytes } from "ethers";
+import type {
   Router,
   Escrow,
   MockERC20,
   MockERC20Votes,
   MockOracle,
-} from "../typechain-types";
-import { DataTypes } from "./DataTypes";
+} from "../typechain-types/index.js";
+import { DataTypes } from "./DataTypes.js";
 import {
   setupTestContracts,
   rfqSignaturePayload,
@@ -16,7 +17,8 @@ import {
   getLatestTimestamp,
   getAuctionInitialization,
   createAuction,
-} from "./helpers";
+  setHardhatEthers,
+} from "./helpers.js";
 
 describe("Router And Escrow Interaction", function () {
   let router: Router;
@@ -30,6 +32,12 @@ describe("Router And Escrow Interaction", function () {
   let user2: any;
   let provider: any;
   const CHAIN_ID = 31337;
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
+
+  before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
+  });
 
   beforeEach(async function () {
     const contracts = await setupTestContracts();
@@ -143,7 +151,7 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(user1)
           .bidOnAuction(escrowAddress, user1.address, lowRelBid, refSpot, data)
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
   });
 
@@ -328,7 +336,7 @@ describe("Router And Escrow Interaction", function () {
             underlyingToken.target,
             ethers.parseEther("100")
           )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
   });
 
@@ -781,7 +789,7 @@ describe("Router And Escrow Interaction", function () {
           true, // Pay in settlement token
           []
         )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
   });
 
@@ -961,7 +969,7 @@ describe("Router And Escrow Interaction", function () {
           settlementToken.target,
           expectedCollatAmount
         )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
 
       // Check borrowed amount
       expect(await escrow.borrowedUnderlyingAmounts(user1.address)).to.equal(
@@ -1575,7 +1583,7 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(user1)
           .borrow(escrowAddress, user1.address, ethers.parseEther("10"))
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
 
     it("should allow withdrawing from expired auction and creating a new one (1/3)", async function () {
@@ -1601,7 +1609,7 @@ describe("Router And Escrow Interaction", function () {
             auctionInitialization,
             ethers.ZeroAddress
           )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
 
       // Revert if not owner
       await expect(
@@ -1613,7 +1621,7 @@ describe("Router And Escrow Interaction", function () {
             auctionInitialization,
             ethers.ZeroAddress
           )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
 
       const preBalUser = await underlyingToken.balanceOf(owner.address);
       const preBalOldEscrow = await underlyingToken.balanceOf(oldEscrowAddress);
@@ -1913,7 +1921,7 @@ describe("Router And Escrow Interaction", function () {
       const currentFeeHandler = await router.feeHandler();
 
       await expect(router.connect(owner).setFeeHandler(currentFeeHandler)).to.be
-        .reverted;
+        .revert(ethers);
     });
   });
 
@@ -3367,7 +3375,7 @@ describe("Router And Escrow Interaction", function () {
             ethers.parseUnits("1", 6),
             []
           )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
 
     it("should revert when exercising on non-existent escrow", async function () {
@@ -3383,7 +3391,7 @@ describe("Router And Escrow Interaction", function () {
             false,
             []
           )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
 
     it("should revert when borrowing from non-existent escrow", async function () {
@@ -3393,7 +3401,7 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(user1)
           .borrow(nonExistentEscrow, user1.address, ethers.parseEther("10"))
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
 
     it("should revert when repaying to non-existent escrow", async function () {
@@ -3403,7 +3411,7 @@ describe("Router And Escrow Interaction", function () {
         router
           .connect(user1)
           .repay(nonExistentEscrow, user1.address, ethers.parseEther("10"))
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
 
     it("should revert with InvalidGetEscrowsQuery for invalid queries", async function () {

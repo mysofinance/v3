@@ -1,11 +1,12 @@
-import { chainlink } from "../typechain-types";
+import type { chainlink } from "../typechain-types/index.js";
+import { expect } from "chai";
+import hre from "hardhat";
+import { ZeroAddress, parseUnits, parseEther, formatUnits, Wallet } from "ethers";
 
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-
-import { getLatestTimestamp } from "./helpers";
+import { getLatestTimestamp, setHardhatEthers } from "./helpers.js";
 
 describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Comparison", function () {
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
   let chainlinkOracle: any;
   let owner: any;
   let unauthorizedUser: any;
@@ -80,6 +81,11 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
     }
     return basePriceUSD / quotePriceUSD;
   }
+
+  before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
+  });
 
   describe("Forked Mainnet Tests", function () {
     before(async function () {
@@ -274,7 +280,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           ChainlinkOracle.deploy(
             [USDC],
             [USDC_USD_ORACLE],
-            ethers.ZeroAddress, // Invalid ETH/USD oracle address
+            ZeroAddress, // Invalid ETH/USD oracle address
             owner.address,
             WETH,
             MAX_TIME_SINCE_LAST_UPDATE,
@@ -288,7 +294,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             [USDC_USD_ORACLE],
             ETH_USD_ORACLE,
             owner.address,
-            ethers.ZeroAddress, // Invalid WETH address
+            ZeroAddress, // Invalid WETH address
             MAX_TIME_SINCE_LAST_UPDATE,
             true
           )
@@ -317,7 +323,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           chainlinkOracle
             .connect(unauthorizedUser)
             .addOracleMapping([SHIBA], [SHIBA_ETH_ORACLE])
-        ).to.be.reverted;
+        ).to.be.revert(ethers);
       });
 
       it("should revert if oracle is append only and attempting to overwrite an already set mapping", async function () {
@@ -399,15 +405,15 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
       mockAggregatorEthUsd = await MockAggregator.deploy(
         8,
-        ethers.parseUnits("2500", 8)
+        parseUnits("2500", 8)
       );
       mockAggregatorUsdcUsd = await MockAggregator.deploy(
         8,
-        ethers.parseUnits("1", 8)
+        parseUnits("1", 8)
       );
       mockAggregatorUniUsd = await MockAggregator.deploy(
         18,
-        ethers.parseUnits("0.002972", 18)
+        parseUnits("0.002972", 18)
       );
 
       // Deploy OracleAdapter contract using the mock aggregator
@@ -453,7 +459,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         await expect(
           OracleAdapter.deploy(
             [USDC],
-            [ethers.ZeroAddress], // Invalid oracle address
+            [ZeroAddress], // Invalid oracle address
             mockAggregatorEthUsd.target,
             owner.address,
             WETH,
@@ -486,7 +492,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           OracleAdapter.deploy(
             [USDC],
             [mockAggregatorUsdcUsd.target],
-            ethers.ZeroAddress, // Invalid ETH/USD oracle address
+            ZeroAddress, // Invalid ETH/USD oracle address
             owner.address,
             WETH,
             MAX_TIME_SINCE_LAST_UPDATE,
@@ -501,7 +507,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             [mockAggregatorUsdcUsd.target],
             mockAggregatorEthUsd.target,
             owner.address,
-            ethers.ZeroAddress, // Invalid WETH address
+            ZeroAddress, // Invalid WETH address
             MAX_TIME_SINCE_LAST_UPDATE,
             true
           )
@@ -526,15 +532,15 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
       it("should retrieve correct price from the mock aggregator", async function () {
         const priceInEth = await oracleAdapter.getPriceOfToken(WETH);
         const priceInUsdc = await oracleAdapter.getPrice(WETH, USDC, []);
-        const expectedPriceInEth = ethers.parseUnits("1", 18);
-        const expectedPriceInUsdc = ethers.parseUnits("2500", 6);
+        const expectedPriceInEth = parseUnits("1", 18);
+        const expectedPriceInUsdc = parseUnits("2500", 6);
         expect(priceInEth).to.equal(expectedPriceInEth);
         expect(priceInUsdc).to.equal(expectedPriceInUsdc);
       });
 
       it("should convert USD to ETH correctly using mock ETH/USD oracle", async function () {
         await mockAggregatorEthUsd.setLatestAnswer(
-          ethers.parseUnits("1500", 8)
+          parseUnits("1500", 8)
         );
         const priceInEth = await oracleAdapter.getPrice(USDC, WETH, []); // Expecting 1 USDC in ETH
         const expectedPriceInEth =
@@ -545,7 +551,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
       it("should correctly handle token price with 8 decimal oracle", async function () {
         await mockAggregatorUniUsd.setLatestAnswer(
-          ethers.parseUnits("0.002972", 18)
+          parseUnits("0.002972", 18)
         );
         await oracleAdapter.addOracleMapping(
           [UNI],
@@ -554,14 +560,14 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         expect(await mockAggregatorUniUsd.decimals()).to.be.equal(18);
 
         const priceInEth = await oracleAdapter.getPriceOfToken(UNI);
-        expect(priceInEth).to.be.equal(ethers.parseUnits("0.002972", 18));
+        expect(priceInEth).to.be.equal(parseUnits("0.002972", 18));
         const priceInUsdc = await oracleAdapter.getPrice(UNI, USDC, []);
-        const expectedPriceInUsdc = ethers.parseUnits("7.43", 6);
+        const expectedPriceInUsdc = parseUnits("7.43", 6);
         expect(priceInUsdc).to.equal(expectedPriceInUsdc);
       });
 
       it("should revert if attempting to fetch price for unsupported token", async function () {
-        const randomToken = ethers.Wallet.createRandom().address;
+        const randomToken = Wallet.createRandom().address;
         await expect(
           oracleAdapter.getPriceOfToken(randomToken)
         ).to.be.revertedWithCustomError(oracleAdapter, "NoOracle");
@@ -690,7 +696,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         ).to.be.equal(veryShortStaleTime);
 
         await mockAggregatorEthUsd.setLatestAnswer(
-          ethers.parseUnits("2500", 8)
+          parseUnits("2500", 8)
         );
         await ethers.provider.send("evm_increaseTime", [
           veryShortStaleTime + 1,
@@ -700,7 +706,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         // Note fetching ETH price will not fail as it always returns 10**18
         expect(
           await oracleWithShortStaleTime.getPriceOfToken(WETH)
-        ).to.be.equal(ethers.parseEther("1"));
+        ).to.be.equal(parseEther("1"));
 
         // Expect other prices to fail
         await expect(
@@ -740,7 +746,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           oracleAdapter
             .connect(owner)
             .addOracleMapping(
-              [ethers.ZeroAddress],
+              [ZeroAddress],
               [mockAggregatorUniUsd.target]
             )
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
@@ -771,7 +777,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           oracleAdapter
             .connect(unauthorizedUser)
             .addOracleMapping([UNI], [mockAggregatorUniUsd.target])
-        ).to.be.reverted;
+        ).to.be.revert(ethers);
       });
 
       it("should revert if trying to overwrite an existing oracle mapping in append-only mode", async function () {
@@ -785,7 +791,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           await ethers.getContractFactory("MockAggregatorV3");
         const invalidAggregator = await MockAggregator.deploy(
           12,
-          ethers.parseUnits("100", 12)
+          parseUnits("100", 12)
         ); // Invalid 12 decimals
 
         await expect(

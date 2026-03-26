@@ -1,9 +1,31 @@
-const { expect } = require("chai");
-import { ethers } from "hardhat";
-import { DataTypes } from "./DataTypes";
-import { MockERC20, Escrow } from "../typechain-types";
+import { expect } from "chai";
+import hre from "hardhat";
+import {
+  parseEther,
+  parseUnits,
+  ZeroAddress,
+  MaxUint256,
+  hexlify,
+  randomBytes,
+  AbiCoder,
+  keccak256,
+} from "ethers";
+import { DataTypes } from "./DataTypes.js";
+import type { MockERC20, Escrow } from "../typechain-types/index.js";
+
+let _ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"] | null = null;
+
+export function setHardhatEthers(ethers: typeof _ethers) {
+  _ethers = ethers;
+}
+
+function getHardhatEthers() {
+  if (!_ethers) throw new Error("setHardhatEthers() must be called before using helpers");
+  return _ethers;
+}
 
 export const setupTestContracts = async () => {
+  const ethers = getHardhatEthers();
   const [owner, user1, user2] = await ethers.getSigners();
   const provider = owner.provider;
 
@@ -33,22 +55,22 @@ export const setupTestContracts = async () => {
   await mockOracle.setPrice(
     underlyingToken.target,
     settlementToken.target,
-    ethers.parseUnits("1", 6)
+    parseUnits("1", 6)
   );
   await mockOracle.setPrice(
     votingUnderlyingToken.target,
     settlementToken.target,
-    ethers.parseUnits("1", 6)
+    parseUnits("1", 6)
   );
 
   // Mint tokens for users
-  await settlementToken.mint(owner.address, ethers.parseEther("1000"));
-  await settlementToken.mint(user1.address, ethers.parseEther("1000"));
-  await settlementToken.mint(user2.address, ethers.parseEther("1000"));
+  await settlementToken.mint(owner.address, parseEther("1000"));
+  await settlementToken.mint(user1.address, parseEther("1000"));
+  await settlementToken.mint(user2.address, parseEther("1000"));
 
-  await underlyingToken.mint(owner.address, ethers.parseEther("1000"));
-  await underlyingToken.mint(user1.address, ethers.parseEther("1000"));
-  await underlyingToken.mint(user2.address, ethers.parseEther("1000"));
+  await underlyingToken.mint(owner.address, parseEther("1000"));
+  await underlyingToken.mint(user1.address, parseEther("1000"));
+  await underlyingToken.mint(user2.address, parseEther("1000"));
 
   return {
     owner,
@@ -87,19 +109,19 @@ interface AuctionInitializationParams {
 export const getAuctionInitialization = async ({
   underlyingTokenAddress,
   settlementTokenAddress,
-  notionalAmount = ethers.parseEther("100"), // Default 100 ETH
-  relStrike = ethers.parseEther("1.2"), // Default 120%
+  notionalAmount = parseEther("100"), // Default 100 ETH
+  relStrike = parseEther("1.2"), // Default 120%
   tenor = 86400 * 30, // Default 30 days
   earliestExerciseTenor = 86400 * 7, // Default 7 days
-  relPremiumStart = ethers.parseEther("0.1"), // Default 10%
-  relPremiumFloor = ethers.parseEther("0.01"), // Default 1%
+  relPremiumStart = parseEther("0.1"), // Default 10%
+  relPremiumFloor = parseEther("0.01"), // Default 1%
   decayDuration = 86400 * 7, // Default 7 days
   minSpot = BigInt(1), // Default 1
   maxSpot = BigInt(2) ** BigInt(128) - BigInt(1), // Default maxuint128
   decayStartTime, // Can be undefined, default set below
   borrowCap = 0n, // Default 0%
   votingDelegationAllowed = false, // Default false
-  allowedDelegateRegistry = ethers.ZeroAddress, // Default 0x
+  allowedDelegateRegistry = ZeroAddress, // Default 0x
   premiumTokenIsUnderlying = false, // Default false
   oracleAddress,
 }: AuctionInitializationParams): Promise<DataTypes.AuctionInitialization> => {
@@ -140,6 +162,7 @@ export const createAuction = async (
   owner: any,
   distPartner?: any
 ): Promise<Escrow> => {
+  const ethers = getHardhatEthers();
   // Attach the underlying token to its contract instance
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   const underlyingToken = (await MockERC20Factory.attach(
@@ -149,7 +172,7 @@ export const createAuction = async (
   // Approve tokens and create the auction
   await underlyingToken
     .connect(owner)
-    .approve(router.target, ethers.MaxUint256);
+    .approve(router.target, MaxUint256);
 
   // Create the auction via the Router contract
   await expect(
@@ -158,7 +181,7 @@ export const createAuction = async (
       .createAuction(
         owner.address,
         auctionInitialization,
-        distPartner || ethers.ZeroAddress
+        distPartner || ZeroAddress
       )
   ).to.emit(router, "CreateAuction");
 
@@ -198,7 +221,7 @@ export const rfqSignaturePayload = (
   rfqInitialization: DataTypes.RFQInitialization,
   chainId: number
 ): string => {
-  const abiCoder = new ethers.AbiCoder();
+  const abiCoder = new AbiCoder();
   const payload = abiCoder.encode(
     [
       "uint256", // CHAIN_ID
@@ -230,7 +253,7 @@ export const rfqSignaturePayload = (
       rfqInitialization.rfqQuote.validUntil,
     ]
   );
-  return ethers.keccak256(payload);
+  return keccak256(payload);
 };
 
 interface AuctionParams {
@@ -259,7 +282,7 @@ export const swapSignaturePayload = (
   swapQuote: DataTypes.SwapQuote,
   chainId: number
 ): string => {
-  const abiCoder = new ethers.AbiCoder();
+  const abiCoder = new AbiCoder();
   const payload = abiCoder.encode(
     [
       "uint256", // CHAIN_ID
@@ -278,7 +301,7 @@ export const swapSignaturePayload = (
       swapQuote.validUntil,
     ]
   );
-  return ethers.keccak256(payload);
+  return keccak256(payload);
 };
 
 interface RFQInitializationParams {
@@ -300,17 +323,17 @@ interface RFQInitializationParams {
 export const getRFQInitialization = async ({
   underlyingTokenAddress,
   settlementTokenAddress,
-  notionalAmount = ethers.parseEther("100"), // Default 100
-  strike = ethers.parseEther("1"), // Default 1
+  notionalAmount = parseEther("100"), // Default 100
+  strike = parseEther("1"), // Default 1
   tenor = 86400 * 30, // Default 30 days
   earliestExerciseTenor = 0, // Default 0
-  premium = ethers.parseEther("10"), // Default 10
+  premium = parseEther("10"), // Default 10
   validUntil, // Can be undefined, set below
   borrowCap = 0n, // Default 0%
   votingDelegationAllowed = true, // Default true
-  allowedDelegateRegistry = ethers.ZeroAddress, // Default zero address
+  allowedDelegateRegistry = ZeroAddress, // Default zero address
   premiumTokenIsUnderlying = false, // Default false
-  oracleAddress = ethers.ZeroAddress,
+  oracleAddress = ZeroAddress,
 }: RFQInitializationParams): Promise<DataTypes.RFQInitialization> => {
   // Handle optional validUntil, defaulting to block timestamp + 1 day
   const latestTimestamp = await getLatestTimestamp();
@@ -336,14 +359,15 @@ export const getRFQInitialization = async ({
     rfqQuote: {
       premium,
       validUntil,
-      signature: ethers.hexlify(ethers.randomBytes(65)), // Mock signature
-      eip1271Maker: ethers.ZeroAddress,
+      signature: hexlify(randomBytes(65)), // Mock signature
+      eip1271Maker: ZeroAddress,
     },
   };
   return rfqInitialization;
 };
 
 export const getLatestTimestamp = async () => {
+  const ethers = getHardhatEthers();
   const latestBlock = await ethers.provider.getBlock("latest");
   return latestBlock ? latestBlock.timestamp : Date.now() / 1000;
 };
@@ -359,16 +383,16 @@ export const getDefaultOptionInfo = async (
   const defaultOptionInfo: DataTypes.OptionInfo = {
     underlyingToken,
     settlementToken,
-    notional: ethers.parseUnits("1", 18), // Default notional amount
+    notional: parseUnits("1", 18), // Default notional amount
     strike,
     earliestExercise: latestTimestamp, // Default now
     expiry: latestTimestamp + 60 * 60 * 24 * 30, // Default in 30 days
     advancedSettings: {
       borrowCap: 0n,
-      oracle: ethers.ZeroAddress,
+      oracle: ZeroAddress,
       premiumTokenIsUnderlying: false,
       votingDelegationAllowed: false,
-      allowedDelegateRegistry: ethers.ZeroAddress,
+      allowedDelegateRegistry: ZeroAddress,
     },
   };
 
@@ -383,7 +407,7 @@ export async function deployEscrowWithRFQ(
 ) {
   const tx = await router
     .connect(owner)
-    .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress);
+    .takeQuote(owner.address, rfqInitialization, ZeroAddress);
   const receipt = await tx.wait();
 
   const takeQuoteEvent = receipt?.logs.find((log: any) => {

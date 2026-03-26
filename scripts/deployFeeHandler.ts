@@ -1,5 +1,5 @@
-import { ethers } from "hardhat";
-import { getNetworkInfo } from "./utils";
+import hre from "hardhat";
+import { getNetworkInfo } from "./utils.js";
 import readline from "readline";
 
 const rl = readline.createInterface({
@@ -18,6 +18,8 @@ async function deployFeeHandler(
   exerciseFee: any,
   mintFee: any
 ) {
+  const { ethers } = await hre.network.connect();
+
   // Deploy Fee Handler
   const FeeHandler = await ethers.getContractFactory("FeeHandler");
   const feeHandler = await FeeHandler.deploy(
@@ -32,6 +34,8 @@ async function deployFeeHandler(
 }
 
 async function main() {
+  const { ethers } = await hre.network.connect();
+
   const [deployer] = await ethers.getSigners();
 
   const owner = deployer.address;

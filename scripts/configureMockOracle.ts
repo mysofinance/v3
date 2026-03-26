@@ -1,5 +1,5 @@
-import { ethers } from "hardhat";
-import { getNetworkInfo } from "./utils";
+import hre from "hardhat";
+import { getNetworkInfo } from "./utils.js";
 import readline from "readline";
 
 const rl = readline.createInterface({
@@ -15,6 +15,8 @@ async function getTokenDecimals(
   tokenAddress: string,
   deployer: any
 ): Promise<bigint> {
+  const { ethers } = await hre.network.connect();
+
   try {
     const ERC20 = await ethers.getContractAt(
       "MockERC20",
@@ -49,6 +51,8 @@ async function setOraclePrice(
 }
 
 async function main() {
+  const { ethers } = await hre.network.connect();
+
   const [deployer] = await ethers.getSigners();
   console.log("Deployer account:", deployer.address);
   const balance = await ethers.provider.getBalance(deployer.address);

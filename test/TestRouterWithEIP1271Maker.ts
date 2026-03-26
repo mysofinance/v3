@@ -1,16 +1,17 @@
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
+import "dotenv/config";
+import { expect } from "chai";
+import hre from "hardhat";
+import { Signature, ZeroAddress, concat, toBeHex, solidityPackedKeccak256, getBytes } from "ethers";
 import {
   setupTestContracts,
   getRFQInitialization,
   rfqSignaturePayload,
   getLatestTimestamp,
   swapSignaturePayload,
-} from "./helpers";
-import { Router, Escrow, MockERC20, MockOracle } from "../typechain-types";
-import { DataTypes } from "./DataTypes";
-
-require("dotenv").config();
+  setHardhatEthers,
+} from "./helpers.js";
+import type { Router, Escrow, MockERC20, MockOracle } from "../typechain-types/index.js";
+import { DataTypes } from "./DataTypes.js";
 
 // Constants
 const EIP1271_SAFE_ADDRESS = "0x6e96a002A8fDA96339b97674dcE5C02ab71bFC4c";
@@ -29,16 +30,17 @@ const SAFE_CALLBACK_ABI = [
 
 // Helper method to prepare the signature with Safe-compatible v adjustment
 function prepareSafeEIP1271Signature(signature: any) {
-  const { v, r, s } = ethers.Signature.from(signature);
+  const { v, r, s } = Signature.from(signature);
 
   // Adjust the v value for Safe's eth_sign compatibility
   // See: https://github.com/safe-global/safe-smart-account/blob/6fde75d29c8b52d5ac0c93a6fb7631d434b64119/contracts/Safe.sol#L319-L322
   const adjustedV = v >= 27 ? v + 4 : v; // Shift v by +4 to follow Safe's pre-signature logic
 
-  return ethers.concat([r, s, ethers.toBeHex(adjustedV, 1)]);
+  return concat([r, s, toBeHex(adjustedV, 1)]);
 }
 
 describe("EIP-1271 Signer Tests", function () {
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
   let eip1271SignerKey: any;
   let signer: any;
   let signerAddress: any;
@@ -46,6 +48,8 @@ describe("EIP-1271 Signer Tests", function () {
   let eip1271Contract: any;
 
   before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
     eip1271SignerKey = process.env.SEPOLIA_EIP_1271_SIGNER_KEY;
     if (!eip1271SignerKey) {
       throw new Error("EIP1271 signer key is not defined in the .env file");
@@ -311,9 +315,10 @@ describe("EIP-1271 Signer Tests", function () {
     let user2: any;
     let swapQuote: any;
     let CHAIN_ID: any;
-    const FUND_AMOUNT = ethers.parseUnits("1000", 18);
+    let FUND_AMOUNT: any;
 
     beforeEach(async function () {
+      FUND_AMOUNT = ethers.parseUnits("1000", 18);
       CHAIN_ID = await ethers.provider.send("eth_chainId");
       // Set up contracts and users
       const contracts = await setupTestContracts();

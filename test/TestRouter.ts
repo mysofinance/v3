@@ -1,12 +1,13 @@
-const { expect } = require("chai");
-import { ethers } from "hardhat";
-import {
+import { expect } from "chai";
+import hre from "hardhat";
+import { parseEther, parseUnits, ZeroAddress, MaxUint256, getBytes } from "ethers";
+import type {
   Router,
   Escrow,
   MockERC20,
   MockOracle,
   FeeHandler,
-} from "../typechain-types";
+} from "../typechain-types/index.js";
 import {
   setupTestContracts,
   getAuctionInitialization,
@@ -17,10 +18,11 @@ import {
   swapSignaturePayload,
   getLatestTimestamp,
   getDefaultOptionInfo,
-} from "./helpers";
-import { DataTypes } from "./DataTypes";
+  setHardhatEthers,
+} from "./helpers.js";
+import { DataTypes } from "./DataTypes.js";
 
-const BASE = ethers.parseEther("1");
+const BASE = parseEther("1");
 
 describe("Router Contract", function () {
   let router: Router;
@@ -33,6 +35,12 @@ describe("Router Contract", function () {
   let user2: any;
   let provider: any;
   const CHAIN_ID = 31337;
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
+
+  before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
+  });
 
   beforeEach(async function () {
     const contracts = await setupTestContracts();
@@ -874,7 +882,7 @@ describe("Router Contract", function () {
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming
         )
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
 
       // Check revert when trying to retrieve distribution partner on non-auction
       await expect(escrow.distPartner()).to.be.revertedWithCustomError(
@@ -1064,7 +1072,7 @@ describe("Router Contract", function () {
       it("should revert in case non-owner tries to set mint fee", async function () {
         await expect(
           feeHandler.connect(user2).setMintFee(ethers.parseUnits(".1", 18))
-        ).to.be.reverted;
+        ).to.be.revert(ethers);
       });
     });
   });

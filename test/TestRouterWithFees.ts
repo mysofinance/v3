@@ -1,12 +1,13 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
-import {
+import hre from "hardhat";
+import { parseEther, ZeroAddress, MaxUint256 } from "ethers";
+import type {
   Router,
   Escrow,
   MockERC20,
   MockOracle,
   FeeHandler,
-} from "../typechain-types";
+} from "../typechain-types/index.js";
 
 import {
   setupTestContracts,
@@ -15,7 +16,8 @@ import {
   getAuctionInitialization,
   createAuction,
   getDefaultOptionInfo,
-} from "./helpers";
+  setHardhatEthers,
+} from "./helpers.js";
 
 describe("Router Contract Fee Tests", function () {
   let router: Router;
@@ -28,9 +30,16 @@ describe("Router Contract Fee Tests", function () {
   let user2: any;
   let provider: any;
   const CHAIN_ID = 31337;
-  const BASE = ethers.parseEther("1");
-  const MAX_MATCH_FEE = ethers.parseEther("0.2");
-  const MAX_EXERCISE_FEE = ethers.parseEther("0.005");
+  const BASE = parseEther("1");
+  const MAX_MATCH_FEE = parseEther("0.2");
+  const MAX_EXERCISE_FEE = parseEther("0.005");
+
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
+
+  before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
+  });
 
   beforeEach(async function () {
     const contracts = await setupTestContracts();
@@ -513,7 +522,7 @@ describe("Router Contract Fee Tests", function () {
         router
           .connect(user1)
           .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.reverted;
+      ).to.be.revert(ethers);
     });
   });
 
@@ -855,8 +864,8 @@ describe("Router Contract Fee Tests", function () {
 
   describe("Fee Capping", function () {
     let highFeeHandler: any;
-    const optionPremium = ethers.parseEther("100"); // Example premium
-    const notional = ethers.parseEther("1000"); // Example notional
+    const optionPremium = parseEther("100"); // Example premium
+    const notional = parseEther("1000"); // Example notional
 
     beforeEach(async function () {
       const HighFeeHandler =

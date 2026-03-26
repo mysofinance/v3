@@ -1,5 +1,5 @@
-import { ethers } from "hardhat";
-import { getNetworkInfo } from "./utils";
+import hre from "hardhat";
+import { getNetworkInfo } from "./utils.js";
 import readline from "readline";
 
 const rl = readline.createInterface({
@@ -17,6 +17,8 @@ async function deployToken(
   tokenDecimals: number,
   deployer: any
 ) {
+  const { ethers } = await hre.network.connect();
+
   const MockERC20 = await ethers.getContractFactory("MockERC20");
   const token = await MockERC20.deploy(tokenName, tokenSymbol, tokenDecimals);
   console.log(
@@ -31,6 +33,8 @@ async function deployToken(
 }
 
 async function main() {
+  const { ethers } = await hre.network.connect();
+
   const [deployer] = await ethers.getSigners();
   console.log("Deployer account:", deployer.address);
   const balance = await ethers.provider.getBalance(deployer.address);

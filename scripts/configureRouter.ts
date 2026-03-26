@@ -1,5 +1,5 @@
-import { ethers } from "hardhat";
-import { getNetworkInfo } from "./utils"; // Import utility
+import hre from "hardhat";
+import { getNetworkInfo } from "./utils.js"; // Import utility
 import readline from "readline";
 
 const rl = readline.createInterface({
@@ -16,6 +16,8 @@ async function configureRouter(
   feeHandlerAddr: string,
   deployer: any
 ) {
+  const { ethers } = await hre.network.connect();
+
   // Get the deployed Router
   const Router = await ethers.getContractFactory("Router");
   const router: any = await Router.attach(routerAddr);
@@ -26,6 +28,8 @@ async function configureRouter(
 }
 
 async function main() {
+  const { ethers } = await hre.network.connect();
+
   const [deployer] = await ethers.getSigners();
   console.log("Deployer account:", deployer.address);
   const balance = await ethers.provider.getBalance(deployer.address);
