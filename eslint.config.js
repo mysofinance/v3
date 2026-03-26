@@ -8,10 +8,4 @@ export default tseslint.config(
     files: ["**/*.ts"],
     extends: tseslint.configs.recommended,
   },
-  {
-    files: ["test/**/*.ts", "scripts/**/*.ts"],
-    rules: {
-      "@typescript-eslint/no-unused-expressions": "off",
-    },
-  },
 );

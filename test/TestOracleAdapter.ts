@@ -332,8 +332,9 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
       });
 
       it("should revert if oracle is append only and attempting to overwrite an already set mapping", async function () {
-        expect(await chainlinkOracle.ORACLE_MAPPING_IS_APPEND_ONLY()).to.be
-          .true;
+        expect(await chainlinkOracle.ORACLE_MAPPING_IS_APPEND_ONLY()).to.equal(
+          true,
+        );
         const oracleInfos = await chainlinkOracle.oracleInfos(USDC);
         expect(oracleInfos[0]).to.be.equal(USDC_USD_ORACLE);
         await expect(

@@ -76,7 +76,7 @@ describe("Router Contract", function () {
       });
       const escrow = await createAuction(auctionInitialization, router, owner);
 
-      expect(escrow).to.exist; // Ensure the escrow was created
+      expect(escrow).to.not.equal(undefined); // Ensure the escrow was created
 
       const name = await escrow.name();
       const symbol = await escrow.symbol();
@@ -836,7 +836,7 @@ describe("Router Contract", function () {
       );
 
       // Check option is minted, linked router, owner and exercise fee
-      expect(await escrow.optionMinted()).to.be.true;
+      expect(await escrow.optionMinted()).to.be.equal(true);
       expect(await escrow.router()).to.be.equal(router.target);
       expect(await escrow.owner()).to.be.equal(escrowOwner);
       expect(await escrow.exerciseFee()).to.be.equal(

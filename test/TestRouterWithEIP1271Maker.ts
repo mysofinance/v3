@@ -412,7 +412,7 @@ describe("EIP-1271 Signer Tests", function () {
 
       // Ensure eip1271Maker is set correctly and signer is registered on EIP1271 wallet
       swapQuote.eip1271Maker = String(eip1271Maker.target);
-      expect(await eip1271Maker.isSigner(user1.address)).to.be.true;
+      expect(await eip1271Maker.isSigner(user1.address)).to.equal(true);
       expect(swapQuote.eip1271Maker).to.be.equal(eip1271Maker.target);
 
       // Check signature

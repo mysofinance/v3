@@ -2483,7 +2483,7 @@ describe("Router And Escrow Interaction", function () {
           ),
         ).to.emit(router, "BidOnAuction");
 
-        expect(await escrow.optionMinted()).to.be.true;
+        expect(await escrow.optionMinted()).to.equal(true);
       });
 
       it("should revert on exercise without successful bid", async function () {
@@ -2980,7 +2980,7 @@ describe("Router And Escrow Interaction", function () {
         );
 
       // Ensure the option is minted
-      expect(await newEscrow.optionMinted()).to.be.true;
+      expect(await newEscrow.optionMinted()).to.equal(true);
 
       // Fast forward to earliest exercise time
       const optionInfo = await newEscrow.optionInfo();
