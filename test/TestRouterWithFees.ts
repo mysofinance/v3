@@ -7,7 +7,7 @@ import type {
   MockERC20,
   MockOracle,
   FeeHandler,
-} from "../typechain-types/index.js";
+} from "../types/ethers-contracts/index.js";
 
 import {
   setupTestContracts,

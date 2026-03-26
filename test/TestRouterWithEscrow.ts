@@ -7,7 +7,7 @@ import type {
   MockERC20,
   MockERC20Votes,
   MockOracle,
-} from "../typechain-types/index.js";
+} from "../types/ethers-contracts/index.js";
 import { DataTypes } from "./DataTypes.js";
 import {
   setupTestContracts,

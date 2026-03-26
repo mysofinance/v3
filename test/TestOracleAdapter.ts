@@ -1,4 +1,3 @@
-import type { chainlink } from "../typechain-types/index.js";
 import { expect } from "chai";
 import hre from "hardhat";
 import { ZeroAddress, parseUnits, parseEther, formatUnits, Wallet } from "ethers";

@@ -6,6 +6,8 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.5.0",
     "dotenv": "^17.3.1",
     "hardhat": "^3.0.0",
     "prettier": "^3.3.3",

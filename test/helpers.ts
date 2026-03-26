@@ -11,7 +11,7 @@ import {
   keccak256,
 } from "ethers";
 import { DataTypes } from "./DataTypes.js";
-import type { MockERC20, Escrow } from "../typechain-types/index.js";
+import type { MockERC20, Escrow } from "../types/ethers-contracts/index.js";
 
 let _ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"] | null = null;
 

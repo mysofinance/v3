@@ -10,7 +10,7 @@ import {
   swapSignaturePayload,
   setHardhatEthers,
 } from "./helpers.js";
-import type { Router, Escrow, MockERC20, MockOracle } from "../typechain-types/index.js";
+import type { Router, Escrow, MockERC20, MockOracle } from "../types/ethers-contracts/index.js";
 import { DataTypes } from "./DataTypes.js";
 
 // Constants

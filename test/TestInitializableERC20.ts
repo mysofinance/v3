@@ -2,7 +2,7 @@ import { expect } from "chai";
 import hre from "hardhat";
 import { parseEther, parseUnits, ZeroAddress } from "ethers";
 import { getDefaultOptionInfo, setHardhatEthers } from "./helpers.js";
-import type { TestInitializableERC20 } from "../typechain-types/index.js";
+import type { TestInitializableERC20 } from "../types/ethers-contracts/index.js";
 import { DataTypes } from "./DataTypes.js";
 
 describe("Test Initializable ERC20", function () {
