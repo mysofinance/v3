@@ -1,16 +1,6 @@
 import hre from "hardhat";
-import { getNetworkInfo } from "./utils.js";
-import readline from "readline";
+import { askQuestion, closeReadline, getNetworkInfo } from "./utils.js";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-async function askQuestion(query: string): Promise<string> {
-  return new Promise((resolve) => rl.question(query, resolve));
-}
 
 async function configureRouter(
   routerAddr: string,
@@ -72,7 +62,7 @@ async function main() {
     }
   }
 
-  rl.close();
+  closeReadline();
   console.log("Router configuration process finished.");
 }
 

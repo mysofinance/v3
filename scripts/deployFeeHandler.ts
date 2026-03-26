@@ -1,15 +1,5 @@
 import hre from "hardhat";
-import { getNetworkInfo } from "./utils.js";
-import readline from "readline";
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-async function askQuestion(query: string): Promise<string> {
-  return new Promise((resolve) => rl.question(query, resolve));
-}
+import { askQuestion, closeReadline, getNetworkInfo } from "./utils.js";
 
 async function deployFeeHandler(
   owner: string,
@@ -37,7 +27,6 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
 
-  const owner = deployer.address;
   console.log("Deployer account:", deployer.address);
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log(`Account balance: ${ethers.formatEther(balance)} ETH\n`);
@@ -47,6 +36,7 @@ async function main() {
   console.log("Current NETWORK_NAME:", NETWORK_NAME);
   console.log("");
 
+  const owner = await askQuestion("Enter the owner address: ");
   const routerAddr = await askQuestion("Enter the Router contract address: ");
 
   const matchFeeInput = await askQuestion(
@@ -92,7 +82,7 @@ async function main() {
     console.log("Deployment cancelled.");
   }
 
-  rl.close();
+  closeReadline();
 }
 
 main().catch((error) => {
