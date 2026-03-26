@@ -31,7 +31,15 @@ Sensitive values such as deployer private keys and API keys should be stored usi
 Example of setting a deployer private key in the Hardhat keystore:
 
 ```bash
-hardhat keystore set MAINNET_DEPLOYER_KEY
+npx hardhat keystore set MAINNET_DEPLOYER_KEY
+```
+
+### Deployment
+
+Deployment scripts are located in the `scripts/` directory. For example:
+
+```bash
+npx hardhat run scripts/deployCore.ts --network sepolia
 ```
 
 ### Run Tests
