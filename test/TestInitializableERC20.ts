@@ -23,12 +23,12 @@ describe("Test Initializable ERC20", function () {
       const settlementToken = await MockERC20.deploy(
         "Settlement Token",
         "SETT",
-        6
+        6,
       );
       const underlyingToken = await MockERC20.deploy(
         "Underlying Token",
         "UND",
-        18
+        18,
       );
 
       // Deploy bad Escrow implementation
@@ -46,7 +46,7 @@ describe("Test Initializable ERC20", function () {
       const optionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        parseUnits("1", await settlementToken.decimals())
+        parseUnits("1", await settlementToken.decimals()),
       );
 
       // Approve
@@ -64,21 +64,21 @@ describe("Test Initializable ERC20", function () {
             name: "Option Name",
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming,
-          ZeroAddress
-        )
+          ZeroAddress,
+        ),
       ).to.emit(router, "MintOption");
 
       const escrowAddrs = await router.getEscrows(0, 1);
       const EscrowImpl = await ethers.getContractFactory(
-        "TestInitializableERC20"
+        "TestInitializableERC20",
       );
       const escrow = EscrowImpl.attach(
-        escrowAddrs[0]
+        escrowAddrs[0],
       ) as TestInitializableERC20;
 
       // Check re-initializing fails
       await expect(
-        escrow.anotherInitialize("another name", "another symbol", 0)
+        escrow.anotherInitialize("another name", "another symbol", 0),
       ).to.be.revertedWithCustomError(escrowImpl, "AlreadyInitialized");
     });
   });

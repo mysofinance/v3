@@ -1,6 +1,3 @@
 {
-  "plugins": ["prettier-plugin-solidity"],
-  "semi": false,
-  "singleQuote": true,
-  "printWidth": 120
+  "plugins": ["prettier-plugin-solidity"]
 }

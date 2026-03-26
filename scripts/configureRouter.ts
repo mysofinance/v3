@@ -14,7 +14,7 @@ async function askQuestion(query: string): Promise<string> {
 async function configureRouter(
   routerAddr: string,
   feeHandlerAddr: string,
-  deployer: any
+  deployer: any,
 ) {
   const { ethers } = await hre.network.connect();
 
@@ -45,11 +45,11 @@ async function main() {
   while (continueConfigure) {
     const routerAddr = await askQuestion("Enter the Router contract address: ");
     const feeHandlerAddr = await askQuestion(
-      "Enter the Fee Handler contract address: "
+      "Enter the Fee Handler contract address: ",
     );
 
     console.log(
-      `\nYou entered:\nRouter Address: ${routerAddr}\nFee Handler Address: ${feeHandlerAddr}`
+      `\nYou entered:\nRouter Address: ${routerAddr}\nFee Handler Address: ${feeHandlerAddr}`,
     );
     const confirm = await askQuestion("Proceed with configuration? (yes/no): ");
 
@@ -59,12 +59,12 @@ async function main() {
       console.log("\nConfiguration complete.");
       console.log("Next, verify the contracts using the following command:");
       console.log(
-        `npx hardhat verify --network ${NETWORK_NAME} "${routerAddr}" "${feeHandlerAddr}"`
+        `npx hardhat verify --network ${NETWORK_NAME} "${routerAddr}" "${feeHandlerAddr}"`,
       );
     }
 
     const continueAnswer = await askQuestion(
-      "Would you like to continue configuring the router? (yes/no): "
+      "Would you like to continue configuring the router? (yes/no): ",
     );
     if (continueAnswer.toLowerCase() !== "yes") {
       continueConfigure = false;

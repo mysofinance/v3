@@ -27,10 +27,10 @@ async function main() {
   console.log("\nContract deployment complete.");
   console.log("Next, verify the contracts using the following commands:");
   console.log(
-    `npx hardhat verify --network ${NETWORK_NAME} "${escrowImpl.target}"`
+    `npx hardhat verify --network ${NETWORK_NAME} "${escrowImpl.target}"`,
   );
   console.log(
-    `npx hardhat verify --network ${NETWORK_NAME} "${router.target}" "${deployer.address}" "${escrowImpl.target}"`
+    `npx hardhat verify --network ${NETWORK_NAME} "${router.target}" "${deployer.address}" "${escrowImpl.target}"`,
   );
 }
 

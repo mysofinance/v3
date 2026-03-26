@@ -15,14 +15,14 @@ async function deployToken(
   tokenName: string,
   tokenSymbol: string,
   tokenDecimals: number,
-  deployer: any
+  deployer: any,
 ) {
   const { ethers } = await hre.network.connect();
 
   const MockERC20 = await ethers.getContractFactory("MockERC20");
   const token = await MockERC20.deploy(tokenName, tokenSymbol, tokenDecimals);
   console.log(
-    `* Token deployed: ${token.target} (${tokenName}, ${tokenSymbol}, Decimals: ${tokenDecimals})`
+    `* Token deployed: ${token.target} (${tokenName}, ${tokenSymbol}, Decimals: ${tokenDecimals})`,
   );
 
   // Mint tokens for the deployer
@@ -52,11 +52,11 @@ async function main() {
     const tokenSymbol = await askQuestion("Enter the token symbol: ");
     const tokenDecimals = parseInt(
       await askQuestion("Enter the token decimals (e.g., 18): "),
-      10
+      10,
     );
 
     console.log(
-      `\nYou entered:\nToken Name: ${tokenName}\nToken Symbol: ${tokenSymbol}\nDecimals: ${tokenDecimals}`
+      `\nYou entered:\nToken Name: ${tokenName}\nToken Symbol: ${tokenSymbol}\nDecimals: ${tokenDecimals}`,
     );
     const confirm = await askQuestion("Proceed with deployment? (yes/no): ");
 
@@ -65,18 +65,18 @@ async function main() {
         tokenName,
         tokenSymbol,
         tokenDecimals,
-        deployer
+        deployer,
       );
 
       console.log("\nContract deployment complete.");
       console.log("Next, verify the contract using the following command:");
       console.log(
-        `npx hardhat verify --network ${NETWORK_NAME} "${token.target}" "${tokenName}" "${tokenSymbol}" "${tokenDecimals}"`
+        `npx hardhat verify --network ${NETWORK_NAME} "${token.target}" "${tokenName}" "${tokenSymbol}" "${tokenDecimals}"`,
       );
     }
 
     const continueAnswer = await askQuestion(
-      "Would you like to deploy another token? (yes/no): "
+      "Would you like to deploy another token? (yes/no): ",
     );
     if (continueAnswer.toLowerCase() !== "yes") {
       continueDeploy = false;

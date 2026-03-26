@@ -13,14 +13,16 @@ import {
 import { DataTypes } from "./DataTypes.js";
 import type { MockERC20, Escrow } from "../types/ethers-contracts/index.js";
 
-let _ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"] | null = null;
+let _ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"] | null =
+  null;
 
 export function setHardhatEthers(ethers: typeof _ethers) {
   _ethers = ethers;
 }
 
 function getHardhatEthers() {
-  if (!_ethers) throw new Error("setHardhatEthers() must be called before using helpers");
+  if (!_ethers)
+    throw new Error("setHardhatEthers() must be called before using helpers");
   return _ethers;
 }
 
@@ -38,7 +40,7 @@ export const setupTestContracts = async () => {
   const votingUnderlyingToken = await MockERC20Votes.deploy(
     "Voting Underlying Token",
     "Voting Underlying Token",
-    18
+    18,
   );
 
   // Deploy Escrow implementation
@@ -55,12 +57,12 @@ export const setupTestContracts = async () => {
   await mockOracle.setPrice(
     underlyingToken.target,
     settlementToken.target,
-    parseUnits("1", 6)
+    parseUnits("1", 6),
   );
   await mockOracle.setPrice(
     votingUnderlyingToken.target,
     settlementToken.target,
-    parseUnits("1", 6)
+    parseUnits("1", 6),
   );
 
   // Mint tokens for users
@@ -160,19 +162,17 @@ export const createAuction = async (
   auctionInitialization: DataTypes.AuctionInitialization,
   router: any,
   owner: any,
-  distPartner?: any
+  distPartner?: any,
 ): Promise<Escrow> => {
   const ethers = getHardhatEthers();
   // Attach the underlying token to its contract instance
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   const underlyingToken = (await MockERC20Factory.attach(
-    auctionInitialization.underlyingToken
+    auctionInitialization.underlyingToken,
   )) as MockERC20;
 
   // Approve tokens and create the auction
-  await underlyingToken
-    .connect(owner)
-    .approve(router.target, MaxUint256);
+  await underlyingToken.connect(owner).approve(router.target, MaxUint256);
 
   // Create the auction via the Router contract
   await expect(
@@ -181,8 +181,8 @@ export const createAuction = async (
       .createAuction(
         owner.address,
         auctionInitialization,
-        distPartner || ZeroAddress
-      )
+        distPartner || ZeroAddress,
+      ),
   ).to.emit(router, "CreateAuction");
 
   // Retrieve and return the created escrow instance
@@ -200,7 +200,7 @@ export const calculateExpectedAsk = (
   decayStartTime: number,
   decayDuration: number,
   relPremiumStart: bigint,
-  relPremiumFloor: bigint
+  relPremiumFloor: bigint,
 ) => {
   let expectedAsk;
   if (blockTimestamp < decayStartTime) {
@@ -219,7 +219,7 @@ export const calculateExpectedAsk = (
 
 export const rfqSignaturePayload = (
   rfqInitialization: DataTypes.RFQInitialization,
-  chainId: number
+  chainId: number,
 ): string => {
   const abiCoder = new AbiCoder();
   const payload = abiCoder.encode(
@@ -251,7 +251,7 @@ export const rfqSignaturePayload = (
       ],
       rfqInitialization.rfqQuote.premium,
       rfqInitialization.rfqQuote.validUntil,
-    ]
+    ],
   );
   return keccak256(payload);
 };
@@ -280,7 +280,7 @@ interface AuctionParams {
 
 export const swapSignaturePayload = (
   swapQuote: DataTypes.SwapQuote,
-  chainId: number
+  chainId: number,
 ): string => {
   const abiCoder = new AbiCoder();
   const payload = abiCoder.encode(
@@ -299,7 +299,7 @@ export const swapSignaturePayload = (
       swapQuote.makerGiveToken,
       swapQuote.makerGiveAmount,
       swapQuote.validUntil,
-    ]
+    ],
   );
   return keccak256(payload);
 };
@@ -376,7 +376,7 @@ export const getDefaultOptionInfo = async (
   underlyingToken: string,
   settlementToken: string,
   strike: bigint,
-  overrides: Partial<DataTypes.OptionInfo> = {}
+  overrides: Partial<DataTypes.OptionInfo> = {},
 ): Promise<DataTypes.OptionInfo> => {
   const latestTimestamp = await getLatestTimestamp();
 
@@ -403,7 +403,7 @@ export async function deployEscrowWithRFQ(
   rfqInitialization: DataTypes.RFQInitialization,
   router: any,
   owner: any,
-  Escrow: any
+  Escrow: any,
 ) {
   const tx = await router
     .connect(owner)

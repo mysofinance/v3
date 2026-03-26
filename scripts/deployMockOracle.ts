@@ -21,7 +21,7 @@ async function main() {
   console.log("\nContract deployment complete.");
   console.log("Next, verify the contracts using the following commands:");
   console.log(
-    `npx hardhat verify --network ${NETWORK_NAME} "${mockOracle.target}"`
+    `npx hardhat verify --network ${NETWORK_NAME} "${mockOracle.target}"`,
   );
 }
 

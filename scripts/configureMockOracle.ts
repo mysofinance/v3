@@ -13,7 +13,7 @@ async function askQuestion(query: string): Promise<string> {
 
 async function getTokenDecimals(
   tokenAddress: string,
-  deployer: any
+  deployer: any,
 ): Promise<bigint> {
   const { ethers } = await hre.network.connect();
 
@@ -21,14 +21,14 @@ async function getTokenDecimals(
     const ERC20 = await ethers.getContractAt(
       "MockERC20",
       tokenAddress,
-      deployer
+      deployer,
     );
     const decimals = await ERC20.decimals();
     return decimals;
   } catch (error) {
     console.error(
       `Error fetching decimals for token at address ${tokenAddress}:`,
-      error
+      error,
     );
     throw new Error("Failed to retrieve token decimals.");
   }
@@ -40,13 +40,13 @@ async function setOraclePrice(
   settlementTokenAddr: string,
   priceStr: string,
   priceParsed: bigint,
-  deployer: any
+  deployer: any,
 ) {
   await mockOracle
     .connect(deployer)
     .setPrice(underlyingTokenAddr, settlementTokenAddr, priceParsed);
   console.log(
-    `Price of ${priceStr} (=${priceParsed}) set for 1 unit of underlying token ${underlyingTokenAddr} vs settlement token ${settlementTokenAddr}`
+    `Price of ${priceStr} (=${priceParsed}) set for 1 unit of underlying token ${underlyingTokenAddr} vs settlement token ${settlementTokenAddr}`,
   );
 }
 
@@ -65,7 +65,7 @@ async function main() {
 
   // Get the deployed Mock Oracle
   const mockOracleAddress = await askQuestion(
-    "Enter the Mock Oracle contract address: "
+    "Enter the Mock Oracle contract address: ",
   );
   const MockOracle = await ethers.getContractFactory("MockOracle");
   const mockOracle = await MockOracle.attach(mockOracleAddress);
@@ -75,35 +75,35 @@ async function main() {
   while (continueConfig) {
     // Addresses for tokens
     const settlementTokenAddr = await askQuestion(
-      "Enter the settlement token address: "
+      "Enter the settlement token address: ",
     );
     const underlyingTokenAddr = await askQuestion(
-      "Enter the underlying token address: "
+      "Enter the underlying token address: ",
     );
 
     try {
       console.log("Fetching token decimals...");
       const underlyingDecimals = await getTokenDecimals(
         underlyingTokenAddr,
-        deployer
+        deployer,
       );
       const settlementDecimals = await getTokenDecimals(
         settlementTokenAddr,
-        deployer
+        deployer,
       );
 
       console.log(
-        `Decimals fetched: \nUnderlying token decimals: ${underlyingDecimals}\nSettlement token decimals: ${settlementDecimals}`
+        `Decimals fetched: \nUnderlying token decimals: ${underlyingDecimals}\nSettlement token decimals: ${settlementDecimals}`,
       );
 
       // Ask for price
       const price = await askQuestion(
-        `Enter the price (i.e., settlement token amount for 1**${underlyingDecimals} unit of underlying token; e.g., 5.7): `
+        `Enter the price (i.e., settlement token amount for 1**${underlyingDecimals} unit of underlying token; e.g., 5.7): `,
       );
       const priceParsed = ethers.parseUnits(price, settlementDecimals);
       console.log(`\nYou entered:\nPrice: ${price} (=${priceParsed})`);
       const confirm = await askQuestion(
-        "Proceed with setting the price? (yes/no): "
+        "Proceed with setting the price? (yes/no): ",
       );
 
       if (confirm.toLowerCase() === "yes") {
@@ -113,7 +113,7 @@ async function main() {
           settlementTokenAddr,
           price,
           priceParsed,
-          deployer
+          deployer,
         );
         console.log("\nPrice successfully set.");
       }
@@ -122,7 +122,7 @@ async function main() {
     }
 
     const continueAnswer = await askQuestion(
-      "Would you like to set another price? (yes/no): "
+      "Would you like to set another price? (yes/no): ",
     );
     if (continueAnswer.toLowerCase() !== "yes") {
       continueConfig = false;
