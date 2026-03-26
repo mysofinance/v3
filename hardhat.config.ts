@@ -19,12 +19,12 @@ const config: HardhatUserConfig = {
     sepolia: {
       chainId: 11155111,
       url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
+      accounts: [`${process.env.DEPLOYER_KEY}`],
     },
     baseSepolia: {
       chainId: 84532,
       url: `https://base-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
-      accounts: [`${process.env.SEPOLIA_DEPLOYER_KEY}`],
+      accounts: [`${process.env.DEPLOYER_KEY}`],
     },
     mainnet: {
       chainId: 1,
