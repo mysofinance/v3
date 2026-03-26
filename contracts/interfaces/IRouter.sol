@@ -184,6 +184,21 @@ interface IRouter {
         address indexed newOwner
     );
 
+    /// @notice Emitted when on-chain voting rights are delegated via the Router.
+    /// @param escrow The address of the escrow contract.
+    /// @param delegate The address delegated for on-chain voting.
+    event OnChainVotingDelegation(address indexed escrow, address delegate);
+
+    /// @notice Emitted when off-chain voting rights are delegated via the Router.
+    /// @param escrow The address of the escrow contract.
+    /// @param spaceId ID of the delegation space (e.g., for Snapshot).
+    /// @param delegate The address delegated for off-chain voting.
+    event OffChainVotingDelegation(
+        address indexed escrow,
+        bytes32 spaceId,
+        address delegate
+    );
+
     /// @notice Returns the address of the escrow implementation contract.
     /// @return escrowImpl The address of the escrow implementation contract.
     function escrowImpl() external view returns (address);
@@ -250,6 +265,21 @@ interface IRouter {
         address to,
         address token,
         uint256 amount
+    ) external;
+
+    /// @notice Delegates on-chain voting rights for an escrow's underlying token
+    /// @param escrow The escrow address whose underlying token voting rights are delegated
+    /// @param delegate The address to delegate voting rights to
+    function handleOnChainVoting(address escrow, address delegate) external;
+
+    /// @notice Delegates off-chain voting rights for an escrow via a delegate registry
+    /// @param escrow The escrow address whose off-chain voting rights are delegated
+    /// @param spaceId ID of the delegation space (e.g., for Snapshot)
+    /// @param delegate The address to delegate voting rights to
+    function handleOffChainVoting(
+        address escrow,
+        bytes32 spaceId,
+        address delegate
     ) external;
 
     /// @notice Places a bid on an auction
