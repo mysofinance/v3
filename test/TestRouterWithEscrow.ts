@@ -3359,7 +3359,7 @@ describe("Router And Escrow Interaction", function () {
             underlyingToken.target,
             ethers.parseEther("10")
           )
-      ).to.be.revertedWithCustomError;
+      ).to.be.revertedWithCustomError(router, "NotAnEscrow");
     });
 
     it("should revert when bidding on non-existent escrow", async function () {
