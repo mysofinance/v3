@@ -23,7 +23,7 @@ export default defineConfig({
       type: "http",
       chainId: 1,
       url: configVariable("MAINNET_RPC_URL"),
-      accounts: [configVariable("DEPLOYER_KEY")],
+      accounts: [configVariable("MAINNET_DEPLOYER_KEY")],
     },
   },
   verify: {

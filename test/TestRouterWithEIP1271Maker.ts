@@ -1,7 +1,6 @@
-import "dotenv/config";
 import { expect } from "chai";
 import hre from "hardhat";
-import { Signature, Wallet, Contract, concat, toBeHex } from "ethers";
+import { Signature, HDNodeWallet, Contract, concat, toBeHex } from "ethers";
 import {
   setupTestContracts,
   getRFQInitialization,
@@ -46,8 +45,7 @@ function prepareSafeEIP1271Signature(signature: string) {
 
 describe("EIP-1271 Signer Tests", function () {
   let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
-  let eip1271SignerKey: string | undefined;
-  let signer: Wallet;
+  let signer: HDNodeWallet;
   let signerAddress: string;
   let chainId: number;
   let chainIdHex: string;
@@ -56,11 +54,7 @@ describe("EIP-1271 Signer Tests", function () {
   before(async function () {
     ({ ethers } = await hre.network.connect());
     setHardhatEthers(ethers);
-    eip1271SignerKey = process.env.SEPOLIA_EIP_1271_SIGNER_KEY;
-    if (!eip1271SignerKey) {
-      throw new Error("EIP1271 signer key is not defined in the .env file");
-    }
-    signer = new ethers.Wallet(eip1271SignerKey, ethers.provider);
+    signer = ethers.Wallet.createRandom().connect(ethers.provider);
     signerAddress = await signer.getAddress();
     chainIdHex = await ethers.provider.send("eth_chainId");
     chainId = Number(chainIdHex);
