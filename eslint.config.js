@@ -1,6 +1,18 @@
 import tseslint from "typescript-eslint";
 
-export default tseslint.config({
-  files: ["**/*.ts"],
-  extends: tseslint.configs.recommended,
-});
+export default tseslint.config(
+  {
+    ignores: ["artifacts/**", "types/**"],
+  },
+  {
+    files: ["**/*.ts"],
+    extends: tseslint.configs.recommended,
+  },
+  {
+    files: ["test/**/*.ts", "scripts/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+    },
+  },
+);

@@ -256,28 +256,6 @@ export const rfqSignaturePayload = (
   return keccak256(payload);
 };
 
-interface AuctionParams {
-  underlyingTokenAddress: string;
-  settlementTokenAddress: string;
-  notionalAmount?: bigint;
-  relStrike?: bigint;
-  tenor?: number;
-  earliestExerciseTenor?: number;
-  relPremiumStart?: bigint;
-  relPremiumFloor?: bigint;
-  decayDuration?: number;
-  minSpot?: bigint;
-  maxSpot?: bigint;
-  decayStartTime?: number;
-  borrowCap?: bigint;
-  votingDelegationAllowed?: boolean;
-  allowedDelegateRegistry?: string;
-  premiumTokenIsUnderlying?: boolean;
-  oracleAddress: string;
-  router: any;
-  owner: any;
-}
-
 export const swapSignaturePayload = (
   swapQuote: DataTypes.SwapQuote,
   chainId: number,

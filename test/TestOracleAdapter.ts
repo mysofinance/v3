@@ -1,12 +1,6 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import {
-  ZeroAddress,
-  parseUnits,
-  parseEther,
-  formatUnits,
-  Wallet,
-} from "ethers";
+import { ZeroAddress, parseUnits, parseEther, Wallet } from "ethers";
 
 import { getLatestTimestamp, setHardhatEthers } from "./helpers.js";
 
@@ -351,7 +345,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         const oracleInfo = await chainlinkOracle.oracleInfos(SHIBA);
         expect(oracleInfo[0]).to.be.equal(SHIBA_ETH_ORACLE);
 
-        const onchainPriceInUsd = await chainlinkOracle.getPriceOfToken(SHIBA);
+        await chainlinkOracle.getPriceOfToken(SHIBA);
 
         const onChainPrice = await chainlinkOracle.getPrice(SHIBA, USDC, []);
         const usdcDecimals = await ethers

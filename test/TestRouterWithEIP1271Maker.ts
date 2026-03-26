@@ -1,14 +1,7 @@
 import "dotenv/config";
 import { expect } from "chai";
 import hre from "hardhat";
-import {
-  Signature,
-  ZeroAddress,
-  concat,
-  toBeHex,
-  solidityPackedKeccak256,
-  getBytes,
-} from "ethers";
+import { Signature, concat, toBeHex } from "ethers";
 import {
   setupTestContracts,
   getRFQInitialization,
@@ -17,12 +10,7 @@ import {
   swapSignaturePayload,
   setHardhatEthers,
 } from "./helpers.js";
-import type {
-  Router,
-  Escrow,
-  MockERC20,
-  MockOracle,
-} from "../types/ethers-contracts/index.js";
+import type { Router, MockERC20 } from "../types/ethers-contracts/index.js";
 import { DataTypes } from "./DataTypes.js";
 
 // Constants
@@ -194,10 +182,8 @@ describe("EIP-1271 Signer Tests", function () {
 
   describe("EIP-1271 Signer Tests", function () {
     let router: Router;
-    let escrowImpl: Escrow;
     let settlementToken: MockERC20;
     let underlyingToken: MockERC20;
-    let mockOracle: MockOracle;
     let owner: any;
     let user1: any;
     let user2: any;
@@ -205,16 +191,8 @@ describe("EIP-1271 Signer Tests", function () {
 
     beforeEach(async function () {
       const contracts = await setupTestContracts();
-      ({
-        owner,
-        user1,
-        user2,
-        settlementToken,
-        underlyingToken,
-        escrowImpl,
-        router,
-        mockOracle,
-      } = contracts);
+      ({ owner, user1, user2, settlementToken, underlyingToken, router } =
+        contracts);
 
       // Deploy EIP1271Maker contract and set owner as signer
       const EIP1271Maker = await ethers.getContractFactory("EIP1271Maker");

@@ -1,9 +1,8 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import { parseEther, ZeroAddress, MaxUint256 } from "ethers";
+import { parseEther } from "ethers";
 import type {
   Router,
-  Escrow,
   MockERC20,
   MockOracle,
   FeeHandler,
@@ -28,7 +27,6 @@ describe("Router Contract Fee Tests", function () {
   let owner: any;
   let user1: any;
   let user2: any;
-  let provider: any;
   const CHAIN_ID = 31337;
   const BASE = parseEther("1");
   const MAX_MATCH_FEE = parseEther("0.2");
@@ -47,7 +45,6 @@ describe("Router Contract Fee Tests", function () {
       owner,
       user1,
       user2,
-      provider,
       settlementToken,
       underlyingToken,
       router,

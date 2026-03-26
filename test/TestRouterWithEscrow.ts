@@ -1,12 +1,5 @@
 import { expect } from "chai";
 import hre from "hardhat";
-import {
-  parseEther,
-  parseUnits,
-  ZeroAddress,
-  MaxUint256,
-  getBytes,
-} from "ethers";
 import type {
   Router,
   Escrow,
@@ -108,7 +101,7 @@ describe("Router And Escrow Interaction", function () {
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
       const data: any[] = [];
-      const { preview } = await escrow.previewBid(relBid, refSpot, data);
+      await escrow.previewBid(relBid, refSpot, data);
 
       await expect(
         router
@@ -1395,7 +1388,7 @@ describe("Router And Escrow Interaction", function () {
       const EscrowImpl = await ethers.getContractFactory("Escrow");
       const escrow = EscrowImpl.attach(escrowAddress) as Escrow;
 
-      const optionInfo = await escrow.optionInfo();
+      await escrow.optionInfo();
 
       // Partial borrow and repay amounts
       const borrowAmounts = [
@@ -1681,7 +1674,7 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should allow withdrawing from expired auction and creating a new one (2/3)", async function () {
-      let auctionInitialization = await getAuctionInitialization({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),
@@ -1736,7 +1729,7 @@ describe("Router And Escrow Interaction", function () {
     });
 
     it("should allow withdrawing from expired auction and creating a new one (3/3)", async function () {
-      let auctionInitialization = await getAuctionInitialization({
+      const auctionInitialization = await getAuctionInitialization({
         underlyingTokenAddress: String(underlyingToken.target),
         settlementTokenAddress: String(settlementToken.target),
         oracleAddress: String(mockOracle.target),

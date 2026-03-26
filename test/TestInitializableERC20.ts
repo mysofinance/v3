@@ -16,8 +16,6 @@ describe("Test Initializable ERC20", function () {
   describe("Start Auction", function () {
     it("should allow initializating only once", async function () {
       const [owner] = await ethers.getSigners();
-      const provider = owner.provider;
-
       // Deploy mock ERC20 tokens
       const MockERC20 = await ethers.getContractFactory("MockERC20");
       const settlementToken = await MockERC20.deploy(

@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace DataTypes {
   export interface AuctionParams {
     relStrike: bigint;

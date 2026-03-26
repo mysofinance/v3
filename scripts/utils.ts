@@ -1,6 +1,6 @@
 import hre from "hardhat";
 
-export async function getNetworkInfo(): Promise<[BigInt, string]> {
+export async function getNetworkInfo(): Promise<[bigint, string]> {
   const { ethers } = await hre.network.connect();
   const network = await ethers.provider.getNetwork();
 
