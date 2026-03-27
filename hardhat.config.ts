@@ -7,6 +7,13 @@ export default defineConfig({
     profiles: {
       default: {
         version: "0.8.24",
+        settings: {
+          // without optimizer, the bytecode is too large to run for tests
+          optimizer: {
+            enabled: true,
+            runs: 1,
+          },
+        },
       },
       production: {
         version: "0.8.24",
