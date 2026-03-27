@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { askQuestion, closeReadline, getNetworkInfo } from "./utils.js";
+import { askQuestion, getNetworkInfo } from "./utils.js";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import type { MockOracle } from "../types/ethers-contracts/index.js";
 
@@ -121,7 +121,6 @@ async function main() {
     }
   }
 
-  closeReadline();
   console.log("Price configuration process finished.");
 }
 

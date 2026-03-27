@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { askQuestion, closeReadline, getNetworkInfo } from "./utils.js";
+import { askQuestion, getNetworkInfo } from "./utils.js";
 
 async function deployFeeHandler(
   owner: string,
@@ -81,8 +81,6 @@ async function main() {
   } else {
     console.log("Deployment cancelled.");
   }
-
-  closeReadline();
 }
 
 main().catch((error) => {

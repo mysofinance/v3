@@ -41,7 +41,7 @@ Deployment scripts are located in the `scripts/` directory.
 Example of running script:
 
 ```bash
-npx hardhat run scripts/deployCore.ts --network sepolia
+npx hardhat run scripts/deployCore.ts --build-profile production --network sepolia
 ```
 
 ### Run Tests
