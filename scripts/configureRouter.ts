@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { askQuestion, closeReadline, getNetworkInfo } from "./utils.js";
+import { askQuestion, getNetworkInfo } from "./utils.js";
 import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 
 async function configureRouter(
@@ -62,7 +62,6 @@ async function main() {
     }
   }
 
-  closeReadline();
   console.log("Router configuration process finished.");
 }
 
