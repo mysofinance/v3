@@ -1,12 +1,14 @@
 import { expect } from "chai";
-import { ethers } from "hardhat";
-import {
+import hre from "hardhat";
+import { parseEther, type BytesLike } from "ethers";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
+import type {
   Router,
-  Escrow,
   MockERC20,
   MockOracle,
   FeeHandler,
-} from "../typechain-types";
+  MockHighFeeHandler,
+} from "../types/ethers-contracts/index.js";
 
 import {
   setupTestContracts,
@@ -15,7 +17,8 @@ import {
   getAuctionInitialization,
   createAuction,
   getDefaultOptionInfo,
-} from "./helpers";
+  setHardhatEthers,
+} from "./helpers.js";
 
 describe("Router Contract Fee Tests", function () {
   let router: Router;
@@ -23,14 +26,20 @@ describe("Router Contract Fee Tests", function () {
   let underlyingToken: MockERC20;
   let mockOracle: MockOracle;
   let feeHandler: FeeHandler;
-  let owner: any;
-  let user1: any;
-  let user2: any;
-  let provider: any;
+  let owner: HardhatEthersSigner;
+  let user1: HardhatEthersSigner;
+  let user2: HardhatEthersSigner;
   const CHAIN_ID = 31337;
-  const BASE = ethers.parseEther("1");
-  const MAX_MATCH_FEE = ethers.parseEther("0.2");
-  const MAX_EXERCISE_FEE = ethers.parseEther("0.005");
+  const BASE = parseEther("1");
+  const MAX_MATCH_FEE = parseEther("0.2");
+  const MAX_EXERCISE_FEE = parseEther("0.005");
+
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
+
+  before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
+  });
 
   beforeEach(async function () {
     const contracts = await setupTestContracts();
@@ -38,7 +47,6 @@ describe("Router Contract Fee Tests", function () {
       owner,
       user1,
       user2,
-      provider,
       settlementToken,
       underlyingToken,
       router,
@@ -50,7 +58,7 @@ describe("Router Contract Fee Tests", function () {
       owner.address,
       ethers.parseEther("0.01"), // 1% match fee
       ethers.parseEther("0.001"), // 0.1% exercise fee
-      0n
+      0n,
     );
 
     await router.connect(owner).setFeeHandler(feeHandler.target);
@@ -58,7 +66,7 @@ describe("Router Contract Fee Tests", function () {
     await mockOracle.setPrice(
       settlementToken.target,
       underlyingToken.target,
-      ethers.parseUnits("1", 18)
+      ethers.parseUnits("1", 18),
     );
   });
 
@@ -71,12 +79,12 @@ describe("Router Contract Fee Tests", function () {
           .withdraw(
             user1.address,
             underlyingToken.target,
-            ethers.parseEther("10")
-          )
+            ethers.parseEther("10"),
+          ),
       ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
 
       const initialOwnerBalance = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
 
       await underlyingToken
@@ -89,33 +97,33 @@ describe("Router Contract Fee Tests", function () {
           .withdraw(
             owner.address,
             underlyingToken.target,
-            ethers.parseEther("10")
-          )
+            ethers.parseEther("10"),
+          ),
       )
         .to.emit(feeHandler, "Withdraw")
         .withArgs(
           owner.address,
           underlyingToken.target,
-          ethers.parseEther("10")
+          ethers.parseEther("10"),
         );
 
       const finalOwnerBalance = await underlyingToken.balanceOf(owner.address);
 
       // Check balance
       expect(finalOwnerBalance - initialOwnerBalance).to.equal(
-        ethers.parseEther("10")
+        ethers.parseEther("10"),
       );
     });
 
     it("Should allow only owner to setMatchFeeInfo", async function () {
       // Attempt to setMatchFeeInfo from non-owner
       await expect(
-        feeHandler.connect(user1).setMatchFee(ethers.parseEther("0.05"))
+        feeHandler.connect(user1).setMatchFee(ethers.parseEther("0.05")),
       ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
 
       // Owner sets matchFeeInfo
       await expect(
-        feeHandler.connect(owner).setMatchFee(ethers.parseEther("0.05"))
+        feeHandler.connect(owner).setMatchFee(ethers.parseEther("0.05")),
       )
         .to.emit(feeHandler, "SetMatchFee")
         .withArgs(ethers.parseEther("0.05"));
@@ -124,12 +132,12 @@ describe("Router Contract Fee Tests", function () {
       const defaulOptionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        ethers.parseUnits("1", await settlementToken.decimals())
+        ethers.parseUnits("1", await settlementToken.decimals()),
       );
       const matchFeeInfo = await feeHandler.getMatchFeeInfo(
         user1.address,
         0,
-        defaulOptionInfo
+        defaulOptionInfo,
       );
       expect(matchFeeInfo._matchFee).to.equal(ethers.parseEther("0.05"));
       expect(matchFeeInfo._matchFeeDistPartnerShare).to.equal(0); // addr1 is not a distPartner
@@ -143,27 +151,27 @@ describe("Router Contract Fee Tests", function () {
           .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
-            [{ isSet: true, matchFee: 0 }]
-          )
+            [{ isSet: true, matchFee: 0 }],
+          ),
       ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
     });
 
     it("Should allow only owner to setExerciseFee", async function () {
       // Attempt to setExerciseFee from non-owner
       await expect(
-        feeHandler.connect(user1).setExerciseFee(ethers.parseEther("0.002"))
+        feeHandler.connect(user1).setExerciseFee(ethers.parseEther("0.002")),
       ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
 
       // Owner sets exerciseFee
       await expect(
-        feeHandler.connect(owner).setExerciseFee(ethers.parseEther("0.002"))
+        feeHandler.connect(owner).setExerciseFee(ethers.parseEther("0.002")),
       )
         .to.emit(feeHandler, "SetExerciseFee")
         .withArgs(ethers.parseEther("0.002"));
 
       // Verify change
       expect(await feeHandler.exerciseFee()).to.equal(
-        ethers.parseEther("0.002")
+        ethers.parseEther("0.002"),
       );
     });
 
@@ -173,22 +181,22 @@ describe("Router Contract Fee Tests", function () {
 
       // Attempt to setDistPartners from non-owner
       await expect(
-        feeHandler.connect(user1).setDistPartnerFeeShares(accounts, feesShares)
+        feeHandler.connect(user1).setDistPartnerFeeShares(accounts, feesShares),
       ).to.be.revertedWithCustomError(feeHandler, "OwnableUnauthorizedAccount");
 
       // Owner sets distPartners
       await expect(
-        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feesShares)
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feesShares),
       )
         .to.emit(feeHandler, "SetDistPartnerFeeShares")
         .withArgs(accounts, feesShares);
 
       // Verify changes
       expect(await feeHandler.distPartnerFeeShare(user1.address)).to.be.equal(
-        feesShares[0]
+        feesShares[0],
       );
       expect(await feeHandler.distPartnerFeeShare(user2.address)).to.be.equal(
-        feesShares[1]
+        feesShares[1],
       );
     });
   });
@@ -212,17 +220,17 @@ describe("Router Contract Fee Tests", function () {
 
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       // Get initial balances
       const initialOwnerBalance = await settlementToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const initialUser1Balance = await settlementToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Bid on auction
@@ -234,7 +242,7 @@ describe("Router Contract Fee Tests", function () {
       const finalOwnerBalance = await settlementToken.balanceOf(owner.address);
       const finalUser1Balance = await settlementToken.balanceOf(user1.address);
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Calculate expected fees
@@ -249,7 +257,7 @@ describe("Router Contract Fee Tests", function () {
       expect(finalOwnerBalance).to.be.gt(initialOwnerBalance);
       expect(finalUser1Balance).to.be.lt(initialUser1Balance);
       expect(finalFeeHandlerBalance).to.equal(
-        initialFeeHandlerBalance + expectedMatchFee
+        initialFeeHandlerBalance + expectedMatchFee,
       );
     });
 
@@ -271,7 +279,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -294,10 +302,10 @@ describe("Router Contract Fee Tests", function () {
 
       // Get initial balances
       const initialUser1Balance = await settlementToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Borrow
@@ -308,7 +316,7 @@ describe("Router Contract Fee Tests", function () {
       // Get final balances
       const finalUser1Balance = await settlementToken.balanceOf(user1.address);
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Calculate expected fees
@@ -320,7 +328,7 @@ describe("Router Contract Fee Tests", function () {
       // Check balances
       expect(finalUser1Balance).to.be.lt(initialUser1Balance);
       expect(finalFeeHandlerBalance).to.equal(
-        initialFeeHandlerBalance + expectedBorrowFee
+        initialFeeHandlerBalance + expectedBorrowFee,
       );
     });
   });
@@ -347,13 +355,13 @@ describe("Router Contract Fee Tests", function () {
 
       // Get initial balances
       const initialOwnerBalance = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const initialUser1Balance = await settlementToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Take the quote
@@ -365,7 +373,7 @@ describe("Router Contract Fee Tests", function () {
       const finalOwnerBalance = await underlyingToken.balanceOf(owner.address);
       const finalUser1Balance = await settlementToken.balanceOf(user1.address);
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Calculate expected fees
@@ -376,7 +384,7 @@ describe("Router Contract Fee Tests", function () {
       expect(finalOwnerBalance).to.be.lt(initialOwnerBalance);
       expect(finalUser1Balance).to.be.lt(initialUser1Balance);
       expect(finalFeeHandlerBalance).to.equal(
-        initialFeeHandlerBalance + expectedMatchFee
+        initialFeeHandlerBalance + expectedMatchFee,
       );
     });
 
@@ -406,16 +414,16 @@ describe("Router Contract Fee Tests", function () {
 
       // Get initial balances
       const initialOwnerBalance = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const initialUser1Balance = await settlementToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
       const initialDistPartnerBalance = await settlementToken.balanceOf(
-        user2.address
+        user2.address,
       );
 
       // Take the quote
@@ -427,10 +435,10 @@ describe("Router Contract Fee Tests", function () {
       const finalOwnerBalance = await underlyingToken.balanceOf(owner.address);
       const finalUser1Balance = await settlementToken.balanceOf(user1.address);
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
       const finalDistPartnerBalance = await settlementToken.balanceOf(
-        user2.address
+        user2.address,
       );
 
       // Calculate expected fees
@@ -444,10 +452,10 @@ describe("Router Contract Fee Tests", function () {
       expect(finalOwnerBalance).to.be.lt(initialOwnerBalance);
       expect(finalUser1Balance).to.be.lt(initialUser1Balance);
       expect(finalFeeHandlerBalance).to.equal(
-        initialFeeHandlerBalance + expectedProtocolFee
+        initialFeeHandlerBalance + expectedProtocolFee,
       );
       expect(finalDistPartnerBalance).to.equal(
-        initialDistPartnerBalance + expectedDistPartnerFee
+        initialDistPartnerBalance + expectedDistPartnerFee,
       );
     });
 
@@ -479,7 +487,7 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         router
           .connect(owner)
-          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress),
       ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
     });
 
@@ -494,7 +502,7 @@ describe("Router Contract Fee Tests", function () {
 
       const payloadHash = rfqSignaturePayload(rfqInitialization, CHAIN_ID);
       const signature = await poorQuoter.signMessage(
-        ethers.getBytes(payloadHash)
+        ethers.getBytes(payloadHash),
       );
       rfqInitialization.rfqQuote.signature = signature;
 
@@ -512,8 +520,8 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         router
           .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
-      ).to.be.reverted;
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress),
+      ).to.be.revert(ethers);
     });
   });
 
@@ -539,7 +547,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -556,16 +564,16 @@ describe("Router Contract Fee Tests", function () {
 
       // Get initial balances
       const initialOwnerUnderlyingBalance = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const initialOwnerSettlementBalance = await settlementToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const initialUser1Balance = await settlementToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Exercise the call
@@ -574,19 +582,19 @@ describe("Router Contract Fee Tests", function () {
         user1.address,
         ethers.parseEther("50"), // Exercising half the notional
         true, // Pay in settlement token
-        []
+        [],
       );
 
       // Get final balances
       const finalOwnerUnderlyingBalance = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const finalUser1Balance = await settlementToken.balanceOf(user1.address);
       const finalOwnerSettlementBalance = await settlementToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Calculate expected fees
@@ -596,16 +604,16 @@ describe("Router Contract Fee Tests", function () {
 
       // Check balances
       expect(finalOwnerUnderlyingBalance).to.be.equal(
-        initialOwnerUnderlyingBalance
+        initialOwnerUnderlyingBalance,
       );
       expect(finalOwnerSettlementBalance).to.be.equal(
-        initialOwnerSettlementBalance + exerciseAmount
+        initialOwnerSettlementBalance + exerciseAmount,
       );
       expect(finalUser1Balance).to.be.equal(
-        initialUser1Balance - exerciseAmount - expectedExerciseFee
+        initialUser1Balance - exerciseAmount - expectedExerciseFee,
       );
       expect(finalFeeHandlerBalance).to.equal(
-        initialFeeHandlerBalance + expectedExerciseFee
+        initialFeeHandlerBalance + expectedExerciseFee,
       );
     });
 
@@ -630,7 +638,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, ethers.parseEther("100"));
       const relBid = ethers.parseEther("0.02");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       await router
         .connect(user1)
@@ -647,13 +655,13 @@ describe("Router Contract Fee Tests", function () {
 
       // Get initial balances
       const initialOwnerUnderlyingBalance = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const initialUser1Balance = await underlyingToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Exercise the call
@@ -662,23 +670,23 @@ describe("Router Contract Fee Tests", function () {
         user1.address,
         ethers.parseEther("50"), // Exercising half the notional
         false, // Pay in underlying token
-        []
+        [],
       );
 
       // Get final balances
       const finalOwnerUnderlyingBalance = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const finalUser1Balance = await underlyingToken.balanceOf(user1.address);
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Calculate expected fees
       const oraclePrice = await mockOracle.getPrice(
         underlyingToken.target,
         settlementToken.target,
-        []
+        [],
       );
       const exerciseAmount = ethers.parseEther("50");
       const expectedExerciseFee =
@@ -687,11 +695,11 @@ describe("Router Contract Fee Tests", function () {
 
       // Check balances
       expect(finalOwnerUnderlyingBalance).to.be.gt(
-        initialOwnerUnderlyingBalance
+        initialOwnerUnderlyingBalance,
       );
       expect(finalUser1Balance).to.be.equal(initialUser1Balance);
       expect(finalFeeHandlerBalance).to.be.equal(
-        initialFeeHandlerBalance + expectedExerciseFee
+        initialFeeHandlerBalance + expectedExerciseFee,
       );
     });
   });
@@ -720,10 +728,10 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, bidAmount * 2n); // Approve extra for fees
       const relBid = ethers.parseEther("0.2");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       await router
@@ -731,7 +739,7 @@ describe("Router Contract Fee Tests", function () {
         .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Check that the fee doesn't exceed the maximum
@@ -749,7 +757,7 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, exerciseAmount * 2n); // Approve extra for fees
 
       const exerciseInitialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       await router.connect(user1).exercise(
@@ -757,11 +765,11 @@ describe("Router Contract Fee Tests", function () {
         user1.address,
         exerciseAmount,
         true, // Pay in settlement token
-        []
+        [],
       );
 
       const exerciseFinalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
 
       // Check that the exercise fee doesn't exceed the maximum
@@ -773,11 +781,11 @@ describe("Router Contract Fee Tests", function () {
 
     it("should revert when trying to set fees above maximum limits", async function () {
       await expect(
-        feeHandler.connect(owner).setMatchFee(MAX_MATCH_FEE + 1n)
+        feeHandler.connect(owner).setMatchFee(MAX_MATCH_FEE + 1n),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidMatchFee");
 
       await expect(
-        feeHandler.connect(owner).setExerciseFee(MAX_EXERCISE_FEE + 1n)
+        feeHandler.connect(owner).setExerciseFee(MAX_EXERCISE_FEE + 1n),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidExerciseFee");
     });
 
@@ -803,7 +811,7 @@ describe("Router Contract Fee Tests", function () {
         auctionInitialization,
         router,
         owner,
-        distPartner
+        distPartner,
       );
       const escrowAddress = escrow.target;
 
@@ -814,13 +822,13 @@ describe("Router Contract Fee Tests", function () {
         .approve(router.target, bidAmount * 2n);
       const relBid = ethers.parseEther("0.1");
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any[] = [];
+      const data: BytesLike[] = [];
 
       const initialFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
       const initialDistPartnerBalance = await settlementToken.balanceOf(
-        user2.address
+        user2.address,
       );
 
       await router
@@ -828,10 +836,10 @@ describe("Router Contract Fee Tests", function () {
         .bidOnAuction(escrowAddress, user1.address, relBid, refSpot, data);
 
       const finalFeeHandlerBalance = await settlementToken.balanceOf(
-        feeHandler.target
+        feeHandler.target,
       );
       const finalDistPartnerBalance = await settlementToken.balanceOf(
-        user2.address
+        user2.address,
       );
 
       // Check fee distribution
@@ -845,18 +853,18 @@ describe("Router Contract Fee Tests", function () {
       const expectedProtocolFee = totalFee - expectedDistPartnerFee;
 
       expect(finalFeeHandlerBalance - initialFeeHandlerBalance).to.equal(
-        expectedProtocolFee
+        expectedProtocolFee,
       );
       expect(finalDistPartnerBalance - initialDistPartnerBalance).to.equal(
-        expectedDistPartnerFee
+        expectedDistPartnerFee,
       );
     });
   });
 
   describe("Fee Capping", function () {
-    let highFeeHandler: any;
-    const optionPremium = ethers.parseEther("100"); // Example premium
-    const notional = ethers.parseEther("1000"); // Example notional
+    let highFeeHandler: MockHighFeeHandler;
+    const optionPremium = parseEther("100"); // Example premium
+    const notional = parseEther("1000"); // Example notional
 
     beforeEach(async function () {
       const HighFeeHandler =
@@ -865,7 +873,7 @@ describe("Router Contract Fee Tests", function () {
         owner.address,
         ethers.parseEther("0.5"), // 50% match fee
         ethers.parseEther("0.5"), // 50% exercise fee
-        0n
+        0n,
       );
 
       // Set the high fee handler
@@ -879,25 +887,25 @@ describe("Router Contract Fee Tests", function () {
 
       await highFeeHandler.setDistPartnerFeeShares(
         [user1.address],
-        [ethers.parseEther("0.05")]
+        [ethers.parseEther("0.05")],
       );
 
       // Check match fees
       const defaulOptionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        ethers.parseUnits("1", await settlementToken.decimals())
+        ethers.parseUnits("1", await settlementToken.decimals()),
       );
       const [matchFeeProtocol, matchFeeDistPartner] = await router.getMatchFees(
         user1.address,
         optionPremium,
-        defaulOptionInfo
+        defaulOptionInfo,
       );
 
       // Max match fee is 20%
       const expectedMaxMatchFee = (optionPremium * BigInt(20)) / BigInt(100);
       expect(matchFeeProtocol + matchFeeDistPartner).to.equal(
-        expectedMaxMatchFee
+        expectedMaxMatchFee,
       );
 
       // Verify distribution partner share
@@ -905,19 +913,19 @@ describe("Router Contract Fee Tests", function () {
         (expectedMaxMatchFee * BigInt(5)) / BigInt(100); // 5% of max match fee
       expect(matchFeeDistPartner).to.equal(expectedDistPartnerFee);
       expect(matchFeeProtocol).to.equal(
-        expectedMaxMatchFee - expectedDistPartnerFee
+        expectedMaxMatchFee - expectedDistPartnerFee,
       );
 
       // Set dist partner fee over Base
       await highFeeHandler.setDistPartnerFeeShares(
         [user1.address],
-        [ethers.parseEther("1.5")]
+        [ethers.parseEther("1.5")],
       );
       const [secondMatchFeeProtocol, secondMatchFeeDistPartner] =
         await router.getMatchFees(
           user1.address,
           optionPremium,
-          defaulOptionInfo
+          defaulOptionInfo,
         );
 
       // Since the distribution partner share is capped, the entire match fee should go to the partner
@@ -932,7 +940,7 @@ describe("Router Contract Fee Tests", function () {
       const optionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        ethers.parseUnits("1", await settlementToken.decimals())
+        ethers.parseUnits("1", await settlementToken.decimals()),
       );
 
       // Prepare optionInfo with a valid notional value
@@ -941,7 +949,7 @@ describe("Router Contract Fee Tests", function () {
       // Test capping of mint fees
       const [mintFeeProtocol, mintFeeDistPartner] = await router.getMintFees(
         user1.address,
-        optionInfo.notional
+        optionInfo.notional,
       );
 
       // Max mint fee is capped at 20% of notional
@@ -956,7 +964,7 @@ describe("Router Contract Fee Tests", function () {
       // Set distribution partner share
       await highFeeHandler.setDistPartnerFeeShares(
         [user1.address],
-        [ethers.parseEther("0.25")] // 25% of mint fee
+        [ethers.parseEther("0.25")], // 25% of mint fee
       );
 
       // Test mint fees with distribution partner fee share
@@ -967,13 +975,13 @@ describe("Router Contract Fee Tests", function () {
         (expectedMaxMintFee * BigInt(25)) / BigInt(100); // 25% of max mint fee
       expect(mintFeeDistPartnerWithDist).to.equal(expectedDistPartnerFee);
       expect(mintFeeProtocolWithDist).to.equal(
-        expectedMaxMintFee - expectedDistPartnerFee
+        expectedMaxMintFee - expectedDistPartnerFee,
       );
 
       // Set an extremely high distribution partner fee share (>100%)
       await highFeeHandler.setDistPartnerFeeShares(
         [user1.address],
-        [ethers.parseEther("1.5")] // 150% of mint fee
+        [ethers.parseEther("1.5")], // 150% of mint fee
       );
 
       // Test mint fees when distribution partner fee share exceeds 100%
@@ -1015,7 +1023,7 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         router
           .connect(owner)
-          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress),
       ).to.be.revertedWithCustomError(router, "InvalidTakeQuote");
 
       // Toggle pause off
@@ -1027,7 +1035,7 @@ describe("Router Contract Fee Tests", function () {
       await expect(
         router
           .connect(owner)
-          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress)
+          .takeQuote(owner.address, rfqInitialization, ethers.ZeroAddress),
       ).to.emit(router, "TakeQuote");
     });
   });
@@ -1037,7 +1045,7 @@ describe("Router Contract Fee Tests", function () {
       const excessiveMatchFee = MAX_MATCH_FEE + ethers.parseEther("0.001");
 
       await expect(
-        feeHandler.connect(owner).setMatchFee(excessiveMatchFee)
+        feeHandler.connect(owner).setMatchFee(excessiveMatchFee),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidMatchFee");
     });
 
@@ -1049,8 +1057,8 @@ describe("Router Contract Fee Tests", function () {
           .connect(owner)
           .setDistPartnerFeeShares(
             [user1.address],
-            [excessiveDistPartnerFeeShare]
-          )
+            [excessiveDistPartnerFeeShare],
+          ),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidDistPartnerFeeShare");
     });
 
@@ -1059,7 +1067,7 @@ describe("Router Contract Fee Tests", function () {
         MAX_EXERCISE_FEE + ethers.parseEther("0.001");
 
       await expect(
-        feeHandler.connect(owner).setExerciseFee(excessiveExerciseFee)
+        feeHandler.connect(owner).setExerciseFee(excessiveExerciseFee),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidExerciseFee");
     });
 
@@ -1068,7 +1076,7 @@ describe("Router Contract Fee Tests", function () {
       const feeShares = [BASE]; // Unequal length
 
       await expect(
-        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares)
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
     });
 
@@ -1077,7 +1085,7 @@ describe("Router Contract Fee Tests", function () {
       const feeShares: bigint[] = [];
 
       await expect(
-        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares)
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
     });
 
@@ -1092,7 +1100,7 @@ describe("Router Contract Fee Tests", function () {
 
       // Attempt to set to true again
       await expect(
-        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares)
+        feeHandler.connect(owner).setDistPartnerFeeShares(accounts, feeShares),
       ).to.be.revertedWithCustomError(feeHandler, "DistPartnerFeeUnchanged");
     });
   });
@@ -1103,12 +1111,12 @@ describe("Router Contract Fee Tests", function () {
       const defaulOptionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        ethers.parseUnits("1", await settlementToken.decimals())
+        ethers.parseUnits("1", await settlementToken.decimals()),
       );
       let info = await feeHandler.getMatchFeeInfo(
         user1.address,
         0,
-        defaulOptionInfo
+        defaulOptionInfo,
       );
       expect(info._matchFee).to.equal(ethers.parseEther("0.01"));
       expect(info._matchFeeDistPartnerShare).to.equal(0);
@@ -1122,11 +1130,11 @@ describe("Router Contract Fee Tests", function () {
       info = await feeHandler.getMatchFeeInfo(
         user1.address,
         0,
-        defaulOptionInfo
+        defaulOptionInfo,
       );
       expect(info._matchFee).to.equal(ethers.parseEther("0.01"));
       expect(info._matchFeeDistPartnerShare).to.equal(
-        ethers.parseEther("0.05")
+        ethers.parseEther("0.05"),
       );
     });
   });
@@ -1142,8 +1150,8 @@ describe("Router Contract Fee Tests", function () {
           .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
-            [{ isSet: true, matchFee: invalidFee }]
-          )
+            [{ isSet: true, matchFee: invalidFee }],
+          ),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidMatchFee");
 
       // Attempt to set with invalid/mismatched array lengths
@@ -1156,8 +1164,8 @@ describe("Router Contract Fee Tests", function () {
               isSet: true,
               matchFee: ethers.parseEther("0.01"),
             },
-          ]
-        )
+          ],
+        ),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
       await expect(
         feeHandler.connect(owner).setMatchFeesPerPair(
@@ -1168,8 +1176,8 @@ describe("Router Contract Fee Tests", function () {
               isSet: true,
               matchFee: ethers.parseEther("0.01"),
             },
-          ]
-        )
+          ],
+        ),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
       await expect(
         feeHandler
@@ -1177,8 +1185,8 @@ describe("Router Contract Fee Tests", function () {
           .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
-            []
-          )
+            [],
+          ),
       ).to.be.revertedWithCustomError(feeHandler, "InvalidArrayLength");
     });
 
@@ -1193,26 +1201,26 @@ describe("Router Contract Fee Tests", function () {
           .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
-            [{ isSet: true, matchFee: ethers.parseEther("0.02") }]
-          )
+            [{ isSet: true, matchFee: ethers.parseEther("0.02") }],
+          ),
       )
         .to.emit(feeHandler, "SetMatchFeesPerPair")
         .withArgs(
           [underlyingToken.target],
           [settlementToken.target],
-          [[true, ethers.parseEther("0.02")]]
+          [[true, ethers.parseEther("0.02")]],
         );
 
       // Verify the pair-dependent fee is applied
       const defaulOptionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        ethers.parseUnits("1", await settlementToken.decimals())
+        ethers.parseUnits("1", await settlementToken.decimals()),
       );
       const matchFeeInfo = await feeHandler.getMatchFeeInfo(
         ethers.ZeroAddress,
         0,
-        defaulOptionInfo
+        defaulOptionInfo,
       );
 
       expect(matchFeeInfo._matchFee).to.equal(ethers.parseEther("0.02"));
@@ -1228,7 +1236,7 @@ describe("Router Contract Fee Tests", function () {
         .setMatchFeesPerPair(
           [underlyingToken.target],
           [settlementToken.target],
-          [{ isSet: true, matchFee: ethers.parseEther("0.02") }]
+          [{ isSet: true, matchFee: ethers.parseEther("0.02") }],
         );
 
       // Delete pair-dependent fees
@@ -1238,26 +1246,26 @@ describe("Router Contract Fee Tests", function () {
           .setMatchFeesPerPair(
             [underlyingToken.target],
             [settlementToken.target],
-            [{ isSet: false, matchFee: 0 }]
-          )
+            [{ isSet: false, matchFee: 0 }],
+          ),
       )
         .to.emit(feeHandler, "SetMatchFeesPerPair")
         .withArgs(
           [underlyingToken.target],
           [settlementToken.target],
-          [[false, 0]]
+          [[false, 0]],
         );
 
       // Verify the general fee is now applied
       const defaulOptionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        ethers.parseUnits("1", await settlementToken.decimals())
+        ethers.parseUnits("1", await settlementToken.decimals()),
       );
       const matchFeeInfo = await feeHandler.getMatchFeeInfo(
         ethers.ZeroAddress,
         0,
-        defaulOptionInfo
+        defaulOptionInfo,
       );
 
       expect(matchFeeInfo._matchFee).to.equal(ethers.parseEther("0.01"));

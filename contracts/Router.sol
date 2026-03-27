@@ -148,10 +148,7 @@ contract Router is Ownable, IRouter {
         emit Withdraw(msg.sender, escrow, to, token, amount);
     }
 
-    function handleOnChainVoting(
-        address escrow,
-        address delegate
-    ) external {
+    function handleOnChainVoting(address escrow, address delegate) external {
         if (!isEscrow[escrow]) {
             revert Errors.NotAnEscrow();
         }

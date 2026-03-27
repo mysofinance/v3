@@ -1,11 +1,45 @@
 {
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "test": "hardhat test",
+    "test:gas": "hardhat test --gas-stats",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "typecheck": "tsc --noEmit"
+  },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "hardhat": "^2.22.8",
-    "hardhat-gas-reporter": "^2.2.1",
+    "@nomicfoundation/hardhat-ethers": "^4.0.6",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.0",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.5.0",
+    "chai": "^4.5.0",
+    "eslint": "^10.1.0",
+    "ethers": "^6.16.0",
+    "hardhat": "^3.0.0",
     "prettier": "^3.3.3",
     "prettier-plugin-solidity": "^1.3.1",
-    "solidity-coverage": "^0.8.13"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@arbitrum/nitro-contracts"
+    ],
+    "overrides": {
+      "@openzeppelin/contracts-upgradeable@>=4.3.0 <4.8.3": ">=4.8.3",
+      "@openzeppelin/contracts-upgradeable@>=4.0.0 <4.9.3": ">=4.9.3",
+      "@openzeppelin/contracts-upgradeable@>=4.7.0 <4.9.2": ">=4.9.2",
+      "@openzeppelin/contracts-upgradeable@>=3.2.0 <4.8.3": ">=4.8.3",
+      "@openzeppelin/contracts-upgradeable@>=4.3.0 <4.9.1": ">=4.9.1",
+      "@openzeppelin/contracts-upgradeable@>=4.5.0 <4.9.6": ">=4.9.6",
+      "tmp@<=0.2.3": ">=0.2.4",
+      "lodash-es@>=4.0.0 <=4.17.22": ">=4.17.23",
+      "diff@>=6.0.0 <8.0.3": ">=8.0.3",
+      "serialize-javascript@<=7.0.2": ">=7.0.3"
+    }
   },
   "dependencies": {
     "@chainlink/contracts": "^1.2.0",

@@ -9,72 +9,43 @@ For match-making, MYSO v3 offers users the choice between two matching routes:
 
 Upon a match, the underlying token is locked in a segregated escrow account, to which only the option writer has access. The trading firm with whom the user is matched receives an ERC20 token representing the option position, giving the option token holder the right—but not the obligation—to acquire the underlying tokens at the specified strike price. MYSO v3 also features a simple atomic swap mechanism, allowing minted option tokens to be traded in a secondary market. This enables various use cases, such as unwinding a trade or executing back-to-back hedges. Depending on the option configuration, various post-settlement scenarios can be supported, such as allowing the option writer to retain voting power over the underlying tokens or enabling the option holder to borrow (and repay) underlying tokens for hedging purposes.
 
-## Contracts
+## Getting Started
 
-```
-contracts/
-┣ errors/
-┃ ┗ Errors.sol
-┣ feehandler/
-┃ ┗ FeeHandler.sol
-┣ interfaces/
-┃ ┣ IDelegation.sol
-┃ ┣ IEIP1271.sol
-┃ ┣ IEscrow.sol
-┃ ┣ IFeeHandler.sol
-┃ ┣ IOracleAdapter.sol
-┃ ┗ IRouter.sol
-┣ oracles/
-┃ ┗ OracleAdapter.sol
-┣ test/
-┃ ┣ EIP1271Maker.sol
-┃ ┣ MockAggregatorV3.sol
-┃ ┣ MockDelegateRegistry.sol
-┃ ┣ MockERC20.sol
-┃ ┣ MockERC20Votes.sol
-┃ ┣ MockHighFeeHandler.sol
-┃ ┣ MockOracle.sol
-┃ ┣ TestInitializableERC20.sol
-┃ ┗ TestRecover.sol
-┣ utils/
-┃ ┗ InitializableERC20.sol
-┣ DataTypes.sol
-┣ Escrow.sol
-┗ Router.sol
+### Prerequisites
+
+- Node.js >= 22
+- pnpm (the exact version is pinned via the `packageManager` field in `package.json`)
+
+### Install Dependencies
+
+```bash
+pnpm install
 ```
 
-## Test Files
+### Environment Variables
 
-```
-test/
-┣ DataTypes.ts
-┣ helpers.ts
-┣ TestInitializableERC20.ts
-┣ TestOracleAdapter.ts
-┣ TestRouter.ts
-┣ TestRouterWithEIP1271Maker.ts
-┣ TestRouterWithEscrow.ts
-┗ TestRouterWithFees.ts
+The `.env.example` file lists the required environment variables (RPC URLs, API keys, deployer private keys). For deployment and verification workflows, these must be configured before use.
+
+Sensitive values such as deployer private keys and API keys should be stored using Hardhat's encrypted keystore and never in a plain-text `.env` file.
+
+Example of setting a deployer private key in the Hardhat keystore:
+
+```bash
+npx hardhat keystore set MAINNET_DEPLOYER_KEY
 ```
 
-## Test Coverage
+### Deployment
 
-```
------------------------|----------|----------|----------|----------|----------------|
-File                   |  % Stmts | % Branch |  % Funcs |  % Lines |Uncovered Lines |
------------------------|----------|----------|----------|----------|----------------|
- contracts\            |      100 |      100 |      100 |      100 |                |
-  Escrow.sol           |      100 |      100 |      100 |      100 |                |
-  Router.sol           |      100 |      100 |      100 |      100 |                |
- contracts\errors\     |      100 |      100 |      100 |      100 |                |
-  Errors.sol           |      100 |      100 |      100 |      100 |                |
- contracts\feehandler\ |      100 |      100 |      100 |      100 |                |
-  FeeHandler.sol       |      100 |      100 |      100 |      100 |                |
- contracts\oracles\    |      100 |      100 |      100 |      100 |                |
-  OracleAdapter.sol    |      100 |      100 |      100 |      100 |                |
------------------------|----------|----------|----------|----------|----------------|
-All files              |      100 |      100 |      100 |      100 |                |
------------------------|----------|----------|----------|----------|----------------|
+Deployment scripts are located in the `scripts/` directory.
+
+Example of running script:
+
+```bash
+npx hardhat run scripts/deployCore.ts --network sepolia
 ```
 
-To run the tests, install the necessary dependencies using `npm -i` and then run `npx hardhat test`.
+### Run Tests
+
+```bash
+pnpm test
+```

@@ -1,12 +1,14 @@
-const { expect } = require("chai");
-import { ethers } from "hardhat";
-import {
+import { expect } from "chai";
+import hre from "hardhat";
+import { parseEther, type BytesLike } from "ethers";
+import type {
   Router,
   Escrow,
   MockERC20,
   MockOracle,
   FeeHandler,
-} from "../typechain-types";
+} from "../types/ethers-contracts/index.js";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
 import {
   setupTestContracts,
   getAuctionInitialization,
@@ -17,10 +19,11 @@ import {
   swapSignaturePayload,
   getLatestTimestamp,
   getDefaultOptionInfo,
-} from "./helpers";
-import { DataTypes } from "./DataTypes";
+  setHardhatEthers,
+} from "./helpers.js";
+import { DataTypes } from "./DataTypes.js";
 
-const BASE = ethers.parseEther("1");
+const BASE = parseEther("1");
 
 describe("Router Contract", function () {
   let router: Router;
@@ -28,11 +31,16 @@ describe("Router Contract", function () {
   let settlementToken: MockERC20;
   let underlyingToken: MockERC20;
   let mockOracle: MockOracle;
-  let owner: any;
-  let user1: any;
-  let user2: any;
-  let provider: any;
+  let owner: HardhatEthersSigner;
+  let user1: HardhatEthersSigner;
+  let user2: HardhatEthersSigner;
   const CHAIN_ID = 31337;
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
+
+  before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
+  });
 
   beforeEach(async function () {
     const contracts = await setupTestContracts();
@@ -40,7 +48,6 @@ describe("Router Contract", function () {
       owner,
       user1,
       user2,
-      provider,
       settlementToken,
       underlyingToken,
       escrowImpl,
@@ -54,7 +61,7 @@ describe("Router Contract", function () {
       // Check revert if trying to deploy with escrow implementation contract being zero address
       const Router = await ethers.getContractFactory("Router");
       await expect(
-        Router.deploy(owner.address, ethers.ZeroAddress)
+        Router.deploy(owner.address, ethers.ZeroAddress),
       ).to.be.revertedWithCustomError(Router, "InvalidAddress");
     });
   });
@@ -69,7 +76,7 @@ describe("Router Contract", function () {
       });
       const escrow = await createAuction(auctionInitialization, router, owner);
 
-      expect(escrow).to.exist; // Ensure the escrow was created
+      expect(escrow).to.not.equal(undefined); // Ensure the escrow was created
 
       const name = await escrow.name();
       const symbol = await escrow.symbol();
@@ -97,7 +104,7 @@ describe("Router Contract", function () {
         auctionInitialization,
         router,
         owner,
-        ethers.ZeroAddress
+        ethers.ZeroAddress,
       );
       expect(await escrow1.distPartner()).to.be.equal(ethers.ZeroAddress);
       let currentAsk = await escrow1.currAsk();
@@ -105,8 +112,8 @@ describe("Router Contract", function () {
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
       let relBid = currentAsk;
-      let refSpot = ethers.parseUnits("1", 6);
-      let data: any = [];
+      const refSpot = ethers.parseUnits("1", 6);
+      const data: BytesLike[] = [];
       const previewBid1 = await escrow1.previewBid(relBid, refSpot, data);
       expect(previewBid1[1]).to.be.equal(ethers.ZeroAddress);
 
@@ -114,7 +121,7 @@ describe("Router Contract", function () {
         auctionInitialization,
         router,
         owner,
-        user1.address
+        user1.address,
       );
       expect(await escrow2.distPartner()).to.be.equal(user1.address);
       currentAsk = await escrow1.currAsk();
@@ -153,7 +160,7 @@ describe("Router Contract", function () {
         auctionInitialization.auctionParams.decayStartTime,
         auctionInitialization.auctionParams.decayDuration,
         BigInt(relPremiumStart.toString()),
-        BigInt(relPremiumFloor.toString())
+        BigInt(relPremiumFloor.toString()),
       );
 
       expect(currentAsk).to.equal(expectedAsk);
@@ -171,7 +178,7 @@ describe("Router Contract", function () {
         auctionInitialization.auctionParams.decayStartTime,
         auctionInitialization.auctionParams.decayDuration,
         BigInt(relPremiumStart.toString()),
-        BigInt(relPremiumFloor.toString())
+        BigInt(relPremiumFloor.toString()),
       );
 
       expect(currentAsk).to.equal(expectedAsk);
@@ -196,22 +203,20 @@ describe("Router Contract", function () {
       const escrow = await createAuction(auctionInitialization, router, owner);
 
       // Approve and bid on auction
-      let currentAsk = await escrow.currAsk();
+      const currentAsk = await escrow.currAsk();
       await settlementToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
-      const { preview } = await escrow.previewBid(relBid, refSpot, data);
+      const data: BytesLike[] = [];
+      await escrow.previewBid(relBid, refSpot, data);
 
       const optionReceiver = user1.address;
-      const expectedProtocolMatchFee = preview[10];
-
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data),
       ).to.emit(router, "BidOnAuction");
     });
 
@@ -224,20 +229,20 @@ describe("Router Contract", function () {
       auctionInitialization.auctionParams.earliestExerciseTenor = 0;
 
       const ownerBalPreEscrowCreation = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const escrow = await createAuction(auctionInitialization, router, owner);
       const ownerBalPostEscrowCreation = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const escrowBalPostEscrowCreation = await underlyingToken.balanceOf(
-        escrow.target
+        escrow.target,
       );
       expect(
-        ownerBalPreEscrowCreation - ownerBalPostEscrowCreation
+        ownerBalPreEscrowCreation - ownerBalPostEscrowCreation,
       ).to.be.equal(auctionInitialization.notional);
       expect(escrowBalPostEscrowCreation).to.be.equal(
-        auctionInitialization.notional
+        auctionInitialization.notional,
       );
 
       // Escrow owner removes tokens
@@ -247,34 +252,34 @@ describe("Router Contract", function () {
           escrow.target,
           owner.address,
           underlyingToken.target,
-          escrowBalPostEscrowCreation
+          escrowBalPostEscrowCreation,
         );
       const ownerBalPostWithdraw = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const vaultBalPostWithdraw = await underlyingToken.balanceOf(
-        escrow.target
+        escrow.target,
       );
       expect(ownerBalPostWithdraw - ownerBalPostEscrowCreation).to.be.equal(
-        auctionInitialization.notional
+        auctionInitialization.notional,
       );
       expect(vaultBalPostWithdraw).to.be.equal(0n);
 
       // Approve and bid on auction
-      let currentAsk = await escrow.currAsk();
+      const currentAsk = await escrow.currAsk();
       await settlementToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
+      const data: BytesLike[] = [];
 
       const optionReceiver = user1.address;
 
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data),
       ).to.be.revertedWithCustomError(escrowImpl, "InvalidBid");
     });
   });
@@ -296,7 +301,7 @@ describe("Router Contract", function () {
 
       const preview = await router.previewTakeQuote(
         rfqInitialization,
-        ethers.ZeroAddress
+        ethers.ZeroAddress,
       );
       expect(preview.msgHash).to.be.equal(payloadHash);
 
@@ -306,7 +311,7 @@ describe("Router Contract", function () {
       await expect(
         router
           .connect(user1)
-          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress)
+          .takeQuote(user1.address, rfqInitialization, ethers.ZeroAddress),
       ).to.emit(router, "TakeQuote");
     });
   });
@@ -343,7 +348,7 @@ describe("Router Contract", function () {
       // Trading firm prepares signature
       const payloadHash = rfqSignaturePayload(putWritingRfqInit, CHAIN_ID);
       const signature = await tradingFirm.signMessage(
-        ethers.getBytes(payloadHash)
+        ethers.getBytes(payloadHash),
       );
       putWritingRfqInit.rfqQuote.signature = signature;
 
@@ -363,7 +368,7 @@ describe("Router Contract", function () {
       await expect(
         router
           .connect(client)
-          .takeQuote(client, putWritingRfqInit, ethers.ZeroAddress)
+          .takeQuote(client, putWritingRfqInit, ethers.ZeroAddress),
       ).to.emit(router, "TakeQuote");
       const postBalUsdcClient = await usdc.balanceOf(client);
       const postBalUsdcTradingFirm = await usdc.balanceOf(tradingFirm);
@@ -373,11 +378,11 @@ describe("Router Contract", function () {
       // Check balance changes
       // Client provides cash collateral for put and receives premium
       expect(preBalUsdcClient - postBalUsdcClient).to.be.equal(
-        notionalAmountInUsdc - putPremium
+        notionalAmountInUsdc - putPremium,
       );
       // Trading firms pays premium
       expect(preBalUsdcTradingFirm - postBalUsdcTradingFirm).to.be.equal(
-        putPremium
+        putPremium,
       );
       expect(preBalWethClient - postBalWethClient).to.be.equal(0);
       expect(postBalWethTradingFirm).to.be.equal(preBalWethTradingFirm);
@@ -397,7 +402,7 @@ describe("Router Contract", function () {
       const preBal2WethClient = await weth.balanceOf(client);
       const preBal2WethTradingFirm = await weth.balanceOf(tradingFirm);
       const payInSettlementToken = true; // pay in WETH
-      const oracleData: any = [];
+      const oracleData: BytesLike[] = [];
       await weth.connect(tradingFirm).approve(router.target, ethers.MaxUint256);
       await router
         .connect(tradingFirm)
@@ -406,7 +411,7 @@ describe("Router Contract", function () {
           tradingFirm,
           notionalAmountInUsdc,
           payInSettlementToken,
-          oracleData
+          oracleData,
         );
       const postBal2UsdcClient = await usdc.balanceOf(client);
       const postBal2UsdcTradingFirm = await usdc.balanceOf(tradingFirm);
@@ -416,10 +421,10 @@ describe("Router Contract", function () {
       // Check balance changes
       // Trading firm gets cash collateral from selling WETH
       expect(postBal2UsdcTradingFirm - preBal2UsdcTradingFirm).to.be.equal(
-        notionalAmountInUsdc
+        notionalAmountInUsdc,
       );
       expect(preBal2WethTradingFirm - postBal2WethTradingFirm).to.be.equal(
-        wethPayAmount
+        wethPayAmount,
       );
       expect(postBal2UsdcClient).to.be.equal(preBal2UsdcClient);
       expect(postBal2WethClient - preBal2WethClient).to.be.equal(wethPayAmount);
@@ -439,21 +444,19 @@ describe("Router Contract", function () {
       const escrow = await createAuction(auctionInitialization, router, owner);
 
       // Approve and bid on auction
-      let currentAsk = await escrow.currAsk();
+      const currentAsk = await escrow.currAsk();
       await settlementToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
-      const { preview } = await escrow.previewBid(relBid, refSpot, data);
-      const expectedProtocolMatchFee = preview[10];
-
+      const data: BytesLike[] = [];
+      await escrow.previewBid(relBid, refSpot, data);
       const optionReceiver = user1.address;
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data),
       ).to.emit(router, "BidOnAuction");
 
       const optionInfo = await escrow.optionInfo();
@@ -475,10 +478,10 @@ describe("Router Contract", function () {
 
       await settlementToken.mint(user1.address, expectedSettlementAmount);
       const preSettlementTokenBal = await settlementToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const preUnderlyingTokenBal = await underlyingToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const preOptionTokenBalance = await escrow.balanceOf(user1.address);
       const preOptionTokenSupply = await escrow.totalSupply();
@@ -486,7 +489,7 @@ describe("Router Contract", function () {
       const underlyingReceiver = user1.address;
       const underlyingAmount = auctionInitialization.notional;
       const payInSettlementToken = true;
-      const oracleData: any = [];
+      const oracleData: BytesLike[] = [];
       await router
         .connect(user1)
         .exercise(
@@ -494,38 +497,38 @@ describe("Router Contract", function () {
           underlyingReceiver,
           underlyingAmount,
           payInSettlementToken,
-          oracleData
+          oracleData,
         );
 
       const postSettlementTokenBal = await settlementToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const postUnderlyingTokenBal = await underlyingToken.balanceOf(
-        user1.address
+        user1.address,
       );
       const postOptionTokenBalance = await escrow.balanceOf(user1.address);
       const postOptionTokenSupply = await escrow.totalSupply();
 
       expect(preSettlementTokenBal - postSettlementTokenBal).to.be.equal(
-        expectedSettlementAmount
+        expectedSettlementAmount,
       );
       expect(postUnderlyingTokenBal - preUnderlyingTokenBal).to.be.equal(
-        notional
+        notional,
       );
       expect(preOptionTokenBalance - postOptionTokenBalance).to.be.equal(
-        postUnderlyingTokenBal - preUnderlyingTokenBal
+        postUnderlyingTokenBal - preUnderlyingTokenBal,
       );
       expect(preOptionTokenBalance - postOptionTokenBalance).to.be.equal(
-        preOptionTokenSupply - postOptionTokenSupply
+        preOptionTokenSupply - postOptionTokenSupply,
       );
     });
   });
 
   describe("Swap Option Token", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
-    let escrow: any;
+    let escrow: Escrow;
     let swapQuote: DataTypes.SwapQuote;
-    let maker: any;
+    let maker: HardhatEthersSigner;
     let optionReceiver: string;
     let optionTokenAddr: string;
     let optionTokenAmount: bigint;
@@ -542,20 +545,20 @@ describe("Router Contract", function () {
       escrow = await createAuction(auctionInitialization, router, owner);
 
       // Approve and bid on auction
-      let currentAsk = await escrow.currAsk();
+      const currentAsk = await escrow.currAsk();
       await settlementToken
         .connect(user1)
         .approve(router.target, ethers.parseEther("100"));
 
       const relBid = currentAsk;
       const refSpot = ethers.parseUnits("1", 6);
-      const data: any = [];
+      const data: BytesLike[] = [];
 
       optionReceiver = user1.address;
       await expect(
         router
           .connect(user1)
-          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data)
+          .bidOnAuction(escrow.target, optionReceiver, relBid, refSpot, data),
       ).to.emit(router, "BidOnAuction");
 
       const preBal = await settlementToken.balanceOf(user1.address);
@@ -569,7 +572,7 @@ describe("Router Contract", function () {
       // Expect allowance to be automatically set to max. on mint to
       // minimize overhead for follow-on option token swapping via router
       expect(await escrow.allowance(user1.address, router.target)).to.be.equal(
-        ethers.MaxUint256
+        ethers.MaxUint256,
       );
 
       swapQuote = {
@@ -593,12 +596,12 @@ describe("Router Contract", function () {
 
       const expiredPayloadHash = swapSignaturePayload(swapQuote, CHAIN_ID);
       const expiredSignature = await maker.signMessage(
-        ethers.getBytes(expiredPayloadHash)
+        ethers.getBytes(expiredPayloadHash),
       );
       swapQuote.signature = expiredSignature;
 
       await expect(
-        router.connect(user2).takeSwapQuote(user2.address, swapQuote)
+        router.connect(user2).takeSwapQuote(user2.address, swapQuote),
       ).to.be.revertedWithCustomError(router, "SwapQuoteExpired");
     });
 
@@ -607,7 +610,7 @@ describe("Router Contract", function () {
       await router.connect(maker).togglePauseQuotes();
 
       await expect(
-        router.connect(user2).takeSwapQuote(user2.address, swapQuote)
+        router.connect(user2).takeSwapQuote(user2.address, swapQuote),
       ).to.be.revertedWithCustomError(router, "SwapQuotePaused");
 
       // Unpause for other tests
@@ -618,11 +621,11 @@ describe("Router Contract", function () {
       const taker = user2;
 
       const preSettlementTokenBalMaker = await settlementToken.balanceOf(
-        maker.address
+        maker.address,
       );
       const preOptionTokenBalMaker = await escrow.balanceOf(maker.address);
       const preSettlementTokenBalTaker = await settlementToken.balanceOf(
-        taker.address
+        taker.address,
       );
       const preOptionTokenBalTaker = await escrow.balanceOf(taker.address);
 
@@ -631,30 +634,30 @@ describe("Router Contract", function () {
         .approve(router.target, ethers.MaxUint256);
 
       await expect(
-        router.connect(taker).takeSwapQuote(taker.address, swapQuote)
+        router.connect(taker).takeSwapQuote(taker.address, swapQuote),
       ).to.emit(router, "TakeSwapQuote");
 
       const postSettlementTokenBalMaker = await settlementToken.balanceOf(
-        maker.address
+        maker.address,
       );
       const postOptionTokenBalMaker = await escrow.balanceOf(maker.address);
       const postSettlementTokenBalTaker = await settlementToken.balanceOf(
-        taker.address
+        taker.address,
       );
       const postOptionTokenBalTaker = await escrow.balanceOf(taker.address);
 
       // Check balances after the swap
       expect(
-        postSettlementTokenBalMaker - preSettlementTokenBalMaker
+        postSettlementTokenBalMaker - preSettlementTokenBalMaker,
       ).to.be.equal(swapQuote.takerGiveAmount);
       expect(
-        preSettlementTokenBalTaker - postSettlementTokenBalTaker
+        preSettlementTokenBalTaker - postSettlementTokenBalTaker,
       ).to.be.equal(swapQuote.takerGiveAmount);
       expect(preOptionTokenBalMaker - postOptionTokenBalMaker).to.be.equal(
-        swapQuote.makerGiveAmount
+        swapQuote.makerGiveAmount,
       );
       expect(postOptionTokenBalTaker - preOptionTokenBalTaker).to.be.equal(
-        swapQuote.makerGiveAmount
+        swapQuote.makerGiveAmount,
       );
     });
 
@@ -667,12 +670,12 @@ describe("Router Contract", function () {
 
       // First successful take
       await expect(
-        router.connect(taker).takeSwapQuote(taker.address, swapQuote)
+        router.connect(taker).takeSwapQuote(taker.address, swapQuote),
       ).to.emit(router, "TakeSwapQuote");
 
       // Attempt to take the same quote again
       await expect(
-        router.connect(taker).takeSwapQuote(taker.address, swapQuote)
+        router.connect(taker).takeSwapQuote(taker.address, swapQuote),
       ).to.be.revertedWithCustomError(router, "SwapQuoteAlreadyUsed");
     });
   });
@@ -688,7 +691,7 @@ describe("Router Contract", function () {
       optionInfo = await getDefaultOptionInfo(
         String(underlyingToken.target),
         String(settlementToken.target),
-        ethers.parseUnits("1", await settlementToken.decimals())
+        ethers.parseUnits("1", await settlementToken.decimals()),
       );
       optionReceiver = user1.address;
       escrowOwner = user1.address;
@@ -707,8 +710,8 @@ describe("Router Contract", function () {
             name: "Option Name",
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming,
-          ethers.ZeroAddress
-        )
+          ethers.ZeroAddress,
+        ),
       ).to.be.revertedWithCustomError(router, "InvalidTokenPair");
     });
 
@@ -725,8 +728,8 @@ describe("Router Contract", function () {
             name: "Option Name",
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming,
-          ethers.ZeroAddress
-        )
+          ethers.ZeroAddress,
+        ),
       ).to.be.revertedWithCustomError(router, "InvalidNotional");
     });
 
@@ -743,8 +746,8 @@ describe("Router Contract", function () {
             name: "Option Name",
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming,
-          ethers.ZeroAddress
-        )
+          ethers.ZeroAddress,
+        ),
       ).to.be.revertedWithCustomError(router, "InvalidExpiry");
     });
 
@@ -761,8 +764,8 @@ describe("Router Contract", function () {
             name: "Option Name",
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming,
-          ethers.ZeroAddress
-        )
+          ethers.ZeroAddress,
+        ),
       ).to.be.revertedWithCustomError(router, "InvalidEarliestExercise");
     });
 
@@ -779,8 +782,8 @@ describe("Router Contract", function () {
             name: "Option Name",
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming,
-          ethers.ZeroAddress
-        )
+          ethers.ZeroAddress,
+        ),
       ).to.be.revertedWithCustomError(router, "InvalidBorrowCap");
     });
 
@@ -801,7 +804,7 @@ describe("Router Contract", function () {
 
       // Mint the option
       const preUnderlyingUserBal = await underlyingToken.balanceOf(
-        user1.address
+        user1.address,
       );
       await expect(
         router.connect(user1).mintOption(
@@ -812,12 +815,12 @@ describe("Router Contract", function () {
             name: "Option Name",
             symbol: "Option Symbol",
           } as DataTypes.OptionNaming,
-          ethers.ZeroAddress
-        )
+          ethers.ZeroAddress,
+        ),
       ).to.emit(router, "MintOption");
 
       const postUnderlyingUserBal = await underlyingToken.balanceOf(
-        user1.address
+        user1.address,
       );
 
       // Check if the escrow is created and initialized correctly
@@ -829,36 +832,36 @@ describe("Router Contract", function () {
       expect(await escrow.name()).to.be.equal("Option Name");
       expect(await escrow.symbol()).to.be.equal("Option Symbol");
       expect(await escrow.decimals()).to.be.equal(
-        await underlyingToken.decimals()
+        await underlyingToken.decimals(),
       );
 
       // Check option is minted, linked router, owner and exercise fee
-      expect(await escrow.optionMinted()).to.be.true;
+      expect(await escrow.optionMinted()).to.be.equal(true);
       expect(await escrow.router()).to.be.equal(router.target);
       expect(await escrow.owner()).to.be.equal(escrowOwner);
       expect(await escrow.exerciseFee()).to.be.equal(
-        await router.getExerciseFee()
+        await router.getExerciseFee(),
       );
 
       // Check option info
       const escrowOptionInfo = await escrow.optionInfo();
       expect(escrowOptionInfo.underlyingToken).to.be.equal(
-        optionInfo.underlyingToken
+        optionInfo.underlyingToken,
       );
       expect(escrowOptionInfo.settlementToken).to.be.equal(
-        optionInfo.settlementToken
+        optionInfo.settlementToken,
       );
       expect(escrowOptionInfo.notional).to.be.equal(optionInfo.notional);
       expect(escrowOptionInfo.expiry).to.be.equal(optionInfo.expiry);
       expect(escrowOptionInfo.earliestExercise).to.be.equal(
-        optionInfo.earliestExercise
+        optionInfo.earliestExercise,
       );
 
       // Ensure the underlying token has been transferred to the escrow
       const escrowBalance = await underlyingToken.balanceOf(escrow.target);
       expect(escrowBalance).to.be.equal(optionInfo.notional);
       expect(preUnderlyingUserBal - postUnderlyingUserBal).to.be.equal(
-        optionInfo.notional
+        optionInfo.notional,
       );
 
       // Ensure option cannot be re-initialized
@@ -872,14 +875,14 @@ describe("Router Contract", function () {
           {
             name: "Option Name",
             symbol: "Option Symbol",
-          } as DataTypes.OptionNaming
-        )
-      ).to.be.reverted;
+          } as DataTypes.OptionNaming,
+        ),
+      ).to.be.revert(ethers);
 
       // Check revert when trying to retrieve distribution partner on non-auction
       await expect(escrow.distPartner()).to.be.revertedWithCustomError(
         escrow,
-        "OnlyAvailableForAuctions"
+        "OnlyAvailableForAuctions",
       );
     });
 
@@ -908,8 +911,8 @@ describe("Router Contract", function () {
               name: "Option Name",
               symbol: "Option Symbol",
             } as DataTypes.OptionNaming,
-            ethers.ZeroAddress
-          )
+            ethers.ZeroAddress,
+          ),
         ).to.emit(router, "MintOption");
 
         const numEscrows = await router.numEscrows();
@@ -918,7 +921,7 @@ describe("Router Contract", function () {
         const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
 
         const feeHandlerBalance = await optionToken.balanceOf(
-          feeHandler.target
+          feeHandler.target,
         );
         expect(feeHandlerBalance).to.be.equal(expectedFee);
       });
@@ -930,7 +933,7 @@ describe("Router Contract", function () {
         await feeHandler.setMintFee(mintFee);
         await feeHandler.setDistPartnerFeeShares(
           [distPartner],
-          [partnerFeeShare]
+          [partnerFeeShare],
         );
 
         await underlyingToken
@@ -949,8 +952,8 @@ describe("Router Contract", function () {
               name: "Option Name",
               symbol: "Option Symbol",
             } as DataTypes.OptionNaming,
-            distPartner
-          )
+            distPartner,
+          ),
         ).to.emit(router, "MintOption");
 
         const numEscrows = await router.numEscrows();
@@ -959,7 +962,7 @@ describe("Router Contract", function () {
         const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
 
         const feeHandlerBalance = await optionToken.balanceOf(
-          feeHandler.target
+          feeHandler.target,
         );
         const distPartnerBalance = await optionToken.balanceOf(distPartner);
         expect(feeHandlerBalance).to.be.equal(expectedProtocolFee);
@@ -973,7 +976,7 @@ describe("Router Contract", function () {
         await feeHandler.setMintFee(mintFee);
         await feeHandler.setDistPartnerFeeShares(
           [distPartner],
-          [partnerFeeShare]
+          [partnerFeeShare],
         );
 
         await underlyingToken
@@ -992,8 +995,8 @@ describe("Router Contract", function () {
               name: "Option Name",
               symbol: "Option Symbol",
             } as DataTypes.OptionNaming,
-            distPartner
-          )
+            distPartner,
+          ),
         ).to.emit(router, "MintOption");
 
         const numEscrows = await router.numEscrows();
@@ -1002,7 +1005,7 @@ describe("Router Contract", function () {
         const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
 
         const feeHandlerBalance = await optionToken.balanceOf(
-          feeHandler.target
+          feeHandler.target,
         );
         const distPartnerBalance = await optionToken.balanceOf(distPartner);
         expect(feeHandlerBalance).to.be.equal(expectedProtocolFee);
@@ -1016,7 +1019,7 @@ describe("Router Contract", function () {
         await feeHandler.setMintFee(mintFee);
         await feeHandler.setDistPartnerFeeShares(
           [distPartner],
-          [partnerFeeShare]
+          [partnerFeeShare],
         );
 
         await underlyingToken
@@ -1035,8 +1038,8 @@ describe("Router Contract", function () {
               name: "Option Name",
               symbol: "Option Symbol",
             } as DataTypes.OptionNaming,
-            distPartner
-          )
+            distPartner,
+          ),
         ).to.emit(router, "MintOption");
 
         const numEscrows = await router.numEscrows();
@@ -1045,7 +1048,7 @@ describe("Router Contract", function () {
         const optionToken = EscrowImpl.attach(optionTokenAddress[0]) as Escrow;
 
         const feeHandlerBalance = await optionToken.balanceOf(
-          feeHandler.target
+          feeHandler.target,
         );
         const distPartnerBalance = await optionToken.balanceOf(distPartner);
         expect(feeHandlerBalance).to.be.equal(expectedProtocolFee);
@@ -1054,31 +1057,30 @@ describe("Router Contract", function () {
 
       it("should revert in case mint fee exceeds cap", async function () {
         await expect(
-          feeHandler.setMintFee(ethers.parseUnits(".200000001", 18))
+          feeHandler.setMintFee(ethers.parseUnits(".200000001", 18)),
         ).to.be.revertedWithCustomError(feeHandler, "InvalidMintFee");
         await expect(
-          feeHandler.setMintFee(ethers.parseUnits("1.01", 18))
+          feeHandler.setMintFee(ethers.parseUnits("1.01", 18)),
         ).to.be.revertedWithCustomError(feeHandler, "InvalidMintFee");
       });
 
       it("should revert in case non-owner tries to set mint fee", async function () {
         await expect(
-          feeHandler.connect(user2).setMintFee(ethers.parseUnits(".1", 18))
-        ).to.be.reverted;
+          feeHandler.connect(user2).setMintFee(ethers.parseUnits(".1", 18)),
+        ).to.be.revert(ethers);
       });
     });
   });
 
   describe("Bid Preview Revert Scenarios", function () {
     let auctionInitialization: DataTypes.AuctionInitialization;
-    let escrow: any;
+    let escrow: Escrow;
     let currentAsk: bigint;
     let relBid: bigint;
     let refSpot: bigint;
     let minSpot: bigint;
     let maxSpot: bigint;
-    let data: any[];
-    let distPartner: string;
+    let data: BytesLike[];
 
     beforeEach(async function () {
       // Initialize auction
@@ -1098,7 +1100,6 @@ describe("Router Contract", function () {
       currentAsk = await escrow.currAsk();
       relBid = currentAsk;
       data = [];
-      distPartner = ethers.ZeroAddress;
 
       await settlementToken
         .connect(user1)
@@ -1129,7 +1130,7 @@ describe("Router Contract", function () {
       await mockOracle.setPrice(
         underlyingToken.target,
         settlementToken.target,
-        ethers.parseUnits("1.5", 6)
+        ethers.parseUnits("1.5", 6),
       );
 
       const { preview } = await escrow.previewBid(relBid, refSpot, data);
@@ -1137,9 +1138,8 @@ describe("Router Contract", function () {
     });
 
     it("should revert if oracle spot price is out of range", async function () {
-      const auctionParams: DataTypes.AuctionParams =
-        await escrow.auctionParams();
-      const optionInfo: DataTypes.OptionInfo = await escrow.optionInfo();
+      const auctionParams = await escrow.auctionParams();
+      const optionInfo = await escrow.optionInfo();
 
       // Ensure correct initialization
       expect(mockOracle.target).to.be.equal(optionInfo.advancedSettings.oracle);
@@ -1150,47 +1150,39 @@ describe("Router Contract", function () {
       await mockOracle.setPrice(
         underlyingToken.target,
         settlementToken.target,
-        auctionParams.minSpot - 1n
+        auctionParams.minSpot - 1n,
       );
       // Ensure price was set
       const price1 = await mockOracle.getPrice(
         underlyingToken.target,
         settlementToken.target,
-        data
+        data,
       );
       expect(price1).to.be.equal(auctionParams.minSpot - 1n);
       expect(price1).to.be.gt(0); // Price shouldn't be zero
 
-      const [previewBelow, distPartner1] = await escrow.previewBid(
-        relBid,
-        price1,
-        data
-      );
+      const [previewBelow] = await escrow.previewBid(relBid, price1, data);
       expect(previewBelow.status).to.equal(
-        DataTypes.BidStatus.OutOfRangeSpotPrice
+        DataTypes.BidStatus.OutOfRangeSpotPrice,
       );
 
       // Mock that oracle price is right above max spot
       await mockOracle.setPrice(
         underlyingToken.target,
         settlementToken.target,
-        auctionParams.maxSpot + 1n
+        auctionParams.maxSpot + 1n,
       );
       // Ensure price was set
       const price3 = await mockOracle.getPrice(
         underlyingToken.target,
         settlementToken.target,
-        data
+        data,
       );
       expect(price3).to.be.equal(auctionParams.maxSpot + 1n);
 
-      const [previewAbove, distPartner2] = await escrow.previewBid(
-        relBid,
-        price3,
-        data
-      );
+      const [previewAbove] = await escrow.previewBid(relBid, price3, data);
       expect(previewAbove.status).to.equal(
-        DataTypes.BidStatus.OutOfRangeSpotPrice
+        DataTypes.BidStatus.OutOfRangeSpotPrice,
       );
     });
 
@@ -1212,7 +1204,7 @@ describe("Router Contract", function () {
         owner.address,
         ethers.parseEther("1.1"), // 110% match fee
         ethers.parseEther("0"),
-        0n
+        0n,
       );
 
       // Set new fee handler
@@ -1223,7 +1215,7 @@ describe("Router Contract", function () {
         .connect(owner)
         .setDistPartnerFeeShares(
           [ethers.ZeroAddress],
-          [ethers.parseEther("1.1")]
+          [ethers.parseEther("1.1")],
         );
 
       const { preview } = await escrow.previewBid(relBid, refSpot, data);
@@ -1268,7 +1260,7 @@ describe("Router Contract", function () {
           user1.address,
           currentAsk,
           ethers.parseUnits("1", 6),
-          []
+          [],
         );
     });
 
@@ -1280,10 +1272,10 @@ describe("Router Contract", function () {
         .withArgs(escrow.target, user1.address, owner.address, totalSupply);
       // Check initial balances
       const underlyingBalanceBefore = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const escrowBalanceBefore = await underlyingToken.balanceOf(
-        escrow.target
+        escrow.target,
       );
 
       // Redeem underlying tokens
@@ -1293,16 +1285,16 @@ describe("Router Contract", function () {
           owner.address,
           owner.address,
           underlyingToken.target,
-          escrowBalanceBefore
+          escrowBalanceBefore,
         );
 
       // Check final balances
       const underlyingBalanceAfter = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const escrowBalanceAfter = await underlyingToken.balanceOf(escrow.target);
       expect(underlyingBalanceAfter - underlyingBalanceBefore).to.equal(
-        escrowBalanceBefore
+        escrowBalanceBefore,
       );
       expect(escrowBalanceAfter).to.equal(0);
     });
@@ -1315,10 +1307,10 @@ describe("Router Contract", function () {
 
       // Check initial balances
       const underlyingBalanceBefore = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const escrowBalanceBefore = await underlyingToken.balanceOf(
-        escrow.target
+        escrow.target,
       );
 
       // Redeem underlying tokens
@@ -1328,19 +1320,19 @@ describe("Router Contract", function () {
           owner.address,
           owner.address,
           underlyingToken.target,
-          redemptionAmount
+          redemptionAmount,
         );
 
       // Check final balances
       const underlyingBalanceAfter = await underlyingToken.balanceOf(
-        owner.address
+        owner.address,
       );
       const escrowBalanceAfter = await underlyingToken.balanceOf(escrow.target);
       expect(underlyingBalanceAfter - underlyingBalanceBefore).to.equal(
-        redemptionAmount
+        redemptionAmount,
       );
       expect(escrowBalanceBefore - escrowBalanceAfter).to.equal(
-        redemptionAmount
+        redemptionAmount,
       );
 
       // Check new outstanding supply
@@ -1350,7 +1342,7 @@ describe("Router Contract", function () {
 
     it("should revert if a non-owner tries to redeem", async function () {
       await expect(
-        escrow.connect(user1).redeem(user1.address)
+        escrow.connect(user1).redeem(user1.address),
       ).to.be.revertedWithCustomError(escrow, "InvalidSender");
     });
 
@@ -1363,17 +1355,17 @@ describe("Router Contract", function () {
           user1.address,
           auctionInitialization.notional,
           true,
-          []
+          [],
         );
 
       await expect(
-        escrow.connect(owner).redeem(owner.address)
+        escrow.connect(owner).redeem(owner.address),
       ).to.be.revertedWithCustomError(escrow, "NothingToRedeem");
     });
 
     it("should revert if trying to trigger transfer event with non-escrow caller", async function () {
       await expect(
-        router.emitTransferEvent(owner.address, user1.address, 1n)
+        router.emitTransferEvent(owner.address, user1.address, 1n),
       ).to.be.revertedWithCustomError(router, "NotAnEscrow");
     });
   });

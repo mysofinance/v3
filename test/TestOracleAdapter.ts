@@ -1,14 +1,20 @@
-import { chainlink } from "../typechain-types";
+import { expect } from "chai";
+import hre from "hardhat";
+import { ZeroAddress, parseUnits, parseEther, Wallet } from "ethers";
+import type { Addressable } from "ethers";
+import type { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/types";
+import type {
+  OracleAdapter,
+  MockAggregatorV3,
+} from "../types/ethers-contracts/index.js";
 
-const { expect } = require("chai");
-const { ethers } = require("hardhat");
-
-import { getLatestTimestamp } from "./helpers";
+import { getLatestTimestamp, setHardhatEthers } from "./helpers.js";
 
 describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Comparison", function () {
-  let chainlinkOracle: any;
-  let owner: any;
-  let unauthorizedUser: any;
+  let ethers: Awaited<ReturnType<typeof hre.network.connect>>["ethers"];
+  let chainlinkOracle: OracleAdapter;
+  let owner: HardhatEthersSigner;
+  let unauthorizedUser: HardhatEthersSigner;
 
   const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
   const USDC = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
@@ -46,7 +52,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
     try {
       // Fetch new price from CoinGecko if not cached or expired
       const response = await fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`
+        `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=usd`,
       );
 
       if (!response.ok) {
@@ -66,7 +72,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
   async function getPriceRatioFromCoinGecko(
     baseToken: keyof typeof tokenToCoingeckoId,
-    quoteToken: keyof typeof tokenToCoingeckoId
+    quoteToken: keyof typeof tokenToCoingeckoId,
   ): Promise<number> {
     const baseId = tokenToCoingeckoId[baseToken];
     const quoteId = tokenToCoingeckoId[quoteToken];
@@ -75,18 +81,23 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
     if (typeof basePriceUSD !== "number" || typeof quotePriceUSD !== "number") {
       throw new Error(
-        `Invalid price data for tokens ${baseToken} or ${quoteToken}`
+        `Invalid price data for tokens ${baseToken} or ${quoteToken}`,
       );
     }
     return basePriceUSD / quotePriceUSD;
   }
+
+  before(async function () {
+    ({ ethers } = await hre.network.connect());
+    setHardhatEthers(ethers);
+  });
 
   describe("Forked Mainnet Tests", function () {
     before(async function () {
       const chainId = await ethers.provider.send("eth_chainId");
       if (chainId !== "0x1") {
         console.log(
-          "Skipping test: Only meant for forked mainnet on Mainnet to test with Chainlink feeds (chain ID 1)."
+          "Skipping test: Only meant for forked mainnet on Mainnet to test with Chainlink feeds (chain ID 1).",
         );
         this.skip();
       }
@@ -102,7 +113,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         owner.address,
         WETH,
         MAX_TIME_SINCE_LAST_UPDATE,
-        true
+        true,
       );
     });
 
@@ -113,7 +124,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const usdcDecimals = await ethers
           .getContractAt("IERC20Metadata", USDC)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, usdcDecimals);
 
         console.log("WETH price in USDC (on-chain):", onchainPrice);
@@ -121,14 +132,14 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         if (typeof coinGeckoPrice !== "number") {
           console.log(
-            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`
+            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`,
           );
           this.skip();
         }
 
         expect(Number(onchainPrice)).to.be.closeTo(
           coinGeckoPrice,
-          coinGeckoPrice * 0.05
+          coinGeckoPrice * 0.05,
         ); // 5% tolerance
       });
 
@@ -138,7 +149,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const usdcDecimals = await ethers
           .getContractAt("IERC20Metadata", USDC)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, usdcDecimals);
 
         console.log("UNI price in USDC (on-chain):", onchainPrice);
@@ -146,13 +157,13 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         if (typeof coinGeckoPrice !== "number") {
           console.log(
-            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`
+            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`,
           );
           this.skip();
         }
         expect(Number(onchainPrice)).to.be.closeTo(
           coinGeckoPrice,
-          coinGeckoPrice * 0.05
+          coinGeckoPrice * 0.05,
         ); // 5% tolerance
       });
 
@@ -162,7 +173,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const wethDecimals = await ethers
           .getContractAt("IERC20Metadata", WETH)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, wethDecimals);
 
         console.log("USDC price in WETH (on-chain):", onchainPrice);
@@ -170,13 +181,13 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         if (typeof coinGeckoPrice !== "number") {
           console.log(
-            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`
+            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`,
           );
           this.skip();
         }
         expect(Number(onchainPrice)).to.be.closeTo(
           coinGeckoPrice,
-          coinGeckoPrice * 0.05
+          coinGeckoPrice * 0.05,
         ); // 5% tolerance
       });
 
@@ -186,7 +197,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const wethDecimals = await ethers
           .getContractAt("IERC20Metadata", WETH)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, wethDecimals);
 
         console.log("UNI price in WETH (on-chain):", onchainPrice);
@@ -194,13 +205,13 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         if (typeof coinGeckoPrice !== "number") {
           console.log(
-            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`
+            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`,
           );
           this.skip();
         }
         expect(Number(onchainPrice)).to.be.closeTo(
           coinGeckoPrice,
-          coinGeckoPrice * 0.05
+          coinGeckoPrice * 0.05,
         ); // 5% tolerance
       });
 
@@ -210,7 +221,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         const uniDecimals = await ethers
           .getContractAt("IERC20Metadata", UNI)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, uniDecimals);
 
         console.log("WETH price in UNI (on-chain):", onchainPrice);
@@ -218,13 +229,13 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         if (typeof coinGeckoPrice !== "number") {
           console.log(
-            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`
+            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`,
           );
           this.skip();
         }
         expect(Number(onchainPrice)).to.be.closeTo(
           coinGeckoPrice,
-          coinGeckoPrice * 0.05
+          coinGeckoPrice * 0.05,
         ); // 5% tolerance
       });
 
@@ -241,14 +252,14 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             owner.address,
             WETH,
             veryShortStaleTime,
-            true
+            true,
           );
 
         await expect(
-          chainlinkOracleWithVeryShortStaleTime.getPrice(WETH, USDC, [])
+          chainlinkOracleWithVeryShortStaleTime.getPrice(WETH, USDC, []),
         ).to.be.revertedWithCustomError(
           chainlinkOracleWithVeryShortStaleTime,
-          "InvalidOracleAnswer"
+          "InvalidOracleAnswer",
         );
       });
     });
@@ -266,20 +277,20 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             owner.address,
             WETH,
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(chainlinkOracle, "InvalidArrayLength");
 
         await expect(
           ChainlinkOracle.deploy(
             [USDC],
             [USDC_USD_ORACLE],
-            ethers.ZeroAddress, // Invalid ETH/USD oracle address
+            ZeroAddress, // Invalid ETH/USD oracle address
             owner.address,
             WETH,
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(chainlinkOracle, "InvalidAddress");
 
         await expect(
@@ -288,10 +299,10 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             [USDC_USD_ORACLE],
             ETH_USD_ORACLE,
             owner.address,
-            ethers.ZeroAddress, // Invalid WETH address
+            ZeroAddress, // Invalid WETH address
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(chainlinkOracle, "InvalidAddress");
 
         await expect(
@@ -302,11 +313,11 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             owner.address,
             WETH,
             0, // Invalid max time since last update
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(
           chainlinkOracle,
-          "InvalidMaxTimeSinceLastUpdate"
+          "InvalidMaxTimeSinceLastUpdate",
         );
       });
     });
@@ -316,17 +327,18 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         await expect(
           chainlinkOracle
             .connect(unauthorizedUser)
-            .addOracleMapping([SHIBA], [SHIBA_ETH_ORACLE])
-        ).to.be.reverted;
+            .addOracleMapping([SHIBA], [SHIBA_ETH_ORACLE]),
+        ).to.be.revert(ethers);
       });
 
       it("should revert if oracle is append only and attempting to overwrite an already set mapping", async function () {
-        expect(await chainlinkOracle.ORACLE_MAPPING_IS_APPEND_ONLY()).to.be
-          .true;
+        expect(await chainlinkOracle.ORACLE_MAPPING_IS_APPEND_ONLY()).to.equal(
+          true,
+        );
         const oracleInfos = await chainlinkOracle.oracleInfos(USDC);
         expect(oracleInfos[0]).to.be.equal(USDC_USD_ORACLE);
         await expect(
-          chainlinkOracle.addOracleMapping([USDC], [USDC_USD_ORACLE])
+          chainlinkOracle.addOracleMapping([USDC], [USDC_USD_ORACLE]),
         )
           .to.be.revertedWithCustomError(chainlinkOracle, "OracleAlreadySet")
           .withArgs(USDC_USD_ORACLE);
@@ -340,12 +352,12 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         const oracleInfo = await chainlinkOracle.oracleInfos(SHIBA);
         expect(oracleInfo[0]).to.be.equal(SHIBA_ETH_ORACLE);
 
-        const onchainPriceInUsd = await chainlinkOracle.getPriceOfToken(SHIBA);
+        await chainlinkOracle.getPriceOfToken(SHIBA);
 
         const onChainPrice = await chainlinkOracle.getPrice(SHIBA, USDC, []);
         const usdcDecimals = await ethers
           .getContractAt("IERC20Metadata", USDC)
-          .then((contract: any) => contract.decimals());
+          .then((contract) => contract.decimals());
         const onchainPrice = ethers.formatUnits(onChainPrice, usdcDecimals);
 
         const coinGeckoPrice = await getPriceRatioFromCoinGecko(SHIBA, USDC);
@@ -355,29 +367,29 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         if (typeof coinGeckoPrice !== "number") {
           console.log(
-            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`
+            `Skipping test: Error retrieving coingecko price ${coinGeckoPrice}`,
           );
           this.skip();
         }
         expect(Number(onchainPrice)).to.be.closeTo(
           coinGeckoPrice,
-          coinGeckoPrice * 0.05
+          coinGeckoPrice * 0.05,
         ); // 5% tolerance
       });
     });
   });
 
   describe("OracleAdapter with Mock Aggregator", function () {
-    let oracleAdapter: any;
-    let mockAggregatorEthUsd: any;
-    let mockAggregatorUsdcUsd: any;
-    let mockAggregatorUniUsd: any;
-    let USDC: any;
-    let WETH: any;
-    let UNI: any;
-    let owner: any;
-    let user2: any;
-    let unauthorizedUser: any;
+    let oracleAdapter: OracleAdapter;
+    let mockAggregatorEthUsd: MockAggregatorV3;
+    let mockAggregatorUsdcUsd: MockAggregatorV3;
+    let mockAggregatorUniUsd: MockAggregatorV3;
+    let USDC: string | Addressable;
+    let WETH: string | Addressable;
+    let UNI: string | Addressable;
+    let owner: HardhatEthersSigner;
+    let user2: HardhatEthersSigner;
+    let unauthorizedUser: HardhatEthersSigner;
 
     const MAX_TIME_SINCE_LAST_UPDATE = 3600 * 12; // 12 hours
 
@@ -399,15 +411,15 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
       mockAggregatorEthUsd = await MockAggregator.deploy(
         8,
-        ethers.parseUnits("2500", 8)
+        parseUnits("2500", 8),
       );
       mockAggregatorUsdcUsd = await MockAggregator.deploy(
         8,
-        ethers.parseUnits("1", 8)
+        parseUnits("1", 8),
       );
       mockAggregatorUniUsd = await MockAggregator.deploy(
         18,
-        ethers.parseUnits("0.002972", 18)
+        parseUnits("0.002972", 18),
       );
 
       // Deploy OracleAdapter contract using the mock aggregator
@@ -419,7 +431,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         owner.address,
         WETH,
         MAX_TIME_SINCE_LAST_UPDATE,
-        true // ORACLE_MAPPING_IS_APPEND_ONLY = true
+        true, // ORACLE_MAPPING_IS_APPEND_ONLY = true
       );
     });
 
@@ -440,11 +452,11 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             owner.address,
             WETH,
             0,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(
           oracleAdapter,
-          "InvalidMaxTimeSinceLastUpdate"
+          "InvalidMaxTimeSinceLastUpdate",
         );
       });
 
@@ -453,13 +465,13 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         await expect(
           OracleAdapter.deploy(
             [USDC],
-            [ethers.ZeroAddress], // Invalid oracle address
+            [ZeroAddress], // Invalid oracle address
             mockAggregatorEthUsd.target,
             owner.address,
             WETH,
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
       });
 
@@ -473,8 +485,8 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             owner.address,
             WETH,
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidArrayLength");
       });
 
@@ -486,12 +498,12 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           OracleAdapter.deploy(
             [USDC],
             [mockAggregatorUsdcUsd.target],
-            ethers.ZeroAddress, // Invalid ETH/USD oracle address
+            ZeroAddress, // Invalid ETH/USD oracle address
             owner.address,
             WETH,
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
 
         // Test case for WETH being an invalid address
@@ -501,10 +513,10 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             [mockAggregatorUsdcUsd.target],
             mockAggregatorEthUsd.target,
             owner.address,
-            ethers.ZeroAddress, // Invalid WETH address
+            ZeroAddress, // Invalid WETH address
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
 
         // Test case for ETH/USD oracle and WETH being the same address
@@ -516,8 +528,8 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
             owner.address,
             mockAggregatorEthUsd.target,
             MAX_TIME_SINCE_LAST_UPDATE,
-            true
-          )
+            true,
+          ),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
       });
     });
@@ -526,16 +538,14 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
       it("should retrieve correct price from the mock aggregator", async function () {
         const priceInEth = await oracleAdapter.getPriceOfToken(WETH);
         const priceInUsdc = await oracleAdapter.getPrice(WETH, USDC, []);
-        const expectedPriceInEth = ethers.parseUnits("1", 18);
-        const expectedPriceInUsdc = ethers.parseUnits("2500", 6);
+        const expectedPriceInEth = parseUnits("1", 18);
+        const expectedPriceInUsdc = parseUnits("2500", 6);
         expect(priceInEth).to.equal(expectedPriceInEth);
         expect(priceInUsdc).to.equal(expectedPriceInUsdc);
       });
 
       it("should convert USD to ETH correctly using mock ETH/USD oracle", async function () {
-        await mockAggregatorEthUsd.setLatestAnswer(
-          ethers.parseUnits("1500", 8)
-        );
+        await mockAggregatorEthUsd.setLatestAnswer(parseUnits("1500", 8));
         const priceInEth = await oracleAdapter.getPrice(USDC, WETH, []); // Expecting 1 USDC in ETH
         const expectedPriceInEth =
           (10n ** 18n * 10n ** 8n) / (1500n * 10n ** 8n);
@@ -544,26 +554,24 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
       });
 
       it("should correctly handle token price with 8 decimal oracle", async function () {
-        await mockAggregatorUniUsd.setLatestAnswer(
-          ethers.parseUnits("0.002972", 18)
-        );
+        await mockAggregatorUniUsd.setLatestAnswer(parseUnits("0.002972", 18));
         await oracleAdapter.addOracleMapping(
           [UNI],
-          [mockAggregatorUniUsd.target]
+          [mockAggregatorUniUsd.target],
         );
         expect(await mockAggregatorUniUsd.decimals()).to.be.equal(18);
 
         const priceInEth = await oracleAdapter.getPriceOfToken(UNI);
-        expect(priceInEth).to.be.equal(ethers.parseUnits("0.002972", 18));
+        expect(priceInEth).to.be.equal(parseUnits("0.002972", 18));
         const priceInUsdc = await oracleAdapter.getPrice(UNI, USDC, []);
-        const expectedPriceInUsdc = ethers.parseUnits("7.43", 6);
+        const expectedPriceInUsdc = parseUnits("7.43", 6);
         expect(priceInUsdc).to.equal(expectedPriceInUsdc);
       });
 
       it("should revert if attempting to fetch price for unsupported token", async function () {
-        const randomToken = ethers.Wallet.createRandom().address;
+        const randomToken = Wallet.createRandom().address;
         await expect(
-          oracleAdapter.getPriceOfToken(randomToken)
+          oracleAdapter.getPriceOfToken(randomToken),
         ).to.be.revertedWithCustomError(oracleAdapter, "NoOracle");
       });
 
@@ -580,10 +588,10 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           answer,
           startedAt,
           updatedAt,
-          answeredInRound
+          answeredInRound,
         );
         await expect(
-          oracleAdapter.getPrice(USDC, WETH, [])
+          oracleAdapter.getPrice(USDC, WETH, []),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
       });
 
@@ -600,10 +608,10 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           answer,
           startedAt,
           updatedAt,
-          answeredInRound
+          answeredInRound,
         );
         await expect(
-          oracleAdapter.getPrice(USDC, WETH, [])
+          oracleAdapter.getPrice(USDC, WETH, []),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
       });
 
@@ -620,10 +628,10 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           answer,
           startedAt,
           updatedAt,
-          answeredInRound
+          answeredInRound,
         );
         await expect(
-          oracleAdapter.getPrice(USDC, WETH, [])
+          oracleAdapter.getPrice(USDC, WETH, []),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
       });
 
@@ -640,10 +648,10 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           answer,
           startedAt,
           updatedAt,
-          answeredInRound
+          answeredInRound,
         );
         await expect(
-          oracleAdapter.getPrice(USDC, WETH, [])
+          oracleAdapter.getPrice(USDC, WETH, []),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
       });
 
@@ -663,10 +671,10 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           answer,
           startedAt,
           updatedAt,
-          answeredInRound
+          answeredInRound,
         );
         await expect(
-          oracleAdapter.getPrice(USDC, WETH, [])
+          oracleAdapter.getPrice(USDC, WETH, []),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleAnswer");
       });
     });
@@ -682,16 +690,14 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           owner.address,
           WETH,
           veryShortStaleTime,
-          true
+          true,
         );
 
         expect(
-          await oracleWithShortStaleTime.MAX_TIME_SINCE_LAST_UPDATE()
+          await oracleWithShortStaleTime.MAX_TIME_SINCE_LAST_UPDATE(),
         ).to.be.equal(veryShortStaleTime);
 
-        await mockAggregatorEthUsd.setLatestAnswer(
-          ethers.parseUnits("2500", 8)
-        );
+        await mockAggregatorEthUsd.setLatestAnswer(parseUnits("2500", 8));
         await ethers.provider.send("evm_increaseTime", [
           veryShortStaleTime + 1,
         ]); // Increase time by veryShortStaleTime
@@ -699,21 +705,21 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
 
         // Note fetching ETH price will not fail as it always returns 10**18
         expect(
-          await oracleWithShortStaleTime.getPriceOfToken(WETH)
-        ).to.be.equal(ethers.parseEther("1"));
+          await oracleWithShortStaleTime.getPriceOfToken(WETH),
+        ).to.be.equal(parseEther("1"));
 
         // Expect other prices to fail
         await expect(
-          oracleWithShortStaleTime.getPriceOfToken(USDC)
+          oracleWithShortStaleTime.getPriceOfToken(USDC),
         ).to.be.revertedWithCustomError(
           oracleWithShortStaleTime,
-          "InvalidOracleAnswer"
+          "InvalidOracleAnswer",
         );
         await expect(
-          oracleWithShortStaleTime.getPrice(WETH, USDC, [])
+          oracleWithShortStaleTime.getPrice(WETH, USDC, []),
         ).to.be.revertedWithCustomError(
           oracleWithShortStaleTime,
-          "InvalidOracleAnswer"
+          "InvalidOracleAnswer",
         );
       });
     });
@@ -731,7 +737,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         await expect(
           oracleAdapter
             .connect(owner)
-            .addOracleMapping([UNI, USDC], [mockAggregatorUniUsd.target])
+            .addOracleMapping([UNI, USDC], [mockAggregatorUniUsd.target]),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidArrayLength");
       });
 
@@ -739,15 +745,12 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         await expect(
           oracleAdapter
             .connect(owner)
-            .addOracleMapping(
-              [ethers.ZeroAddress],
-              [mockAggregatorUniUsd.target]
-            )
+            .addOracleMapping([ZeroAddress], [mockAggregatorUniUsd.target]),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
         await expect(
           oracleAdapter
             .connect(owner)
-            .addOracleMapping([WETH], [mockAggregatorUniUsd.target])
+            .addOracleMapping([WETH], [mockAggregatorUniUsd.target]),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
       });
 
@@ -755,7 +758,7 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         await expect(
           oracleAdapter
             .connect(owner)
-            .addOracleMapping([UNI], [mockAggregatorEthUsd.target])
+            .addOracleMapping([UNI], [mockAggregatorEthUsd.target]),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidAddress");
       });
 
@@ -770,13 +773,16 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
         await expect(
           oracleAdapter
             .connect(unauthorizedUser)
-            .addOracleMapping([UNI], [mockAggregatorUniUsd.target])
-        ).to.be.reverted;
+            .addOracleMapping([UNI], [mockAggregatorUniUsd.target]),
+        ).to.be.revert(ethers);
       });
 
       it("should revert if trying to overwrite an existing oracle mapping in append-only mode", async function () {
         await expect(
-          oracleAdapter.addOracleMapping([USDC], [mockAggregatorUsdcUsd.target])
+          oracleAdapter.addOracleMapping(
+            [USDC],
+            [mockAggregatorUsdcUsd.target],
+          ),
         ).to.be.revertedWithCustomError(oracleAdapter, "OracleAlreadySet");
       });
 
@@ -785,11 +791,11 @@ describe("ChainlinkOracle Price Retrieval on Forked Mainnet with CoinGecko Compa
           await ethers.getContractFactory("MockAggregatorV3");
         const invalidAggregator = await MockAggregator.deploy(
           12,
-          ethers.parseUnits("100", 12)
+          parseUnits("100", 12),
         ); // Invalid 12 decimals
 
         await expect(
-          oracleAdapter.addOracleMapping([UNI], [invalidAggregator.target])
+          oracleAdapter.addOracleMapping([UNI], [invalidAggregator.target]),
         ).to.be.revertedWithCustomError(oracleAdapter, "InvalidOracleDecimals");
       });
     });

@@ -1,30 +1,21 @@
-import { ethers } from "hardhat";
-import { getNetworkInfo } from "./utils";
-import readline from "readline";
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-async function askQuestion(query: string): Promise<string> {
-  return new Promise((resolve) => rl.question(query, resolve));
-}
+import hre from "hardhat";
+import { askQuestion, closeReadline, getNetworkInfo } from "./utils.js";
 
 async function deployFeeHandler(
-  routerAddr: string,
   owner: string,
-  matchFee: any,
-  exerciseFee: any,
-  mintFee: any
+  matchFee: bigint,
+  exerciseFee: bigint,
+  mintFee: bigint,
 ) {
+  const { ethers } = await hre.network.connect();
+
   // Deploy Fee Handler
   const FeeHandler = await ethers.getContractFactory("FeeHandler");
   const feeHandler = await FeeHandler.deploy(
     owner,
     matchFee,
     exerciseFee,
-    mintFee
+    mintFee,
   );
   console.log(`* Fee Handler: ${feeHandler.target}`);
 
@@ -32,9 +23,10 @@ async function deployFeeHandler(
 }
 
 async function main() {
+  const { ethers } = await hre.network.connect();
+
   const [deployer] = await ethers.getSigners();
 
-  const owner = deployer.address;
   console.log("Deployer account:", deployer.address);
   const balance = await ethers.provider.getBalance(deployer.address);
   console.log(`Account balance: ${ethers.formatEther(balance)} ETH\n`);
@@ -44,20 +36,21 @@ async function main() {
   console.log("Current NETWORK_NAME:", NETWORK_NAME);
   console.log("");
 
+  const owner = await askQuestion("Enter the owner address: ");
   const routerAddr = await askQuestion("Enter the Router contract address: ");
 
   const matchFeeInput = await askQuestion(
-    "Enter the Match Fee percentage (e.g., 10 for 10%): "
+    "Enter the Match Fee percentage (e.g., 10 for 10%): ",
   );
   const matchFee = ethers.parseUnits(matchFeeInput, 16);
 
   const exerciseFeeInput = await askQuestion(
-    "Enter the Exercise Fee percentage (e.g., 0.1 for 0.1%): "
+    "Enter the Exercise Fee percentage (e.g., 0.1 for 0.1%): ",
   );
   const exerciseFee = ethers.parseUnits(exerciseFeeInput, 16);
 
   const mintFeeInput = await askQuestion(
-    "Enter the Mint Fee percentage (e.g., 1 for 1%): "
+    "Enter the Mint Fee percentage (e.g., 1 for 1%): ",
   );
   const mintFee = ethers.parseUnits(mintFeeInput, 16);
 
@@ -69,28 +62,27 @@ async function main() {
   console.log("Mint Fee (18 decimals):", mintFee.toString());
 
   const confirm = await askQuestion(
-    "Proceed with Fee Handler deployment? (yes/no): "
+    "Proceed with Fee Handler deployment? (yes/no): ",
   );
 
   if (confirm.toLowerCase() === "yes") {
     const feeHandler = await deployFeeHandler(
-      routerAddr,
       owner,
       matchFee,
       exerciseFee,
-      mintFee
+      mintFee,
     );
 
     console.log("\nContract deployment complete.");
     console.log("Next, verify the contracts using the following command:");
     console.log(
-      `npx hardhat verify --network ${NETWORK_NAME} "${feeHandler.target}" "${owner}" "${matchFee}" "${exerciseFee}" "${mintFee}"`
+      `npx hardhat verify --network ${NETWORK_NAME} "${feeHandler.target}" "${owner}" "${matchFee}" "${exerciseFee}" "${mintFee}"`,
     );
   } else {
     console.log("Deployment cancelled.");
   }
 
-  rl.close();
+  closeReadline();
 }
 
 main().catch((error) => {
