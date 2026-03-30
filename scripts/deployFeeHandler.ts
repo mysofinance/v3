@@ -37,7 +37,6 @@ async function main() {
   console.log("");
 
   const owner = await askQuestion("Enter the owner address: ");
-  const routerAddr = await askQuestion("Enter the Router contract address: ");
 
   const matchFeeInput = await askQuestion(
     "Enter the Match Fee percentage (e.g., 10 for 10%): ",
@@ -55,7 +54,6 @@ async function main() {
   const mintFee = ethers.parseUnits(mintFeeInput, 16);
 
   console.log("\nDeployment parameters:");
-  console.log("Router Address:", routerAddr);
   console.log("Owner:", owner);
   console.log("Match Fee (18 decimals):", matchFee.toString());
   console.log("Exercise Fee (18 decimals):", exerciseFee.toString());
