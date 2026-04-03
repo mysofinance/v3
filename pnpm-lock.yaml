@@ -28,11 +28,11 @@ importers:
         version: 5.1.0
     devDependencies:
       '@nomicfoundation/hardhat-ethers':
-        specifier: ^4.0.6
-        version: 4.0.6(hardhat@3.2.0)
+        specifier: ^4.0.7
+        version: 4.0.7(hardhat@3.2.0)
       '@nomicfoundation/hardhat-toolbox-mocha-ethers':
         specifier: ^3.0.0
-        version: 3.0.3(5c25944d230bc8baa693054f569cd2e9)
+        version: 3.0.3(dffb21453c88de9368168e795e0f97eb)
       '@types/chai':
         specifier: ^5.2.3
         version: 5.2.3
@@ -520,6 +520,9 @@ packages:
     resolution: {integrity: sha512-DOW5VFGIZWpuB6Llx+5ewn9HingN7uV/6nI3ecB3pZ4qc5OnwxnfG/KatYS6Fq3J55SuWMSxgDMHHA0kAVTFHQ==}
     engines: {node: '>= 20'}
 
+  '@nomicfoundation/hardhat-errors@3.0.10':
+    resolution: {integrity: sha512-jfQ75/t21674cIQPbQmzRSY8YdusvQhKMsT+IGEoXlJuAzw+ngWsD7y7nHT8UKQ+liHWgMA+Am2843KwP0KtiA==}
+
   '@nomicfoundation/hardhat-errors@3.0.9':
     resolution: {integrity: sha512-qwKMpPsTI0q2Q5w3SKh231WZZPyCHjUvlbUivAn8zNeQ7ko59nBqWoiwMNRuq4F0zVaO1XZ3863R8HwyNd/n0A==}
 
@@ -531,8 +534,8 @@ packages:
       ethers: ^6.14.0
       hardhat: ^3.0.0
 
-  '@nomicfoundation/hardhat-ethers@4.0.6':
-    resolution: {integrity: sha512-ZGQ7UzKs/EAzVgm0OShJP25oAGEqv9YKuRpRSHd1NyxD0bqJj4U3QeFhZ/3sB5CUly+pJlowJn2e8IVqoELxzA==}
+  '@nomicfoundation/hardhat-ethers@4.0.7':
+    resolution: {integrity: sha512-7wT4/ikhnL44fzJpe4Bh+bnsuWN55P02rbULCvhmcOOCbh/vouIrfVd008Te4+gwx+rYmJtL92vthj/I9dUd0g==}
     peerDependencies:
       hardhat: ^3.1.11
 
@@ -596,6 +599,9 @@ packages:
   '@nomicfoundation/hardhat-utils@4.0.1':
     resolution: {integrity: sha512-9xxD6WXLn+kopd+hmF+XYcJJ38Gm06QmZxKf/fIJzlzs9FuNI6C7Lvdd4qHv8/3ReegIbpBCrzozaL2GISmNrA==}
 
+  '@nomicfoundation/hardhat-utils@4.0.2':
+    resolution: {integrity: sha512-6lK0+9ygB7wGDlu11DAmTuZxhnoGbyGZC2aRaKKehW0vDNTS9iT7GUimgVvlO3B23E/HwwRKOOLmSVPC4qmmQw==}
+
   '@nomicfoundation/hardhat-vendored@3.0.1':
     resolution: {integrity: sha512-jBOAqmEAMJ8zdfiQmTLV+c0IaSyySqkDSJ9spTy8Ts/m/mO8w364TClyfn+p4ZpxBjyX4LMa3NfC402hoDtwCg==}
 
@@ -612,8 +618,8 @@ packages:
   '@nomicfoundation/ignition-core@3.1.0':
     resolution: {integrity: sha512-RJMBTBZqiWRT6lP0sWr2QoIogS0czCioxF4wYW8Y6PowipQKg/usvfJEbzcIEkTIbqOPBZbA7WGINr8YKIoJAA==}
 
-  '@nomicfoundation/ignition-ui@3.1.0':
-    resolution: {integrity: sha512-K34qH+C0IgerzzcY+OmLlXvAnpE1TGKRlDRDE0IfyhjB/ueDJj83+5+YhoPbCiwDFIl7uT7vaWopfFhkRPn9YQ==}
+  '@nomicfoundation/ignition-ui@3.1.1':
+    resolution: {integrity: sha512-j5eSn7bc//vJjFilRJ7EWX+BodGnujNi8USCfa88Lny6rnwClpuhGPW07pAiV80eZ3EpUOPmhPLRDyoL1mqgwA==}
 
   '@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.2':
     resolution: {integrity: sha512-JaqcWPDZENCvm++lFFGjrDd8mxtf+CtLd2MiXvMNTBD33dContTZ9TWETwNFwg7JTJT5Q9HEecH7FA+HTSsIUw==}
@@ -1458,8 +1464,8 @@ packages:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
     engines: {node: '>=10'}
 
-  lodash-es@4.17.23:
-    resolution: {integrity: sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==}
+  lodash-es@4.18.1:
+    resolution: {integrity: sha512-J8xewKD/Gk22OZbhpOVSwcs60zhd95ESDwezOFuA3/099925PdHJ7OFHNTGtajL3AlZkykD32HykiMo+BIBI8A==}
 
   lodash.camelcase@4.3.0:
     resolution: {integrity: sha512-TwuEnCnxbc3rAvhf/LbG7tJUDzhqXyFnv3dtzLOPgCG/hODL7WFnsbwktkD7yUV0RrreP/l1PALq/YSg6VvjlA==}
@@ -1467,8 +1473,8 @@ packages:
   lodash.startcase@4.4.0:
     resolution: {integrity: sha512-+WKqsK294HMSc2jEbNgpHpd0JfIBhp7rEV4aqXWqFr6AlXov+SlcgB1Fv01y2kGe3Gc8nMW7VA0SrGuSkRfIEg==}
 
-  lodash@4.17.23:
-    resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==}
+  lodash@4.18.1:
+    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
   log-symbols@4.1.0:
     resolution: {integrity: sha512-8XPvpAA8uyhfteu8pIvQxpJZ7SYYdpUivZpGy6sFsBuKRY/7rQGavedeB8aK+Zkyq6upMFVL/9AW6vOYzfRyLg==}
@@ -2682,16 +2688,22 @@ snapshots:
       '@nomicfoundation/edr-linux-x64-musl': 0.12.0-next.28
       '@nomicfoundation/edr-win32-x64-msvc': 0.12.0-next.28
 
-  '@nomicfoundation/hardhat-errors@3.0.9':
+  '@nomicfoundation/hardhat-errors@3.0.10':
     dependencies:
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-utils': 4.0.2
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-ethers-chai-matchers@3.0.3(@nomicfoundation/hardhat-ethers@4.0.6(hardhat@3.2.0))(chai@6.2.2)(ethers@6.16.0)(hardhat@3.2.0)':
+  '@nomicfoundation/hardhat-errors@3.0.9':
     dependencies:
-      '@nomicfoundation/hardhat-ethers': 4.0.6(hardhat@3.2.0)
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-utils': 4.0.2
+    transitivePeerDependencies:
+      - supports-color
+
+  '@nomicfoundation/hardhat-ethers-chai-matchers@3.0.3(@nomicfoundation/hardhat-ethers@4.0.7(hardhat@3.2.0))(chai@6.2.2)(ethers@6.16.0)(hardhat@3.2.0)':
+    dependencies:
+      '@nomicfoundation/hardhat-ethers': 4.0.7(hardhat@3.2.0)
+      '@nomicfoundation/hardhat-utils': 4.0.2
       '@types/chai-as-promised': 8.0.2
       chai: 6.2.2
       chai-as-promised: 8.0.2(chai@6.2.2)
@@ -2701,10 +2713,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-ethers@4.0.6(hardhat@3.2.0)':
+  '@nomicfoundation/hardhat-ethers@4.0.7(hardhat@3.2.0)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       debug: 4.4.3(supports-color@8.1.1)
       ethereum-cryptography: 2.2.1
       ethers: 6.16.0
@@ -2714,10 +2726,10 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  '@nomicfoundation/hardhat-ignition-ethers@3.1.0(@nomicfoundation/hardhat-ethers@4.0.6(hardhat@3.2.0))(@nomicfoundation/hardhat-ignition@3.1.0(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(hardhat@3.2.0))(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(@nomicfoundation/ignition-core@3.1.0)(ethers@6.16.0)(hardhat@3.2.0)':
+  '@nomicfoundation/hardhat-ignition-ethers@3.1.0(@nomicfoundation/hardhat-ethers@4.0.7(hardhat@3.2.0))(@nomicfoundation/hardhat-ignition@3.1.0(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(hardhat@3.2.0))(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(@nomicfoundation/ignition-core@3.1.0)(ethers@6.16.0)(hardhat@3.2.0)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-ethers': 4.0.6(hardhat@3.2.0)
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-ethers': 4.0.7(hardhat@3.2.0)
       '@nomicfoundation/hardhat-ignition': 3.1.0(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(hardhat@3.2.0)
       '@nomicfoundation/hardhat-verify': 3.0.12(hardhat@3.2.0)
       '@nomicfoundation/ignition-core': 3.1.0
@@ -2728,11 +2740,11 @@ snapshots:
 
   '@nomicfoundation/hardhat-ignition@3.1.0(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(hardhat@3.2.0)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       '@nomicfoundation/hardhat-verify': 3.0.12(hardhat@3.2.0)
       '@nomicfoundation/ignition-core': 3.1.0
-      '@nomicfoundation/ignition-ui': 3.1.0
+      '@nomicfoundation/ignition-ui': 3.1.1
       chalk: 5.6.2
       debug: 4.4.3(supports-color@8.1.1)
       hardhat: 3.2.0
@@ -2747,8 +2759,8 @@ snapshots:
     dependencies:
       '@noble/ciphers': 1.2.1
       '@noble/hashes': 1.7.1
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       '@nomicfoundation/hardhat-zod-utils': 3.0.3(zod@3.25.76)
       chalk: 5.6.2
       debug: 4.4.3(supports-color@8.1.1)
@@ -2759,8 +2771,8 @@ snapshots:
 
   '@nomicfoundation/hardhat-mocha@3.0.14(hardhat@3.2.0)(mocha@11.7.5)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       '@nomicfoundation/hardhat-zod-utils': 3.0.3(zod@3.25.76)
       chalk: 5.6.2
       debug: 4.4.3(supports-color@8.1.1)
@@ -2773,22 +2785,22 @@ snapshots:
 
   '@nomicfoundation/hardhat-network-helpers@3.0.4(hardhat@3.2.0)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       hardhat: 3.2.0
     transitivePeerDependencies:
       - supports-color
 
-  '@nomicfoundation/hardhat-toolbox-mocha-ethers@3.0.3(5c25944d230bc8baa693054f569cd2e9)':
+  '@nomicfoundation/hardhat-toolbox-mocha-ethers@3.0.3(dffb21453c88de9368168e795e0f97eb)':
     dependencies:
-      '@nomicfoundation/hardhat-ethers': 4.0.6(hardhat@3.2.0)
-      '@nomicfoundation/hardhat-ethers-chai-matchers': 3.0.3(@nomicfoundation/hardhat-ethers@4.0.6(hardhat@3.2.0))(chai@6.2.2)(ethers@6.16.0)(hardhat@3.2.0)
+      '@nomicfoundation/hardhat-ethers': 4.0.7(hardhat@3.2.0)
+      '@nomicfoundation/hardhat-ethers-chai-matchers': 3.0.3(@nomicfoundation/hardhat-ethers@4.0.7(hardhat@3.2.0))(chai@6.2.2)(ethers@6.16.0)(hardhat@3.2.0)
       '@nomicfoundation/hardhat-ignition': 3.1.0(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(hardhat@3.2.0)
-      '@nomicfoundation/hardhat-ignition-ethers': 3.1.0(@nomicfoundation/hardhat-ethers@4.0.6(hardhat@3.2.0))(@nomicfoundation/hardhat-ignition@3.1.0(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(hardhat@3.2.0))(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(@nomicfoundation/ignition-core@3.1.0)(ethers@6.16.0)(hardhat@3.2.0)
+      '@nomicfoundation/hardhat-ignition-ethers': 3.1.0(@nomicfoundation/hardhat-ethers@4.0.7(hardhat@3.2.0))(@nomicfoundation/hardhat-ignition@3.1.0(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(hardhat@3.2.0))(@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0))(@nomicfoundation/ignition-core@3.1.0)(ethers@6.16.0)(hardhat@3.2.0)
       '@nomicfoundation/hardhat-keystore': 3.0.5(hardhat@3.2.0)
       '@nomicfoundation/hardhat-mocha': 3.0.14(hardhat@3.2.0)(mocha@11.7.5)
       '@nomicfoundation/hardhat-network-helpers': 3.0.4(hardhat@3.2.0)
-      '@nomicfoundation/hardhat-typechain': 3.0.4(@nomicfoundation/hardhat-ethers@4.0.6(hardhat@3.2.0))(ethers@6.16.0)(hardhat@3.2.0)(typescript@5.9.3)
+      '@nomicfoundation/hardhat-typechain': 3.0.4(@nomicfoundation/hardhat-ethers@4.0.7(hardhat@3.2.0))(ethers@6.16.0)(hardhat@3.2.0)(typescript@5.9.3)
       '@nomicfoundation/hardhat-verify': 3.0.12(hardhat@3.2.0)
       '@nomicfoundation/ignition-core': 3.1.0
       chai: 6.2.2
@@ -2796,11 +2808,11 @@ snapshots:
       hardhat: 3.2.0
       mocha: 11.7.5
 
-  '@nomicfoundation/hardhat-typechain@3.0.4(@nomicfoundation/hardhat-ethers@4.0.6(hardhat@3.2.0))(ethers@6.16.0)(hardhat@3.2.0)(typescript@5.9.3)':
+  '@nomicfoundation/hardhat-typechain@3.0.4(@nomicfoundation/hardhat-ethers@4.0.7(hardhat@3.2.0))(ethers@6.16.0)(hardhat@3.2.0)(typescript@5.9.3)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-ethers': 4.0.6(hardhat@3.2.0)
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-ethers': 4.0.7(hardhat@3.2.0)
+      '@nomicfoundation/hardhat-utils': 4.0.2
       '@nomicfoundation/hardhat-zod-utils': 3.0.3(zod@3.25.76)
       '@typechain/ethers-v6': 0.5.1(ethers@6.16.0)(typechain@8.3.2(typescript@5.9.3))(typescript@5.9.3)
       debug: 4.4.3(supports-color@8.1.1)
@@ -2825,13 +2837,26 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@nomicfoundation/hardhat-utils@4.0.2':
+    dependencies:
+      '@streamparser/json-node': 0.0.22
+      debug: 4.4.3(supports-color@8.1.1)
+      env-paths: 2.2.1
+      ethereum-cryptography: 2.2.1
+      fast-equals: 5.4.0
+      json-stream-stringify: 3.1.6
+      rfdc: 1.4.1
+      undici: 6.24.1
+    transitivePeerDependencies:
+      - supports-color
+
   '@nomicfoundation/hardhat-vendored@3.0.1': {}
 
   '@nomicfoundation/hardhat-verify@3.0.12(hardhat@3.2.0)':
     dependencies:
       '@ethersproject/abi': 5.8.0
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       '@nomicfoundation/hardhat-zod-utils': 3.0.3(zod@3.25.76)
       cbor2: 1.12.0
       chalk: 5.6.2
@@ -2844,8 +2869,8 @@ snapshots:
 
   '@nomicfoundation/hardhat-zod-utils@3.0.3(zod@3.25.76)':
     dependencies:
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       zod: 3.25.76
     transitivePeerDependencies:
       - supports-color
@@ -2853,21 +2878,21 @@ snapshots:
   '@nomicfoundation/ignition-core@3.1.0':
     dependencies:
       '@ethersproject/address': 5.6.1
-      '@nomicfoundation/hardhat-errors': 3.0.9
-      '@nomicfoundation/hardhat-utils': 4.0.1
+      '@nomicfoundation/hardhat-errors': 3.0.10
+      '@nomicfoundation/hardhat-utils': 4.0.2
       '@nomicfoundation/solidity-analyzer': 0.1.2
       cbor2: 1.12.0
       debug: 4.4.3(supports-color@8.1.1)
       ethers: 6.16.0
       immer: 10.0.2
-      lodash-es: 4.17.23
+      lodash-es: 4.18.1
       ndjson: 2.0.0
     transitivePeerDependencies:
       - bufferutil
       - supports-color
       - utf-8-validate
 
-  '@nomicfoundation/ignition-ui@3.1.0': {}
+  '@nomicfoundation/ignition-ui@3.1.1': {}
 
   '@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.2':
     optional: true
@@ -2950,7 +2975,7 @@ snapshots:
   '@typechain/ethers-v6@0.5.1(ethers@6.16.0)(typechain@8.3.2(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
       ethers: 6.16.0
-      lodash: 4.17.23
+      lodash: 4.18.1
       ts-essentials: 7.0.3(typescript@5.9.3)
       typechain: 8.3.2(typescript@5.9.3)
       typescript: 5.9.3
@@ -3759,13 +3784,13 @@ snapshots:
     dependencies:
       p-locate: 5.0.0
 
-  lodash-es@4.17.23: {}
+  lodash-es@4.18.1: {}
 
   lodash.camelcase@4.3.0: {}
 
   lodash.startcase@4.4.0: {}
 
-  lodash@4.17.23: {}
+  lodash@4.18.1: {}
 
   log-symbols@4.1.0:
     dependencies:
@@ -4169,7 +4194,7 @@ snapshots:
       fs-extra: 7.0.1
       glob: 7.1.7
       js-sha3: 0.8.0
-      lodash: 4.17.23
+      lodash: 4.18.1
       mkdirp: 1.0.4
       prettier: 2.8.8
       ts-command-line-args: 2.5.1
